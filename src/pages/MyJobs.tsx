@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
+import { WorkReport } from '../types';
 import { 
   Calendar, 
   MapPin, 
@@ -12,22 +13,12 @@ import {
   AlertCircle,
   CheckCircle2,
   Circle,
-  User
+  User,
+  Hash,
+  Search,
+  Filter
 } from 'lucide-react';
 import { clsx } from 'clsx';
-
-interface WorkReport {
-  id: string;
-  work_date: string;
-  customer_name: string;
-  origin: string;
-  destination: string;
-  car_id: any;
-  driver_id: any;
-  status: string;
-  mileage_start: number;
-  mileage_end: number;
-}
 
 export const MyJobs: React.FC = () => {
   const { t } = useTranslation();
@@ -38,6 +29,7 @@ export const MyJobs: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const userEmail = localStorage.getItem('user_email');
   const userRole = localStorage.getItem('user_role') || 'Driver';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
@@ -100,7 +92,19 @@ export const MyJobs: React.FC = () => {
     fetchMyJobs();
   }, []);
 
-  const sortedReports = [...reports].sort((a, b) => {
+  const filteredReports = reports.filter(r => {
+    // Only show active jobs (not completed or cancelled)
+    if (r.status === 'completed' || r.status === 'cancelled') return false;
+
+    const search = searchTerm.toLowerCase();
+    const customer = (r.customer_name || '').toLowerCase();
+    const origin = (r.origin || '').toLowerCase();
+    const dest = (r.destination || '').toLowerCase();
+    const car = typeof r.car_id === 'object' ? r.car_id.car_number.toLowerCase() : '';
+    const caseNum = (r.case_number || '').toLowerCase();
+    
+    return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
+  }).sort((a, b) => {
     const getStatusWeight = (status: string) => {
       switch (status) {
         case 'pending': return 0;
@@ -112,19 +116,19 @@ export const MyJobs: React.FC = () => {
       }
     };
 
-    const weightA = getStatusWeight(a.status);
-    const weightB = getStatusWeight(b.status);
+    const weightA = getStatusWeight(a.status || 'pending');
+    const weightB = getStatusWeight(b.status || 'pending');
 
     if (weightA !== weightB) {
       return weightA - weightB;
     }
 
     // Tie-breaker: newest date first
-    return new Date(b.work_date).getTime() - new Date(a.work_date).getTime();
+    return new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime();
   });
 
-  const totalPages = Math.ceil(sortedReports.length / itemsPerPage);
-  const paginatedReports = sortedReports.slice(
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+  const paginatedReports = filteredReports.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -156,7 +160,7 @@ export const MyJobs: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-12">
+    <div className="max-w-6xl mx-auto pb-12">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-900">
           {isAdmin ? t('all_jobs') : t('my_assigned_jobs')}
@@ -189,74 +193,112 @@ export const MyJobs: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="space-y-4">
-            {paginatedReports.map((report) => {
-              const isCompleted = report.mileage_end > 0;
-              return (
-                <button
-                  key={report.id}
-                  onClick={() => navigate(`/jobs/edit/${report.id}`)}
-                  className="w-full text-left bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-3 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={clsx(
-                          "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                          report.status === 'completed' ? "bg-emerald-100 text-emerald-700" : 
-                          report.status === 'accepted' ? "bg-blue-100 text-blue-700" :
-                          report.status === 'cancelled' ? "bg-red-100 text-red-700" :
-                          report.status === 'cancel_pending' ? "bg-orange-100 text-orange-700 border border-orange-200" :
-                          "bg-slate-100 text-slate-700"
-                        )}>
-                          {t(`status_${report.status || 'pending'}`)}
-                        </span>
-                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {report.work_date}
-                        </span>
-                      </div>
-                      
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-primary transition-colors">
-                          {report.customer_name}
-                        </h3>
-                        <div className="flex items-center gap-2 text-slate-500 text-sm mt-1">
-                          <MapPin className="w-3 h-3" />
-                          <span>{report.origin}</span>
-                          <ChevronRight className="w-3 h-3" />
-                          <span>{report.destination}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 pt-2 border-t border-slate-50">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                          <Truck className="w-3.5 h-3.5 text-slate-400" />
-                          {report.car_id?.car_number || t('no_vehicle')}
-                        </div>
-                        {isAdmin && report.driver_id && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                            <User className="w-3.5 h-3.5 text-slate-400" />
-                            {typeof report.driver_id === 'object' 
-                              ? `${report.driver_id.first_name} ${report.driver_id.last_name}`
-                              : report.driver_id}
-                          </div>
-                        )}
-                        {isCompleted && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 ml-auto">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {t('done')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder={t('search_jobs_placeholder')}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
+                <Filter className="w-4 h-4" />
+                {t('total')}: {filteredReports.length}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number') || 'Case No.'}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('status')}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('date')}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('route')}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('vehicle')}</th>
+                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>}
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedReports.map((report) => {
+                    const car = typeof report.car_id === 'object' ? report.car_id : null;
+                    const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
                     
-                    <div className="self-center p-2 bg-slate-50 rounded-xl group-hover:bg-primary group-hover:text-white transition-all">
-                      <ChevronRight className="w-5 h-5" />
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                    return (
+                      <tr 
+                        key={report.id} 
+                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                        onClick={() => navigate(`/jobs/edit/${report.id}`)}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Hash className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="font-mono text-sm font-bold text-slate-700">
+                              {report.case_number || '-'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={clsx(
+                            "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block",
+                            report.status === 'completed' ? "bg-emerald-100 text-emerald-700" : 
+                            report.status === 'accepted' ? "bg-blue-100 text-blue-700" :
+                            report.status === 'cancelled' ? "bg-red-100 text-red-700" :
+                            report.status === 'cancel_pending' ? "bg-orange-100 text-orange-700 border border-orange-200" :
+                            "bg-slate-100 text-slate-700"
+                          )}>
+                            {t(`status_${report.status || 'pending'}`)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {(report.work_date || report.date_created || '').split('T')[0].split(' ')[0]}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors">
+                            {report.customer_name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="truncate max-w-[100px]">{report.origin}</span>
+                            <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate max-w-[100px]">{report.destination}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                            <Truck className="w-3.5 h-3.5 text-slate-400" />
+                            {car?.car_number || t('no_vehicle')}
+                          </div>
+                        </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                              <User className="w-3.5 h-3.5 text-slate-400" />
+                              {driver ? `${driver.first_name} ${driver.last_name}` : '-'}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-6 py-4 text-right">
+                          <div className="p-1.5 bg-slate-50 rounded-lg group-hover:bg-primary group-hover:text-white transition-all inline-block">
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {totalPages > 1 && (

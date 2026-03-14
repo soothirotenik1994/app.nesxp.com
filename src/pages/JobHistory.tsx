@@ -65,9 +65,10 @@ export const JobHistory: React.FC = () => {
     const accountSource = driver?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
     const driverName = driver ? `${driver.first_name} ${driver.last_name} ${accountSource}` : report.driver_id;
     
-    const workDate = report.work_date ? report.work_date.split(' ')[0] : '';
+    const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     
-    return `📅 ${t('report_date')} : ${workDate}
+    return `🆔 ${t('case_number') || 'Case No.'} : ${report.case_number || '-'}
+📅 ${t('report_date')} : ${workDate}
 📁 ${t('customer_name')} : ${report.customer_name}
 
 📍 ${t('origin')} : ${report.origin}
@@ -89,13 +90,17 @@ export const JobHistory: React.FC = () => {
   };
 
   const filteredReports = reports.filter(r => {
+    // Only show finished jobs (completed or cancelled)
+    if (r.status !== 'completed' && r.status !== 'cancelled') return false;
+
     const search = searchTerm.toLowerCase();
     const customer = (r.customer_name || '').toLowerCase();
     const origin = (r.origin || '').toLowerCase();
     const dest = (r.destination || '').toLowerCase();
     const car = typeof r.car_id === 'object' ? r.car_id.car_number.toLowerCase() : '';
+    const caseNum = (r.case_number || '').toLowerCase();
     
-    return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search);
+    return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
   }).sort((a, b) => {
     const getStatusWeight = (status: string) => {
       switch (status) {
@@ -151,139 +156,141 @@ export const JobHistory: React.FC = () => {
           </div>
         </div>
 
-        <div className="divide-y divide-slate-100">
-          {loading ? (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-              <p className="text-slate-500">{t('loading_history')}</p>
-            </div>
-          ) : filteredReports.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              {t('no_reports_found')}
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {paginatedReports.map((report) => {
-                const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
-                
-                return (
-                  <div key={report.id} className="p-6 hover:bg-slate-50 transition-colors group">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-blue-100 text-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" />
-                            {format(new Date(report.work_date), 'MMM dd, yyyy')}
-                          </div>
-                          <div className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
-                            <Truck className="w-3 h-3" />
-                            {typeof report.car_id === 'object' ? report.car_id.car_number : 'N/A'}
-                          </div>
-                          <div className={clsx(
-                            "px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5",
-                            report.status === 'completed' ? "bg-emerald-100 text-emerald-700" : 
-                            report.status === 'accepted' ? "bg-blue-50 text-blue-600" :
-                            report.status === 'cancelled' ? "bg-red-100 text-red-700" :
-                            report.status === 'cancel_pending' ? "bg-orange-50 text-orange-600 border border-orange-100" :
-                            "bg-slate-100 text-slate-700"
-                          )}>
-                            {t(`status_${report.status || 'pending'}`)}
-                          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number') || 'Case No.'}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('date')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('route')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('vehicle')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="p-12 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-slate-500">{t('loading_history')}</p>
+                  </td>
+                </tr>
+              ) : filteredReports.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-12 text-center text-slate-400">
+                    {t('no_reports_found')}
+                  </td>
+                </tr>
+              ) : (
+                paginatedReports.map((report) => {
+                  const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
+                  const car = typeof report.car_id === 'object' ? report.car_id : null;
+                  
+                  return (
+                    <tr key={report.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-slate-700">
+                            {report.case_number || '-'}
+                          </span>
                         </div>
-
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-900">{report.customer_name}</h3>
-                          <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-slate-500">
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-4 h-4 text-slate-400" />
-                              <span>{report.origin}</span>
-                              <ChevronRight className="w-3 h-3 mx-1" />
-                              <span>{report.destination}</span>
-                            </div>
-                          </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={clsx(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block",
+                          report.status === 'completed' ? "bg-emerald-100 text-emerald-700" : 
+                          report.status === 'accepted' ? "bg-blue-50 text-blue-600" :
+                          report.status === 'cancelled' ? "bg-red-100 text-red-700" :
+                          report.status === 'cancel_pending' ? "bg-orange-50 text-orange-600 border border-orange-100" :
+                          "bg-slate-100 text-slate-700"
+                        )}>
+                          {t(`status_${report.status || 'pending'}`)}
                         </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('times')}</p>
-                            <div className="flex items-center gap-1 text-xs font-medium text-slate-700">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              {formatTimeDisplay(report.standby_time)} - {formatTimeDisplay(report.arrival_time)}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('mileage')}</p>
-                            <div className="flex items-center gap-1 text-xs font-medium text-slate-700">
-                              <Gauge className="w-3 h-3 text-slate-400" />
-                              {report.mileage_start} → {report.mileage_end}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('driver_name')}</p>
-                            <p className="text-xs font-medium text-slate-700">
-                              {driver ? `${driver.first_name} ${driver.last_name} ${driver.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)'}` : 'N/A'}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('photos')}</p>
-                            <p className="text-xs font-medium text-slate-700">
-                              {report.photos?.length || 0} {t('photos')}
-                            </p>
-                          </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {format(new Date(report.work_date || report.date_created || Date.now()), 'MMM dd, yyyy')}
                         </div>
-                      </div>
-
-                        <div className="flex items-center gap-2 lg:self-start">
-                          <button 
-                            onClick={() => setSelectedReport(report)}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
-                          >
-                            <FileText className="w-4 h-4" />
-                            {t('view_report')}
-                          </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900 text-sm">
+                          {report.customer_name}
                         </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {totalPages > 1 && (
-                <div className="p-6 border-t border-slate-100 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5 rotate-180" />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={clsx(
-                          "w-10 h-10 rounded-xl font-bold text-sm transition-all",
-                          currentPage === page 
-                            ? "bg-primary text-white shadow-lg shadow-blue-100" 
-                            : "text-slate-500 hover:bg-slate-50"
-                        )}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="truncate max-w-[100px]">{report.origin}</span>
+                          <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate max-w-[100px]">{report.destination}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                          <Truck className="w-3.5 h-3.5 text-slate-400" />
+                          {car?.car_number || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs font-medium text-slate-700">
+                          {driver ? `${driver.first_name} ${driver.last_name}` : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => setSelectedReport(report)}
+                          className="p-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all"
+                          title={t('view_report')}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="p-6 border-t border-slate-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 rotate-180" />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={clsx(
+                    "w-10 h-10 rounded-xl font-bold text-sm transition-all",
+                    currentPage === page 
+                      ? "bg-primary text-white shadow-lg shadow-blue-100" 
+                      : "text-slate-500 hover:bg-slate-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Report Modal */}

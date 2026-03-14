@@ -13,6 +13,7 @@ import {
   Truck, 
   User, 
   Phone, 
+  Hash,
   Clock, 
   Gauge, 
   FileText, 
@@ -49,6 +50,7 @@ export const JobReport: React.FC = () => {
   const [cancelReasonInput, setCancelReasonInput] = useState('');
 
   const [formData, setFormData] = useState({
+    case_number: '',
     work_date: new Date().toISOString().split('T')[0],
     customer_name: '',
     origin: '',
@@ -65,6 +67,44 @@ export const JobReport: React.FC = () => {
     status: 'pending',
     cancel_reason: ''
   });
+
+  const generateNextCaseNumber = async (dateStr: string) => {
+    try {
+      // dateStr is YYYY-MM-DD
+      const datePart = dateStr.replace(/-/g, ''); // YYYYMMDD
+      
+      const response = await api.get('/items/work_reports', {
+        params: {
+          filter: {
+            case_number: { _starts_with: datePart }
+          },
+          sort: '-case_number',
+          limit: 1,
+          fields: 'case_number'
+        }
+      });
+
+      const lastReport = response.data.data[0];
+      let nextSeq = 1;
+
+      if (lastReport && lastReport.case_number) {
+        const parts = lastReport.case_number.split('-');
+        if (parts.length === 2) {
+          const lastSeq = parseInt(parts[1], 10);
+          if (!isNaN(lastSeq)) {
+            nextSeq = lastSeq + 1;
+          }
+        }
+      }
+
+      const seqPart = String(nextSeq).padStart(3, '0');
+      return `${datePart}-${seqPart}`;
+    } catch (err) {
+      console.error('Error generating case number:', err);
+      const datePart = dateStr.replace(/-/g, '');
+      return `${datePart}-001`; // Fallback
+    }
+  };
 
   const filteredCars = useMemo(() => {
     const memberId = localStorage.getItem('member_id');
@@ -187,7 +227,8 @@ export const JobReport: React.FC = () => {
           };
 
           const initialData = {
-            work_date: report.work_date ? report.work_date.split(' ')[0] : '',
+            case_number: report.case_number || '',
+            work_date: (report.work_date || report.date_created || '').split('T')[0].split(' ')[0],
             customer_name: report.customer_name || '',
             origin: report.origin || '',
             destination: report.destination || '',
@@ -213,18 +254,24 @@ export const JobReport: React.FC = () => {
             const previews = photoIds.map((fileId: string) => `${import.meta.env.VITE_DIRECTUS_URL}/assets/${fileId}`);
             setPhotoPreviews(previews);
           }
-        } else if (!isAdmin) {
-          // Pre-fill driver_id for new reports if user is a driver
-          const memberId = localStorage.getItem('member_id');
-          const userPhone = localStorage.getItem('user_phone');
-          if (memberId) {
-            const member = membersData.find(m => String(m.id) === String(memberId));
-            const memberPhone = member?.phone || (member as any)?.Phone || (member as any)?.phone_number || userPhone || '';
-            setFormData(prev => ({
-              ...prev,
-              driver_id: memberId,
-              phone: memberPhone || prev.phone
-            }));
+        } else {
+          // New report: Generate case number
+          const nextCaseNumber = await generateNextCaseNumber(formData.work_date);
+          setFormData(prev => ({ ...prev, case_number: nextCaseNumber }));
+
+          if (!isAdmin) {
+            // Pre-fill driver_id for new reports if user is a driver
+            const memberId = localStorage.getItem('member_id');
+            const userPhone = localStorage.getItem('user_phone');
+            if (memberId) {
+              const member = membersData.find(m => String(m.id) === String(memberId));
+              const memberPhone = member?.phone || (member as any)?.Phone || (member as any)?.phone_number || userPhone || '';
+              setFormData(prev => ({
+                ...prev,
+                driver_id: memberId,
+                phone: memberPhone || prev.phone
+              }));
+            }
           }
         }
       } catch (error) {
@@ -340,6 +387,7 @@ export const JobReport: React.FC = () => {
         reportData.notes = formData.notes;
       }
 
+      if (formData.case_number) reportData.case_number = formData.case_number;
       if (!id || isAdmin) {
         // New report OR Admin can edit everything
         // For new reports, we include the basic info
@@ -1106,6 +1154,22 @@ export const JobReport: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Hash className="w-4 h-4" /> {t('case_number') || 'Case Number'}
+              </label>
+              <input 
+                type="text" 
+                placeholder="YYYYMMDD-XXX"
+                disabled={!!id && !isAdmin}
+                value={formData.case_number}
+                onChange={e => setFormData({...formData, case_number: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> {t('report_date')}
               </label>
               <input 
@@ -1113,13 +1177,21 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 value={formData.work_date}
-                onChange={e => setFormData({...formData, work_date: e.target.value})}
+                onChange={async (e) => {
+                  const newDate = e.target.value;
+                  setFormData(prev => ({ ...prev, work_date: newDate }));
+                  if (!id) {
+                    const nextCaseNumber = await generateNextCaseNumber(newDate);
+                    setFormData(prev => ({ ...prev, case_number: nextCaseNumber }));
+                  }
+                }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
             </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> {t('customer_name')}

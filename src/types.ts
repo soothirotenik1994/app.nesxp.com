@@ -74,6 +74,7 @@ export interface CustomerLocation {
 
 export interface WorkReport {
   id: string;
+  case_number?: string;
   work_date: string;
   customer_name: string;
   origin: string;

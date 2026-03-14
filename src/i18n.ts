@@ -5,6 +5,11 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 const resources = {
   en: {
     translation: {
+      "case_number": "Case Number",
+      "route": "Route",
+      "vehicle": "Vehicle",
+      "date": "Date",
+      "total": "Total",
       "dashboard": "Dashboard",
       "vehicles": "Vehicles",
       "members": "Members",
@@ -297,6 +302,11 @@ const resources = {
       "first_name": "ชื่อ",
       "last_name": "นามสกุล",
       "email": "อีเมล",
+      "case_number": "เลขที่เคส",
+      "route": "เส้นทาง",
+      "vehicle": "ทะเบียนรถ",
+      "date": "วันที่",
+      "total": "ทั้งหมด",
       "phone": "เบอร์โทร",
       "line_id": "LINE User ID",
       "cancel": "ยกเลิก",
