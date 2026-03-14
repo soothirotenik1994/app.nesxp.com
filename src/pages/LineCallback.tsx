@@ -1,0 +1,154 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { directusApi, setAuthToken } from '../api/directus';
+
+export const LineCallback: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('Processing LINE login...');
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const errorParam = searchParams.get('error');
+
+      if (errorParam) {
+        setError(`LINE Login Error: ${errorParam}`);
+        return;
+      }
+
+      if (!code) {
+        setError('No authorization code received');
+        return;
+      }
+
+      try {
+        setStatus('Exchanging code for token...');
+        // Exchange code for token via our server proxy
+        const tokenResponse = await axios.post('/api/auth/line/token', {
+          code,
+          redirect_uri: import.meta.env.VITE_LINE_REDIRECT_URI || `${window.location.origin}/line/callback`
+        });
+
+        const { id_token, access_token } = tokenResponse.data;
+
+        setStatus('Fetching LINE profile...');
+        // Get user profile from LINE
+        const profileResponse = await axios.get('https://api.line.me/v2/profile', {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+
+        const lineProfile = profileResponse.data;
+        const lineUserId = lineProfile.userId;
+
+        setStatus('Finding member profile...');
+        // Search for member in Directus by line_user_id
+        const members = await directusApi.getMembers();
+        let member = members.find(m => m.line_user_id === lineUserId);
+
+        if (!member) {
+          // Try to get email from id_token
+          let email = '';
+          try {
+            if (id_token) {
+              // Decode JWT payload
+              const base64Url = id_token.split('.')[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+              }).join(''));
+              
+              const payload = JSON.parse(jsonPayload);
+              email = payload.email || '';
+            }
+          } catch (e) {
+            console.warn('Failed to decode id_token:', e);
+          }
+
+          // If not found by line_user_id, try by email
+          if (email) {
+            member = members.find(m => m.email === email);
+            if (member) {
+              // Link LINE account to existing member
+              setStatus('Linking LINE account...');
+              member = await directusApi.updateMember(member.id, {
+                line_user_id: lineUserId,
+                picture_url: lineProfile.pictureUrl,
+                display_name: lineProfile.displayName
+              });
+            }
+          }
+
+          if (!member) {
+            // Auto-register as Customer (Requirement: First time must be 'customer')
+            setStatus('Registering new account...');
+            member = await directusApi.createMember({
+              line_user_id: lineUserId,
+              display_name: lineProfile.displayName,
+              picture_url: lineProfile.pictureUrl,
+              first_name: lineProfile.displayName,
+              last_name: '',
+              email: email,
+              role: 'customer',
+              phone: ''
+            });
+          }
+        }
+
+        setStatus('Logging in...');
+        // Use the role from the member profile, default to 'Customer'
+        const role = member.role || 'Customer';
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('user_name', member.display_name || `${member.first_name} ${member.last_name}`);
+        localStorage.setItem('user_email', member.email || '');
+        localStorage.setItem('user_phone', member.phone || (member as any).Phone || '');
+        localStorage.setItem('line_user_id', lineUserId);
+        localStorage.setItem('member_id', member.id);
+        
+        // If we have a picture, save it
+        if (member.picture_url) {
+          localStorage.setItem('user_picture', member.picture_url);
+        }
+
+        navigate('/jobs/my');
+      } catch (err: any) {
+        console.error('LINE Callback Error:', err);
+        setError(err.response?.data?.error || err.message || 'An error occurred during LINE login');
+      }
+    };
+
+    handleCallback();
+  }, [searchParams, navigate]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl text-center">
+        {error ? (
+          <>
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Login Failed</h2>
+            <p className="text-slate-500 mb-6">{error}</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full bg-slate-900 text-white py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors"
+            >
+              Back to Login
+            </button>
+          </>
+        ) : (
+          <>
+            <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Authenticating</h2>
+            <p className="text-slate-500">{status}</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
