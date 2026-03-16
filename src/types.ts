@@ -20,6 +20,7 @@ export interface Member {
 export interface Car {
   id: string;
   car_number: string;
+  vehicle_type?: string;
   description: string;
   owner_name?: string;
   driver_phone?: string;
@@ -69,27 +70,51 @@ export interface CustomerLocation {
   email?: string;
   address?: string;
   branch?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  member_id?: string | Member;
+  members?: {
+    line_user_id: Member;
+  }[];
   date_created?: string;
 }
 
 export interface WorkReport {
   id: string;
-  case_number?: string;
+  UUID?: string;
   work_date: string;
   customer_name: string;
+  customer_contact_name?: string;
+  customer_contact_phone?: string;
   origin: string;
+  origin_lat?: number;
+  origin_lng?: number;
   destination: string;
+  destination_lat?: number;
+  destination_lng?: number;
+  vehicle_type?: string;
   car_id: string | Car;
   driver_id: string | Member;
+  customer_id?: string | CustomerLocation;
   phone: string;
   standby_time: string;
   departure_time: string;
   arrival_time: string;
-  mileage_yard: number;
-  mileage_start: number;
-  mileage_end: number;
+  mileage_start?: number;
+  mileage_end?: number;
   notes?: string;
   photos?: string[];
+  photo_metadata?: {
+    file_id: string;
+    latitude?: number;
+    longitude?: number;
+    timestamp?: string;
+  }[];
   status?: 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending';
   date_created?: string;
+  status_logs?: {
+    status: string;
+    timestamp: string;
+    notes?: string;
+  }[];
 }

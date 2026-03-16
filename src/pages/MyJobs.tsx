@@ -53,16 +53,37 @@ export const MyJobs: React.FC = () => {
         // Admin sees everything, no need to check line_users
         myReports = allReports;
       } else {
-        // Driver needs to find their member profile
+        // Find member profile
         const members = await directusApi.getMembers();
         const currentMember = members.find(m => m.email === userEmail);
 
         if (currentMember) {
-          // Driver sees only their own
-          myReports = allReports.filter(r => {
-            const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-            return String(driverId) === String(currentMember.id);
-          });
+          if (currentMember.role === 'customer') {
+            // Customer sees reports linked to their customer locations
+            myReports = allReports.filter(r => {
+              const customerLoc = typeof r.customer_id === 'object' ? r.customer_id : null;
+              if (!customerLoc) return false;
+              
+              const memberIds: string[] = [];
+              const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+              if (primaryId) memberIds.push(String(primaryId));
+              
+              if (customerLoc.members && Array.isArray(customerLoc.members)) {
+                customerLoc.members.forEach((m: any) => {
+                  const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                  if (id) memberIds.push(String(id));
+                });
+              }
+                
+              return memberIds.includes(String(currentMember.id));
+            });
+          } else {
+            // Driver sees only their own
+            myReports = allReports.filter(r => {
+              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+              return String(driverId) === String(currentMember.id);
+            });
+          }
         } else {
           // Not an admin and no member profile found
           setProfileMissing(true);
@@ -97,11 +118,11 @@ export const MyJobs: React.FC = () => {
     if (r.status === 'completed' || r.status === 'cancelled') return false;
 
     const search = searchTerm.toLowerCase();
-    const customer = (r.customer_name || '').toLowerCase();
-    const origin = (r.origin || '').toLowerCase();
-    const dest = (r.destination || '').toLowerCase();
-    const car = typeof r.car_id === 'object' ? r.car_id.car_number.toLowerCase() : '';
-    const caseNum = (r.case_number || '').toLowerCase();
+    const customer = String(r.customer_name || '').toLowerCase();
+    const origin = String(r.origin || '').toLowerCase();
+    const dest = String(r.destination || '').toLowerCase();
+    const car = typeof r.car_id === 'object' ? String(r.car_id.car_number || '').toLowerCase() : '';
+    const caseNum = String(r.id || '').toLowerCase();
     
     return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
   }).sort((a, b) => {
@@ -239,7 +260,7 @@ export const MyJobs: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <Hash className="w-3.5 h-3.5 text-slate-400" />
                             <span className="font-mono text-sm font-bold text-slate-700">
-                              {report.case_number || '-'}
+                              {report.id || '-'}
                             </span>
                           </div>
                         </td>
@@ -265,6 +286,14 @@ export const MyJobs: React.FC = () => {
                           <div className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors">
                             {report.customer_name}
                           </div>
+                          {(report.customer_contact_name || report.customer_contact_phone) && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                              <User className="w-3 h-3 text-slate-400" />
+                              <span className="truncate max-w-[150px]">
+                                {report.customer_contact_name || '-'} {report.customer_contact_phone ? `(${report.customer_contact_phone})` : ''}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -275,9 +304,28 @@ export const MyJobs: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                            <Truck className="w-3.5 h-3.5 text-slate-400" />
-                            {car?.car_number || t('no_vehicle')}
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                              <Truck className="w-3.5 h-3.5 text-slate-400" />
+                              {car?.car_number || t('no_vehicle')}
+                              {car?.vehicle_type && (
+                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold ml-1">
+                                  {car.vehicle_type}
+                                </span>
+                              )}
+                            </div>
+                            {car?.car_number && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/?vehicle=${car.car_number}`);
+                                }}
+                                className="text-[10px] text-primary font-bold hover:underline flex items-center gap-1 mt-1"
+                              >
+                                <MapPin className="w-3 h-3" />
+                                GPS
+                              </button>
+                            )}
                           </div>
                         </td>
                         {isAdmin && (

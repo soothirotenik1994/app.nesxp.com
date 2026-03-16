@@ -267,7 +267,7 @@ export const directusApi = {
   getWorkReports: async (): Promise<any[]> => {
     const response = await api.get('/items/work_reports', {
       params: {
-        fields: '*,car_id.*,driver_id.*',
+        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*',
         sort: '-date_created'
       }
     });
@@ -277,7 +277,7 @@ export const directusApi = {
   getWorkReport: async (id: string): Promise<any> => {
     const response = await api.get(`/items/work_reports/${id}`, {
       params: {
-        fields: '*,car_id.*,driver_id.*'
+        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*'
       }
     });
     return response.data.data;
@@ -297,9 +297,19 @@ export const directusApi = {
     await api.delete(`/items/work_reports/${id}`);
   },
 
+  getCustomerLocation: async (id: string): Promise<any> => {
+    const response = await api.get(`/items/customer_locations/${id}`, {
+      params: {
+        fields: '*,member_id.*,members.*,members.line_user_id.*'
+      }
+    });
+    return response.data.data;
+  },
+
   getCustomerLocations: async (): Promise<any[]> => {
     const response = await api.get('/items/customer_locations', {
       params: {
+        fields: '*,member_id.*,members.*,members.line_user_id.*',
         sort: '-date_created'
       }
     });
@@ -318,6 +328,31 @@ export const directusApi = {
 
   deleteCustomerLocation: async (id: string): Promise<void> => {
     await api.delete(`/items/customer_locations/${id}`);
+  },
+
+  linkCarToMember: async (carId: string, memberId: string): Promise<any> => {
+    try {
+      // Check if already linked
+      const existing = await api.get('/items/car_users', {
+        params: {
+          filter: {
+            car_id: { _eq: carId },
+            line_user_id: { _eq: memberId }
+          }
+        }
+      });
+      
+      if (existing.data.data.length === 0) {
+        return await api.post('/items/car_users', {
+          car_id: carId,
+          line_user_id: memberId
+        });
+      }
+      return existing.data.data[0];
+    } catch (error) {
+      console.error('Error linking car to member:', error);
+      throw error;
+    }
   },
 
   getRoles: async (): Promise<any[]> => {

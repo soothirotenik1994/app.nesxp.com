@@ -20,6 +20,7 @@ export const Cars: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     car_number: '',
+    vehicle_type: '',
     description: '',
     owner_name: '',
     driver_phone: ''
@@ -84,6 +85,7 @@ export const Cars: React.FC = () => {
       setEditingCar(car);
       setFormData({
         car_number: car.car_number,
+        vehicle_type: car.vehicle_type || '',
         description: car.description,
         owner_name: car.owner_name || '',
         driver_phone: car.driver_phone || ''
@@ -92,6 +94,7 @@ export const Cars: React.FC = () => {
       setEditingCar(null);
       setFormData({
         car_number: '',
+        vehicle_type: '',
         description: '',
         owner_name: '',
         driver_phone: ''
@@ -137,9 +140,9 @@ export const Cars: React.FC = () => {
   };
 
   const filteredCars = cars.filter(c => {
-    const carNum = (c.car_number || '').toLowerCase();
-    const desc = (c.description || '').toLowerCase();
-    const owner = (c.owner_name || '').toLowerCase();
+    const carNum = String(c.car_number || '').toLowerCase();
+    const desc = String(c.description || '').toLowerCase();
+    const owner = String(c.owner_name || '').toLowerCase();
     const search = searchTerm.toLowerCase();
     
     return carNum.includes(search) || desc.includes(search) || owner.includes(search);
@@ -221,7 +224,14 @@ export const Cars: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">{car.car_number}</h3>
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-lg font-bold text-slate-900">{car.car_number}</h3>
+                    {car.vehicle_type && (
+                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                        {car.vehicle_type}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-2 space-y-2">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('driver_name')}</p>
@@ -274,7 +284,7 @@ export const Cars: React.FC = () => {
                               const name = member?.display_name || (member?.first_name ? `${member.first_name} ${member.last_name}` : t('unknown_car'));
                               return (
                                 <span 
-                                  key={cu.id || Math.random()}
+                                  key={(cu as any).id || Math.random()}
                                   className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
                                 >
                                   {name}
@@ -348,6 +358,16 @@ export const Cars: React.FC = () => {
                   onChange={(e) => setFormData({...formData, car_number: e.target.value})}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                   placeholder="3ฒธ2714"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('vehicle_type') || 'ประเภทรถ'}</label>
+                <input 
+                  type="text" 
+                  value={formData.vehicle_type}
+                  onChange={(e) => setFormData({...formData, vehicle_type: e.target.value})}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="4 ล้อตู้ทึบ"
                 />
               </div>
               <div className="space-y-1.5">

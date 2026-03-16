@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import Select from 'react-select';
+import usePlacesAutocomplete, {
+  getGeocode,
+  getLatLng,
+} from "use-places-autocomplete";
 import { directusApi, api } from '../api/directus';
 import { lineService } from '../services/lineService';
 import { Car, Member, CustomerLocation } from '../types';
 import clsx from 'clsx';
+import EXIF from 'exif-js';
 import { 
   Calendar, 
   Building2, 
@@ -21,14 +27,67 @@ import {
   Send, 
   Loader2, 
   CheckCircle2,
+  Circle,
   X,
   Plus,
   AlertCircle,
   Trash2,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  Package,
+  Weight,
+  Coins
 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+
+const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
+  const { t } = useTranslation();
+  const steps = [
+    { key: 'pending', label: t('status_pending') },
+    { key: 'accepted', label: t('status_accepted') },
+    { key: 'arrived', label: 'Arrived' },
+    { key: 'completed', label: t('status_completed') }
+  ];
+
+  const currentIdx = steps.findIndex(s => s.key === status);
+  const isCancelled = status === 'cancelled' || status === 'cancel_pending';
+
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      <div className="flex items-center justify-between relative">
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
+        {steps.map((step, idx) => {
+          const isActive = idx <= currentIdx && !isCancelled;
+          const isCurrent = idx === currentIdx && !isCancelled;
+          
+          return (
+            <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
+              <div className={clsx(
+                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
+                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100" : "bg-slate-100 text-slate-400",
+                isCurrent && "ring-4 ring-blue-50"
+              )}>
+                {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+              </div>
+              <span className={clsx(
+                "text-[10px] font-bold uppercase tracking-wider",
+                isActive ? "text-primary" : "text-slate-400"
+              )}>
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {isCancelled && (
+        <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          {status === 'cancel_pending' ? t('status_cancel_pending') : t('status_cancelled')}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const JobReport: React.FC = () => {
   const { t } = useTranslation();
@@ -50,13 +109,20 @@ export const JobReport: React.FC = () => {
   const [cancelReasonInput, setCancelReasonInput] = useState('');
 
   const [formData, setFormData] = useState({
-    case_number: '',
-    work_date: new Date().toISOString().split('T')[0],
+    work_date: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
     customer_name: '',
+    customer_contact_name: '',
+    customer_contact_phone: '',
     origin: '',
+    origin_lat: undefined as number | undefined,
+    origin_lng: undefined as number | undefined,
     destination: '',
+    destination_lat: undefined as number | undefined,
+    destination_lng: undefined as number | undefined,
+    vehicle_type: '',
     car_id: '',
     driver_id: '',
+    customer_id: '',
     phone: '',
     standby_time: '',
     departure_time: '',
@@ -64,47 +130,71 @@ export const JobReport: React.FC = () => {
     mileage_start: '',
     mileage_end: '',
     notes: '',
-    status: 'pending',
-    cancel_reason: ''
+    status: 'pending' as 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending',
+    cancel_reason: '',
+    status_logs: [] as any[],
+    photo_metadata: [] as any[]
   });
 
-  const generateNextCaseNumber = async (dateStr: string) => {
-    try {
-      // dateStr is YYYY-MM-DD
-      const datePart = dateStr.replace(/-/g, ''); // YYYYMMDD
-      
-      const response = await api.get('/items/work_reports', {
-        params: {
-          filter: {
-            case_number: { _starts_with: datePart }
-          },
-          sort: '-case_number',
-          limit: 1,
-          fields: 'case_number'
-        }
-      });
+  const [allReports, setAllReports] = useState<any[]>([]);
 
-      const lastReport = response.data.data[0];
-      let nextSeq = 1;
+  // Google Maps Autocomplete for Origin
+  const {
+    ready: originReady,
+    value: originValue,
+    suggestions: { status: originStatus, data: originData },
+    setValue: setOriginValue,
+    clearSuggestions: clearOriginSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      componentRestrictions: { country: "th" },
+    },
+    debounce: 300,
+  });
 
-      if (lastReport && lastReport.case_number) {
-        const parts = lastReport.case_number.split('-');
-        if (parts.length === 2) {
-          const lastSeq = parseInt(parts[1], 10);
-          if (!isNaN(lastSeq)) {
-            nextSeq = lastSeq + 1;
-          }
-        }
-      }
+  // Google Maps Autocomplete for Destination
+  const {
+    ready: destReady,
+    value: destValue,
+    suggestions: { status: destStatus, data: destData },
+    setValue: setDestValue,
+    clearSuggestions: clearDestSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      componentRestrictions: { country: "th" },
+    },
+    debounce: 300,
+  });
 
-      const seqPart = String(nextSeq).padStart(3, '0');
-      return `${datePart}-${seqPart}`;
-    } catch (err) {
-      console.error('Error generating case number:', err);
-      const datePart = dateStr.replace(/-/g, '');
-      return `${datePart}-001`; // Fallback
-    }
+  useEffect(() => {
+    if (formData.origin) setOriginValue(formData.origin, false);
+    if (formData.destination) setDestValue(formData.destination, false);
+  }, [formData.origin, formData.destination]);
+
+  const isDriverBusy = (driverId: string) => {
+    return allReports.some(r => 
+      String(r.driver_id?.id || r.driver_id) === String(driverId) && 
+      !['completed', 'cancelled'].includes(r.status) &&
+      String(r.id) !== String(id)
+    );
   };
+
+  const getLastMileage = (carId: string) => {
+    const carReports = allReports
+      .filter(r => String(r.car_id?.id || r.car_id) === String(carId) && r.status === 'completed')
+      .sort((a, b) => new Date(b.arrival_time || b.date_created).getTime() - new Date(a.arrival_time || a.date_created).getTime());
+    
+    return carReports.length > 0 ? carReports[0].mileage_end : 0;
+  };
+
+  const totalDistance = useMemo(() => {
+    const start = parseFloat(formData.mileage_start);
+    const end = parseFloat(formData.mileage_end);
+    if (!isNaN(start) && !isNaN(end)) {
+      return end - start;
+    }
+    return 0;
+  }, [formData.mileage_start, formData.mileage_end]);
 
   const filteredCars = useMemo(() => {
     const memberId = localStorage.getItem('member_id');
@@ -162,10 +252,18 @@ export const JobReport: React.FC = () => {
     message: string;
     action?: () => void;
   }>({ type: 'success', title: '', message: '' });
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
-  const [initialValues, setInitialValues] = useState<any>({});
+  const [initialValues, setInitialValues] = useState<any>({
+    standby_time: '',
+    departure_time: '',
+    arrival_time: '',
+    mileage_start: '',
+    mileage_end: '',
+    customer_contact_name: '',
+    customer_contact_phone: ''
+  });
   
   useEffect(() => {
     // No redirect needed here, permissions are handled by the backend
@@ -181,24 +279,28 @@ export const JobReport: React.FC = () => {
         let customersData = [];
 
         try {
-          const [c, m, cl] = await Promise.all([
+          const [c, m, cl, ar] = await Promise.all([
             directusApi.getCars(),
             directusApi.getMembers(),
-            directusApi.getCustomerLocations()
+            directusApi.getCustomerLocations(),
+            api.get('/items/work_reports', { params: { limit: -1 } }).then(res => res.data.data)
           ]);
           carsData = c;
           membersData = m;
           customersData = cl;
+          setAllReports(ar);
         } catch (fetchErr: any) {
           console.error('Initial fetch error in JobReport:', fetchErr);
           // If members fail but user is admin, we might still want to see the form
           if (fetchErr.message?.includes('line_users')) {
-            const [c, cl] = await Promise.all([
+            const [c, cl, ar] = await Promise.all([
               directusApi.getCars(),
-              directusApi.getCustomerLocations()
+              directusApi.getCustomerLocations(),
+              api.get('/items/work_reports', { params: { limit: -1 } }).then(res => res.data.data)
             ]);
             carsData = c;
             customersData = cl;
+            setAllReports(ar);
           } else {
             throw fetchErr;
           }
@@ -227,13 +329,20 @@ export const JobReport: React.FC = () => {
           };
 
           const initialData = {
-            case_number: report.case_number || '',
-            work_date: (report.work_date || report.date_created || '').split('T')[0].split(' ')[0],
-            customer_name: report.customer_name || '',
+            work_date: formatTimeForInput(report.work_date || report.date_created),
+            customer_name: report.customer_name || report.customer_id?.company_name || '',
+            customer_contact_name: report.customer_contact_name || report.customer_id?.contact_name || '',
+            customer_contact_phone: report.customer_contact_phone || report.customer_id?.contact_phone || '',
             origin: report.origin || '',
+            origin_lat: report.origin_lat,
+            origin_lng: report.origin_lng,
             destination: report.destination || '',
+            destination_lat: report.destination_lat,
+            destination_lng: report.destination_lng,
+            vehicle_type: report.vehicle_type || report.car_id?.vehicle_type || '',
             car_id: report.car_id?.id || report.car_id || '',
             driver_id: report.driver_id?.id || report.driver_id || '',
+            customer_id: report.customer_id?.id || report.customer_id || '',
             phone: report.phone || '',
             standby_time: formatTimeForInput(report.standby_time),
             departure_time: formatTimeForInput(report.departure_time),
@@ -242,7 +351,9 @@ export const JobReport: React.FC = () => {
             mileage_end: report.mileage_end !== null && report.mileage_end !== undefined ? report.mileage_end.toString() : '',
             notes: report.notes || '',
             status: report.status || 'pending',
-            cancel_reason: report.cancel_reason || ''
+            cancel_reason: report.cancel_reason || '',
+            status_logs: report.status_logs || [],
+            photo_metadata: report.photo_metadata || []
           };
           
           setFormData(initialData);
@@ -255,10 +366,6 @@ export const JobReport: React.FC = () => {
             setPhotoPreviews(previews);
           }
         } else {
-          // New report: Generate case number
-          const nextCaseNumber = await generateNextCaseNumber(formData.work_date);
-          setFormData(prev => ({ ...prev, case_number: nextCaseNumber }));
-
           if (!isAdmin) {
             // Pre-fill driver_id for new reports if user is a driver
             const memberId = localStorage.getItem('member_id');
@@ -298,13 +405,69 @@ export const JobReport: React.FC = () => {
     }
   }, [formData.driver_id, members]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files) as File[];
-      setPhotos(prev => [...prev, ...newFiles]);
-      
-      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
-      setPhotoPreviews(prev => [...prev, ...newPreviews]);
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setSubmitting(true);
+    try {
+      const newPhotos = [...photos];
+      const newPreviews = [...photoPreviews];
+
+      for (const file of files) {
+        // Extract EXIF data
+        const metadata: any = await new Promise((resolve) => {
+          EXIF.getData(file as any, function(this: any) {
+            const allMetadata = EXIF.getAllTags(this);
+            const lat = EXIF.getTag(this, "GPSLatitude");
+            const lon = EXIF.getTag(this, "GPSLongitude");
+            const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+            const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+            const timestamp = EXIF.getTag(this, "DateTimeOriginal") || EXIF.getTag(this, "DateTime");
+
+            let latitude = null;
+            let longitude = null;
+
+            if (lat && lat.length === 3) {
+              latitude = lat[0] + lat[1] / 60 + lat[2] / 3600;
+              if (latRef === "S") latitude = -latitude;
+            }
+
+            if (lon && lon.length === 3) {
+              longitude = lon[0] + lon[1] / 60 + lon[2] / 3600;
+              if (lonRef === "W") longitude = -longitude;
+            }
+
+            resolve({
+              latitude,
+              longitude,
+              timestamp,
+              all: allMetadata
+            });
+          });
+        });
+
+        const reader = new FileReader();
+        const previewUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        newPhotos.push({
+          file,
+          metadata,
+          preview: previewUrl
+        } as any);
+        newPreviews.push(previewUrl);
+      }
+
+      setPhotos(newPhotos);
+      setPhotoPreviews(newPreviews);
+    } catch (err) {
+      console.error("Error processing photos:", err);
+      setError("Error processing photos. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -343,12 +506,52 @@ export const JobReport: React.FC = () => {
     try {
       // 1. Upload new photos to Directus if any
       const uploadedPhotoIds: string[] = [];
+      const newPhotoMetadata: any[] = [];
+      
       if (photos.length > 0) {
-        for (const photo of photos) {
+        for (const photoObj of photos) {
           const formDataFile = new FormData();
-          formDataFile.append('file', photo);
+          formDataFile.append('file', photoObj.file);
           const response = await api.post('/files', formDataFile);
-          uploadedPhotoIds.push(response.data.data.id);
+          const fileId = response.data.data.id;
+          uploadedPhotoIds.push(fileId);
+          
+          if (photoObj.metadata) {
+            newPhotoMetadata.push({
+              file_id: fileId,
+              latitude: photoObj.metadata.latitude,
+              longitude: photoObj.metadata.longitude,
+              timestamp: photoObj.metadata.timestamp
+            });
+          }
+        }
+      }
+
+      // 1.6 Mandatory photos check for drivers
+      if (!isAdmin && id) {
+        const totalPhotos = (existingPhotos.length + uploadedPhotoIds.length);
+        if (totalPhotos < 2) {
+          setError(t('mandatory_photos_error'));
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // 1.7 Mileage validation check
+      if (formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id)) {
+        setError(t('mileage_less_than_previous', { mileage: getLastMileage(formData.car_id) }));
+        setSubmitting(false);
+        return;
+      }
+
+      // 1.8 Time validation: Arrival cannot be before Departure
+      if (formData.departure_time && formData.arrival_time) {
+        const departure = new Date(formData.departure_time).getTime();
+        const arrival = new Date(formData.arrival_time).getTime();
+        if (arrival < departure) {
+          setError(t('arrival_before_departure_error') || 'เวลาถึงต้องไม่น้อยกว่าเวลาออกเดินทาง');
+          setSubmitting(false);
+          return;
         }
       }
 
@@ -387,15 +590,16 @@ export const JobReport: React.FC = () => {
         reportData.notes = formData.notes;
       }
 
-      if (formData.case_number) reportData.case_number = formData.case_number;
       if (!id || isAdmin) {
         // New report OR Admin can edit everything
         // For new reports, we include the basic info
         if (formData.work_date) {
-        // If work_date is DateTime in Directus, we send it with 00:00:00
-        reportData.work_date = `${formData.work_date} 00:00:00`;
-      }
+          reportData.work_date = formatTime(formData.work_date);
+        }
         if (formData.customer_name) reportData.customer_name = formData.customer_name;
+        if (formData.customer_id) reportData.customer_id = formData.customer_id;
+        if (formData.customer_contact_name) reportData.customer_contact_name = formData.customer_contact_name;
+        if (formData.customer_contact_phone) reportData.customer_contact_phone = formData.customer_contact_phone;
         if (formData.origin) reportData.origin = formData.origin;
         if (formData.destination) reportData.destination = formData.destination;
         if (formData.phone) reportData.phone = formData.phone;
@@ -405,6 +609,7 @@ export const JobReport: React.FC = () => {
 
       if (uploadedPhotoIds.length > 0 || existingPhotos.length > 0) {
         reportData.photos = [...existingPhotos, ...uploadedPhotoIds];
+        reportData.photo_metadata = [...(formData.photo_metadata || []), ...newPhotoMetadata];
       }
       
       console.log('Submitting report data:', reportData);
@@ -413,6 +618,19 @@ export const JobReport: React.FC = () => {
         console.log('Updating existing report...');
         await directusApi.updateWorkReport(id, reportData);
         console.log('Update successful');
+
+        // Send notifications if status changed to completed
+        if (reportData.status === 'completed') {
+          console.log('Status changed to completed, triggering notifications and unassignment...');
+          try {
+            await sendCustomerStatusNotification('completed');
+            await sendDriverStatusNotification('completed');
+            await unassignCarFromCustomer();
+            console.log('Completion actions triggered successfully');
+          } catch (notifyErr) {
+            console.error('Error sending completion notifications/unassignment:', notifyErr);
+          }
+        }
         
         setStatusConfig({
           type: 'success',
@@ -446,7 +664,7 @@ export const JobReport: React.FC = () => {
             const messages = [
               {
                 type: "text",
-                text: `🔔 มีงานใหม่มอบหมายให้คุณ\n\n🏢 ลูกค้า: ${formData.customer_name}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}\n🚚 รถ: ${selectedCar?.car_number || ''}\n📅 วันที่: ${formData.work_date}`
+                text: `🔔 มีงานใหม่มอบหมายให้คุณ\n\n🆔 เคส: ${result.id || 'N/A'}\n🏢 ลูกค้า: ${formData.customer_name}\n👤 ผู้ติดต่อ: ${formData.customer_contact_name || '-'}\n📞 เบอร์ติดต่อ: ${formData.customer_contact_phone || '-'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}\n🚚 รถ: ${selectedCar?.car_number || ''}\n📅 วันที่: ${formData.work_date}`
               },
               {
                 type: "flex",
@@ -496,6 +714,26 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
+                                text: "🆔 เลขที่เคส",
+                                size: "sm",
+                                color: "#8c8c8c",
+                                flex: 1
+                              },
+                              {
+                                type: "text",
+                                text: String(result.id || 'N/A'),
+                                size: "sm",
+                                color: "#111111",
+                                flex: 3
+                              }
+                            ]
+                          },
+                          {
+                            type: "box",
+                            layout: "horizontal",
+                            contents: [
+                              {
+                                type: "text",
                                 text: "ทะเบียนรถ",
                                 size: "sm",
                                 color: "#8c8c8c",
@@ -524,6 +762,48 @@ export const JobReport: React.FC = () => {
                               {
                                 type: "text",
                                 text: formData.customer_name,
+                                size: "sm",
+                                color: "#111111",
+                                flex: 3,
+                                wrap: true
+                              }
+                            ]
+                          },
+                          {
+                            type: "box",
+                            layout: "horizontal",
+                            contents: [
+                              {
+                                type: "text",
+                                text: "ผู้ติดต่อ",
+                                size: "sm",
+                                color: "#8c8c8c",
+                                flex: 1
+                              },
+                              {
+                                type: "text",
+                                text: formData.customer_contact_name || '-',
+                                size: "sm",
+                                color: "#111111",
+                                flex: 3,
+                                wrap: true
+                              }
+                            ]
+                          },
+                          {
+                            type: "box",
+                            layout: "horizontal",
+                            contents: [
+                              {
+                                type: "text",
+                                text: "เบอร์ติดต่อ",
+                                size: "sm",
+                                color: "#8c8c8c",
+                                flex: 1
+                              },
+                              {
+                                type: "text",
+                                text: formData.customer_contact_phone || '-',
                                 size: "sm",
                                 color: "#111111",
                                 flex: 3,
@@ -666,6 +946,281 @@ export const JobReport: React.FC = () => {
           return; // Stop here to let the user see the error
         }
 
+        // Send LINE notification to customer and auto-link car
+        try {
+          const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false';
+          const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
+          if (customerLoc && customerLoc.member_id) {
+            const member = typeof customerLoc.member_id === 'object' 
+              ? customerLoc.member_id 
+              : members.find(m => String(m.id) === String(customerLoc.member_id));
+            
+            const memberId = member?.id;
+            const customerLineId = member?.line_user_id;
+
+            // 1. Auto-link car to customer member account
+            if (memberId && formData.car_id) {
+              await directusApi.linkCarToMember(formData.car_id, memberId);
+              console.log('Car auto-linked to customer member account');
+            }
+            
+            // 2. Send notification
+            if (notificationsEnabled && customerLineId) {
+              const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+              const driver = members.find(m => String(m.id) === String(formData.driver_id));
+              
+              const customerMessages = [
+                {
+                  type: "flex",
+                  altText: "🔔 Nationwide Express Tracker: แจ้งเตือนการจัดส่ง",
+                  contents: {
+                    type: "bubble",
+                    header: {
+                      type: "box",
+                      layout: "vertical",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "Nationwide Express Tracker",
+                          color: "#ffffff",
+                          weight: "bold",
+                          size: "sm"
+                        }
+                      ],
+                      backgroundColor: "#2c5494",
+                      paddingAll: "md"
+                    },
+                    body: {
+                      type: "box",
+                      layout: "vertical",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "แจ้งเตือนการส่งสินค้า",
+                          weight: "bold",
+                          size: "3xl",
+                          color: "#2c5494",
+                          margin: "md"
+                        },
+                        {
+                          type: "separator",
+                          margin: "md"
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          margin: "lg",
+                          spacing: "sm",
+                          contents: [
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "🆔 เลขที่เคส",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: String(result.id || 'N/A'),
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "🏢 บริษัท",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: formData.customer_name,
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5,
+                                  wrap: true
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "📦 สถานะ",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: "กำลังเตรียมการจัดส่ง",
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5,
+                                  weight: "bold"
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "📍 ต้นทาง",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: formData.origin,
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5,
+                                  wrap: true
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "🏁 ปลายทาง",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: formData.destination,
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5,
+                                  wrap: true
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "🚚 รถ",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: selectedCar?.car_number || 'N/A',
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "👤 คนขับ",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: driver ? `${driver.first_name} ${driver.last_name}` : '-',
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "📞 เบอร์คนขับ",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: driver?.phone || '-',
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "📅 วันที่",
+                                  size: "sm",
+                                  color: "#8c8c8c",
+                                  flex: 2
+                                },
+                                {
+                                  type: "text",
+                                  text: formData.work_date,
+                                  size: "sm",
+                                  color: "#111111",
+                                  flex: 5
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      paddingAll: "lg"
+                    }
+                  }
+                }
+              ];
+              
+              await axios.post('/api/line/send', {
+                to: customerLineId,
+                messages: customerMessages
+              });
+              console.log('Customer LINE notification sent');
+            }
+          }
+        } catch (err) {
+          console.error('Error in customer notification/linking:', err);
+        }
+
+        // If the new report is already completed, unassign car
+        if (reportData.status === 'completed') {
+          await unassignCarFromCustomer();
+        }
+
         setStatusConfig({
           type: 'success',
           title: t('save_success'),
@@ -691,12 +1246,568 @@ export const JobReport: React.FC = () => {
     }
   };
 
+  const handleReportProblem = async (type: 'delay' | 'accident') => {
+    try {
+      setSubmitting(true);
+      const driver = members.find(m => String(m.id) === String(formData.driver_id));
+      const driverName = driver ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
+      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+      
+      const message = `⚠️ รายงานปัญหาจากคนขับ\n\n👤 คนขับ: ${driverName}\n🚚 รถ: ${selectedCar?.car_number || 'N/A'}\n🆔 เคส: ${id || 'N/A'}\n🚩 ปัญหา: ${type === 'delay' ? 'ล่าช้า (Delay)' : 'อุบัติเหตุ (Accident)'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}`;
+      
+      // Send to Admin Group (via lineService if configured, or just log for now)
+      // In a real app, you'd have an admin group chat ID
+      await lineService.sendPushMessage('ADMIN_GROUP_ID_HERE', {
+        type: "text",
+        text: message
+      });
+
+      setStatusConfig({
+        type: 'success',
+        title: t('problem_report'),
+        message: t('save_success'),
+        action: () => setShowStatusModal(false)
+      });
+      setShowStatusModal(true);
+    } catch (err) {
+      console.error('Error reporting problem:', err);
+      setError('Failed to send report');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const sendCustomerStatusNotification = async (status: 'accepted' | 'completed') => {
+    try {
+      console.log(`Starting customer notification for status: ${status}, customer_id: ${formData.customer_id}`);
+      const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false';
+      if (!notificationsEnabled) {
+        console.log('Notifications disabled in localStorage');
+        return;
+      }
+
+      const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
+      if (!customerLoc) {
+        console.log('Customer location not found for ID:', formData.customer_id);
+        console.log('Available customer IDs:', customers.map(c => c.id));
+        return;
+      }
+      
+      const memberIds: string[] = [];
+      const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+      if (primaryId) memberIds.push(String(primaryId));
+      
+      if (customerLoc.members && Array.isArray(customerLoc.members)) {
+        customerLoc.members.forEach((m: any) => {
+          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+          if (id && !memberIds.includes(String(id))) {
+            memberIds.push(String(id));
+          }
+        });
+      }
+
+      if (memberIds.length === 0) {
+        console.log('Customer location has no members linked');
+        return;
+      }
+
+      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+      const driver = members.find(m => String(m.id) === String(formData.driver_id));
+      
+      const statusText = status === 'accepted' ? 'กำลังส่งสินค้า' : 'จัดส่งสินค้าสำเร็จ';
+      const headerColor = '#2c5494'; // NES Blue
+      const statusColor = '#e54d42'; // NES Red
+
+      // Send notification to each member
+      for (const memberId of memberIds) {
+        const member = members.find(m => String(m.id) === String(memberId));
+        const customerLineId = member?.line_user_id;
+        
+        if (!customerLineId) {
+          console.log('Customer LINE ID not found for member:', memberId);
+          continue;
+        }
+
+        const flexContents: any = {
+        type: "bubble",
+        header: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "Nationwide Express Tracker",
+              color: "#ffffff",
+              weight: "bold",
+              size: "sm"
+            }
+          ],
+          backgroundColor: headerColor,
+          paddingAll: "md"
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "แจ้งเตือนการส่งสินค้า",
+              weight: "bold",
+              size: "3xl",
+              color: statusColor,
+              margin: "md"
+            },
+            {
+              type: "separator",
+              margin: "md"
+            },
+            {
+              type: "box",
+              layout: "vertical",
+              margin: "lg",
+              spacing: "sm",
+              contents: [
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "🆔 เลขที่เคส",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(id || 'N/A'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "🏢 บริษัท",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(formData.customer_name || '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5,
+                      wrap: true
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "📦 สถานะ",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: statusText,
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5,
+                      weight: "bold"
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "📍 ต้นทาง",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(formData.origin || '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5,
+                      wrap: true
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "🏁 ปลายทาง",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(formData.destination || '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5,
+                      wrap: true
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "🚚 รถ",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(selectedCar?.car_number || 'N/A'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "👤 คนขับ",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "📞 เบอร์คนขับ",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(driver?.phone || '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "📅 วันที่",
+                      size: "sm",
+                      color: "#2c5494",
+                      flex: 2
+                    },
+                    {
+                      type: "text",
+                      text: String(formData.work_date || '-'),
+                      size: "sm",
+                      color: "#111111",
+                      flex: 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          paddingAll: "lg"
+        }
+      };
+
+      // Only add footer for 'accepted' status (กำลังส่งสินค้า)
+      if (status === 'accepted') {
+        flexContents.footer = {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "button",
+              style: "primary",
+              color: "#2c5494",
+              action: {
+                type: "message",
+                label: "รถของฉัน",
+                text: "รถของฉัน"
+              },
+              height: "md"
+            }
+          ],
+          paddingAll: "md"
+        };
+      }
+
+      const customerMessages = [
+        {
+          type: "flex",
+          altText: `🔔 Nationwide Express Tracker: ${statusText}`,
+          contents: flexContents
+        }
+      ];
+      
+      await axios.post('/api/line/send', {
+        to: customerLineId,
+        messages: customerMessages
+      });
+      console.log(`Customer LINE notification sent for status: ${status} to member: ${memberId}`);
+    }
+    console.log('All customer notifications sent');
+    } catch (err) {
+      console.error('Error sending customer status notification:', err);
+    }
+  };
+
+  const sendDriverStatusNotification = async (status: 'completed') => {
+    try {
+      console.log(`Starting driver notification for status: ${status}, driver_id: ${formData.driver_id}`);
+      const driver = members.find(m => String(m.id) === String(formData.driver_id));
+      const driverLineId = driver?.line_user_id;
+      
+      if (!driverLineId) {
+        console.log('Driver LINE ID not found, skipping notification. Driver ID:', formData.driver_id);
+        console.log('Driver details:', driver);
+        return;
+      }
+
+      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+      const statusText = 'จัดส่งงานสำเร็จแล้ว';
+      const headerColor = '#2c5494'; // NES Blue
+      const statusColor = '#e54d42'; // NES Red
+
+      const driverMessages = [
+        {
+          type: "flex",
+          altText: `🔔 Nationwide Express Tracker: ${statusText}`,
+          contents: {
+            type: "bubble",
+            header: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: "Nationwide Express Tracker",
+                  color: "#ffffff",
+                  weight: "bold",
+                  size: "sm"
+                }
+              ],
+              backgroundColor: headerColor,
+              paddingAll: "md"
+            },
+            body: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: statusText,
+                  weight: "bold",
+                  size: "xl",
+                  color: statusColor,
+                  margin: "md"
+                },
+                {
+                  type: "separator",
+                  margin: "md"
+                },
+                {
+                  type: "box",
+                  layout: "vertical",
+                  margin: "lg",
+                  spacing: "sm",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🆔 เลขที่เคส",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(id || 'N/A'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🚚 รถ",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(selectedCar?.car_number || 'N/A'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🏁 ปลายทาง",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(formData.destination || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5,
+                          wrap: true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              paddingAll: "lg"
+            }
+          }
+        }
+      ];
+
+      await axios.post('/api/line/send', {
+        to: driverLineId,
+        messages: driverMessages
+      });
+      console.log('Driver completion notification sent');
+    } catch (err) {
+      console.error('Error sending driver status notification:', err);
+    }
+  };
+
+  const unassignCarFromCustomer = async () => {
+    try {
+      if (!formData.customer_id || !formData.car_id) return;
+
+      console.log('Attempting to unassign car from customer...');
+      
+      // 1. Get Customer Location to find member_id
+      const customerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+      if (!customerId) return;
+
+      const customerLocation = await directusApi.getCustomerLocation(customerId);
+      
+      const memberIds: string[] = [];
+      const primaryId = typeof customerLocation.member_id === 'object' ? customerLocation.member_id?.id : customerLocation.member_id;
+      if (primaryId) memberIds.push(String(primaryId));
+      
+      if (customerLocation.members && Array.isArray(customerLocation.members)) {
+        customerLocation.members.forEach((m: any) => {
+          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+          if (id && !memberIds.includes(String(id))) {
+            memberIds.push(String(id));
+          }
+        });
+      }
+
+      if (memberIds.length === 0) {
+        console.log('No members linked to this customer location');
+        return;
+      }
+
+      // 2. Get Car ID
+      const carId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
+      if (!carId) return;
+
+      // Unassign for all members
+      for (const memberId of memberIds) {
+        console.log(`Checking permissions for member: ${memberId}`);
+        // 3. Get all permissions for this member
+        const permissions = await directusApi.getCarPermissions(memberId);
+        
+        // 4. Find the permission for this specific car
+        const permissionToDelete = permissions.find(p => {
+          if (!p.car_id) return false;
+          const pCarId = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+          return String(pCarId) === String(carId);
+        });
+
+        if (permissionToDelete) {
+          console.log('Deleting car permission:', permissionToDelete.id, 'for member:', memberId);
+          await directusApi.deleteCarPermission(permissionToDelete.id);
+        }
+      }
+      console.log('Car unassigned from all linked customers successfully');
+    } catch (error) {
+      console.error('Error in unassignCarFromCustomer:', error);
+    }
+  };
+
   const handleAcceptJob = async () => {
     if (!id) return;
     setSubmitting(true);
     try {
       await directusApi.updateWorkReport(id, { status: 'accepted' });
       setFormData(prev => ({ ...prev, status: 'accepted' }));
+      
+      // Notify customer
+      await sendCustomerStatusNotification('accepted');
+
       setStatusConfig({
         type: 'success',
         title: t('job_accepted'),
@@ -722,6 +1833,16 @@ export const JobReport: React.FC = () => {
     try {
       await directusApi.updateWorkReport(id, { status: 'completed' });
       setFormData(prev => ({ ...prev, status: 'completed' }));
+      
+      // Notify customer
+      await sendCustomerStatusNotification('completed');
+      
+      // Notify driver
+      await sendDriverStatusNotification('completed');
+
+      // Unassign car from customer
+      await unassignCarFromCustomer();
+
       setStatusConfig({
         type: 'success',
         title: t('job_completed'),
@@ -919,6 +2040,8 @@ export const JobReport: React.FC = () => {
     
     return `📅 ${t('report_date')} : ${formData.work_date}
 📁 ${t('customer_name')} : ${formData.customer_name}
+👤 ${t('contact_name')} : ${formData.customer_contact_name || '-'}
+📞 ${t('contact_phone')} : ${formData.customer_contact_phone || '-'}
 
 📍 ${t('origin')} : ${formData.origin}
 📍 ${t('destination')} : ${formData.destination}
@@ -938,7 +2061,7 @@ export const JobReport: React.FC = () => {
 📌 ${t('notes')} : ${formData.notes || '-'}`;
   };
 
-  const isEditable = !id || isAdmin || (formData.status === 'accepted' && formData.status !== 'cancel_pending');
+  const isEditable = !id || isAdmin || formData.status === 'accepted';
   const isPendingCancel = formData.status === 'cancel_pending';
   const selectedMember = members.find(m => String(m.id) === String(formData.driver_id));
 
@@ -1025,16 +2148,16 @@ export const JobReport: React.FC = () => {
           <p className="text-slate-500">{id ? t('update_job_desc') : t('assign_new_job_desc')}</p>
         </div>
         {id && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {formData.status === 'pending' && (
               <button 
                 type="button"
                 onClick={handleAcceptJob}
                 disabled={submitting}
-                className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100"
+                className="px-10 py-5 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all flex items-center gap-3 shadow-2xl shadow-emerald-200 text-xl transform hover:scale-105 active:scale-95"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                {t('accept_job')}
+                <CheckCircle2 className="w-8 h-8" />
+                {t('accept_job') || 'รับงาน'}
               </button>
             )}
 
@@ -1043,72 +2166,100 @@ export const JobReport: React.FC = () => {
                 type="button"
                 onClick={handleCompleteJob}
                 disabled={submitting}
-                className="px-4 py-2 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+                className="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-5 h-5" />
                 {t('complete_job')}
               </button>
             )}
 
-            {isAdmin && (formData.status === 'completed' || formData.status === 'cancelled') && (
-              <button 
-                type="button"
-                onClick={handleReopenJob}
-                disabled={submitting}
-                className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-lg shadow-amber-100"
-              >
-                <Plus className="w-4 h-4" />
-                {t('reopen_job')}
-              </button>
-            )}
-            {formData.status === 'cancel_pending' && isAdmin && (
-              <div className="flex gap-2">
+            <div className="flex items-center gap-2 ml-auto">
+              {isAdmin && (formData.status === 'completed' || formData.status === 'cancelled') && (
                 <button 
                   type="button"
-                  onClick={handleApproveCancel}
+                  onClick={handleReopenJob}
                   disabled={submitting}
-                  className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100"
+                  className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-lg shadow-amber-100"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {t('approve_cancel')}
+                  <Plus className="w-4 h-4" />
+                  {t('reopen_job')}
                 </button>
+              )}
+              
+              {formData.status === 'cancel_pending' && isAdmin && (
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={handleApproveCancel}
+                    disabled={submitting}
+                    className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {t('approve_cancel')}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleRejectCancel}
+                    disabled={submitting}
+                    className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
+                  >
+                    <X className="w-4 h-4" />
+                    {t('reject_cancel')}
+                  </button>
+                </div>
+              )}
+
+              {(formData.status === 'pending' || formData.status === 'accepted' || (isAdmin && formData.status === 'completed')) && (
                 <button 
                   type="button"
-                  onClick={handleRejectCancel}
+                  onClick={() => {
+                    setCancelReasonInput('');
+                    setShowCancelConfirm(true);
+                  }}
+                  disabled={submitting || (formData.status as any) === 'cancel_pending'}
+                  className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center gap-2 border border-slate-300 disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                  {formData.status === 'accepted' && !isAdmin ? t('request_cancel') : t('cancel_job')}
+                </button>
+              )}
+
+              {isAdmin && id && (
+                <button 
+                  type="button"
+                  onClick={handleDeleteJob}
                   disabled={submitting}
                   className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
                 >
-                  <X className="w-4 h-4" />
-                  {t('reject_cancel')}
+                  <Trash2 className="w-4 h-4" />
+                  {t('delete_job')}
+                </button>
+              )}
+            </div>
+
+            {id && !isAdmin && formData.status === 'accepted' && (
+              <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                <button 
+                  type="button"
+                  onClick={() => handleReportProblem('delay')}
+                  disabled={submitting}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-bold hover:bg-amber-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  {t('delay')}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handleReportProblem('accident')}
+                  disabled={submitting}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  {t('accident')}
                 </button>
               </div>
             )}
-            {(formData.status === 'pending' || formData.status === 'accepted' || (isAdmin && formData.status === 'completed')) && (
-              <button 
-                type="button"
-                onClick={() => {
-                  setCancelReasonInput('');
-                  setShowCancelConfirm(true);
-                }}
-                disabled={submitting || formData.status === 'cancel_pending'}
-                className="px-4 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all flex items-center gap-2 shadow-lg shadow-orange-100 disabled:opacity-50"
-              >
-                <X className="w-4 h-4" />
-                {formData.status === 'accepted' && !isAdmin ? t('request_cancel') : t('cancel_job')}
-              </button>
-            )}
 
-            {isAdmin && id && (
-              <button 
-                type="button"
-                onClick={handleDeleteJob}
-                disabled={submitting}
-                className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
-              >
-                <Trash2 className="w-4 h-4" />
-                {t('delete_job')}
-              </button>
-            )}
             <button 
               type="button"
               onClick={() => navigate(-1)}
@@ -1121,6 +2272,7 @@ export const JobReport: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {id && <StatusTimeline status={formData.status} />}
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="w-5 h-5" />
@@ -1154,36 +2306,16 @@ export const JobReport: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Hash className="w-4 h-4" /> {t('case_number') || 'Case Number'}
-              </label>
-              <input 
-                type="text" 
-                placeholder="YYYYMMDD-XXX"
-                disabled={!!id && !isAdmin}
-                value={formData.case_number}
-                onChange={e => setFormData({...formData, case_number: e.target.value})}
-                className={clsx(
-                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                )}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> {t('report_date')}
               </label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 required
                 disabled={!!id && !isAdmin}
                 value={formData.work_date}
                 onChange={async (e) => {
                   const newDate = e.target.value;
                   setFormData(prev => ({ ...prev, work_date: newDate }));
-                  if (!id) {
-                    const nextCaseNumber = await generateNextCaseNumber(newDate);
-                    setFormData(prev => ({ ...prev, case_number: nextCaseNumber }));
-                  }
                 }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -1196,58 +2328,156 @@ export const JobReport: React.FC = () => {
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> {t('customer_name')}
               </label>
-              <select 
-                required
-                disabled={!!id && !isAdmin}
-                value={formData.customer_name}
-                onChange={e => {
-                  const customerName = e.target.value;
-                  setFormData(prev => ({...prev, customer_name: customerName}));
+              <Select
+                isDisabled={!!id && !isAdmin}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                placeholder={t('select_customer')}
+                options={customers.map(c => ({ value: c.company_name, label: c.company_name, data: c }))}
+                value={formData.customer_name ? { value: formData.customer_name, label: formData.customer_name } : null}
+                onChange={(option: any) => {
+                  const customerName = option?.value || '';
+                  const selectedCustomerLoc = option?.data;
+                  setFormData(prev => ({
+                    ...prev, 
+                    customer_name: customerName,
+                    customer_id: selectedCustomerLoc?.id || '',
+                    customer_contact_name: selectedCustomerLoc?.contact_name || '',
+                    customer_contact_phone: selectedCustomerLoc?.contact_phone || ''
+                  }));
                   
                   // Auto-fill car if there's only one car assigned to this customer
-                  if (isAdmin && customerName) {
-                    const selectedCustomerLoc = customers.find(c => c.company_name === customerName);
-                    if (selectedCustomerLoc) {
-                      const matchingMember = members.find(m => 
-                        m.role === 'customer' && 
-                        (
-                          (m.email && selectedCustomerLoc.email && m.email.toLowerCase() === selectedCustomerLoc.email.toLowerCase()) ||
-                          (m.phone && selectedCustomerLoc.phone && m.phone.replace(/\D/g, '') === selectedCustomerLoc.phone.replace(/\D/g, '')) ||
-                          (selectedCustomerLoc.company_name.toLowerCase().includes(m.first_name.toLowerCase()) && m.first_name.length > 2)
-                        )
-                      );
-                      
-                      if (matchingMember) {
-                        const assignedCars = cars.filter(car => 
-                          car.car_users?.some((cu: any) => {
-                            const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
-                            return String(cuId) === String(matchingMember.id);
-                          })
-                        );
-                        if (assignedCars.length === 1) {
-                          setFormData(prev => ({...prev, car_id: assignedCars[0].id}));
+                  if (isAdmin && customerName && selectedCustomerLoc) {
+                    let matchingMember = null;
+                    
+                    // Priority 1: Use the direct member_id link or members array
+                    const memberIds: string[] = [];
+                    const primaryId = typeof selectedCustomerLoc.member_id === 'object' ? selectedCustomerLoc.member_id?.id : selectedCustomerLoc.member_id;
+                    if (primaryId) memberIds.push(String(primaryId));
+                    
+                    if (selectedCustomerLoc.members && Array.isArray(selectedCustomerLoc.members)) {
+                      selectedCustomerLoc.members.forEach((m: any) => {
+                        const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                        if (id && !memberIds.includes(String(id))) {
+                          memberIds.push(String(id));
                         }
+                      });
+                    }
+
+                    if (memberIds.length > 0) {
+                      // Find cars assigned to any of these members
+                      const assignedCars = cars.filter(car => 
+                        car.car_users?.some((cu: any) => {
+                          const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
+                          return memberIds.includes(String(cuId));
+                        })
+                      );
+
+                      if (assignedCars.length === 1) {
+                        setFormData(prev => ({
+                          ...prev, 
+                          car_id: assignedCars[0].id,
+                          vehicle_type: assignedCars[0].vehicle_type || ''
+                        }));
+                        matchingMember = members.find(m => String(m.id) === String(memberIds[0]));
+                      } else if (assignedCars.length > 1) {
+                        // If multiple cars, maybe don't auto-select or select first
+                        console.log('Multiple cars found for linked members:', assignedCars.map(c => c.car_number));
                       }
                     }
                   }
                 }}
-                className={clsx(
-                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary appearance-none transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                )}
-              >
-                <option value="">{t('select_customer')}</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.company_name}>
-                    {customer.company_name}
-                  </option>
-                ))}
-              </select>
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    padding: '0.25rem',
+                    backgroundColor: (!!id && !isAdmin) ? '#f1f5f9' : '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      border: '1px solid #cbd5e1'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    overflow: 'hidden',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                  })
+                }}
+              />
+              {(() => {
+                const cust = customers.find(c => c.id === formData.customer_id);
+                if (!cust) return null;
+
+                const memberIds: string[] = [];
+                const primaryId = typeof cust.member_id === 'object' ? cust.member_id?.id : cust.member_id;
+                if (primaryId) memberIds.push(String(primaryId));
+                
+                if (cust.members && Array.isArray(cust.members)) {
+                  cust.members.forEach((m: any) => {
+                    const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                    if (id && !memberIds.includes(String(id))) {
+                      memberIds.push(String(id));
+                    }
+                  });
+                }
+
+                if (memberIds.length === 0) return null;
+
+                return (
+                  <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {t('linked_to_line')}: {
+                      (() => {
+                        const selectedMembers = members.filter(m => memberIds.includes(m.id));
+                        return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
+                      })()
+                    }
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <User className="w-4 h-4" /> {t('contact_name')}
+              </label>
+              <input 
+                type="text" 
+                disabled={!!id && !isAdmin}
+                placeholder={t('contact_name')}
+                value={formData.customer_contact_name}
+                onChange={e => setFormData({...formData, customer_contact_name: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Phone className="w-4 h-4" /> {t('contact_phone')}
+              </label>
+              <input 
+                type="text" 
+                disabled={!!id && !isAdmin}
+                placeholder={t('contact_phone')}
+                value={formData.customer_contact_phone}
+                onChange={e => setFormData({...formData, customer_contact_phone: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5 relative">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> {t('origin')}
               </label>
@@ -1256,15 +2486,42 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('origin')}
-                value={formData.origin}
-                onChange={e => setFormData({...formData, origin: e.target.value})}
+                value={originValue}
+                onChange={e => {
+                  setOriginValue(e.target.value);
+                  setFormData({...formData, origin: e.target.value});
+                }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
+              {originStatus === "OK" && (
+                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-2xl shadow-xl mt-1 overflow-hidden">
+                  {originData.map(({ place_id, description }) => (
+                    <li 
+                      key={place_id} 
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0"
+                      onClick={async () => {
+                        setOriginValue(description, false);
+                        clearOriginSuggestions();
+                        try {
+                          const results = await getGeocode({ address: description });
+                          const { lat, lng } = await getLatLng(results[0]);
+                          setFormData(prev => ({ ...prev, origin: description, origin_lat: lat, origin_lng: lng }));
+                        } catch (error) {
+                          console.error("Error fetching geocode:", error);
+                          setFormData(prev => ({ ...prev, origin: description }));
+                        }
+                      }}
+                    >
+                      {description}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> {t('destination')}
               </label>
@@ -1273,13 +2530,40 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('destination')}
-                value={formData.destination}
-                onChange={e => setFormData({...formData, destination: e.target.value})}
+                value={destValue}
+                onChange={e => {
+                  setDestValue(e.target.value);
+                  setFormData({...formData, destination: e.target.value});
+                }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
+              {destStatus === "OK" && (
+                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-2xl shadow-xl mt-1 overflow-hidden">
+                  {destData.map(({ place_id, description }) => (
+                    <li 
+                      key={place_id} 
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0"
+                      onClick={async () => {
+                        setDestValue(description, false);
+                        clearDestSuggestions();
+                        try {
+                          const results = await getGeocode({ address: description });
+                          const { lat, lng } = await getLatLng(results[0]);
+                          setFormData(prev => ({ ...prev, destination: description, destination_lat: lat, destination_lng: lng }));
+                        } catch (error) {
+                          console.error("Error fetching geocode:", error);
+                          setFormData(prev => ({ ...prev, destination: description }));
+                        }
+                      }}
+                    >
+                      {description}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
@@ -1293,77 +2577,109 @@ export const JobReport: React.FC = () => {
             <h3 className="font-bold text-slate-800">{t('vehicles')} {t('and')} {t('drivers')}</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Truck className="w-4 h-4" /> {t('car_number')}
               </label>
-              <select 
-                required
-                disabled={!!id && !isAdmin}
-                value={formData.car_id}
-                onChange={e => {
-                  const carId = e.target.value;
-                  setFormData(prev => ({...prev, car_id: carId}));
-                  
-                  // Auto-fill customer if car is assigned to a customer
-                  if (isAdmin && carId) {
-                    const selectedCar = cars.find(c => String(c.id) === String(carId));
-                    if (selectedCar && selectedCar.car_users) {
-                      const customerMember = selectedCar.car_users.find((cu: any) => {
-                        const user = cu.line_user_id;
-                        return user && (typeof user === 'object' ? user.role === 'customer' : false);
-                      })?.line_user_id as Member | undefined;
-
-                      if (customerMember) {
-                        const matchingCustomer = customers.find(c => 
-                          (customerMember.email && c.email && customerMember.email.toLowerCase() === c.email.toLowerCase()) ||
-                          (customerMember.phone && c.phone && customerMember.phone.replace(/\D/g, '') === c.phone.replace(/\D/g, '')) ||
-                          (c.company_name.toLowerCase().includes(customerMember.first_name.toLowerCase()) && customerMember.first_name.length > 2)
-                        );
-                        if (matchingCustomer) {
-                          setFormData(prev => ({...prev, customer_name: matchingCustomer.company_name}));
-                        }
-                      }
-
-                      // Auto-fill driver if car is assigned to a driver
-                      const driverMember = selectedCar.car_users.find((cu: any) => {
-                        const user = cu.line_user_id;
-                        return user && (typeof user === 'object' ? user.role === 'driver' : false);
-                      })?.line_user_id as Member | undefined;
-
-                      if (driverMember) {
-                        setFormData(prev => ({
-                          ...prev, 
-                          driver_id: driverMember.id,
-                          phone: driverMember.phone || prev.phone
-                        }));
-                      }
-                    }
-                  }
-                }}
-                className={clsx(
-                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary appearance-none transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                )}
-              >
-                <option value="">{t('select_vehicle')}</option>
-                {filteredCars.map(car => {
+              <Select
+                isDisabled={!!id && !isAdmin}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                placeholder={t('select_vehicle')}
+                options={filteredCars.map(car => {
                   const assignedNames = car.car_users?.map((cu: any) => {
                     const user = cu.line_user_id;
                     if (!user) return null;
-                    const source = user.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
                     const name = user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null);
-                    return name ? `${name} ${source}` : null;
+                    return name;
                   }).filter(Boolean).join(', ');
                   const driverName = assignedNames || car.owner_name || '';
-                  return (
-                    <option key={car.id} value={car.id}>
-                      {car.car_number} {driverName ? `(${driverName})` : ''}
-                    </option>
-                  );
+                  const vehicleType = car.vehicle_type ? ` [${car.vehicle_type}]` : '';
+                  return {
+                    value: car.id,
+                    label: `${car.car_number}${vehicleType} ${driverName ? `(${driverName})` : ''}`,
+                    data: car
+                  };
                 })}
-              </select>
+                value={formData.car_id ? { 
+                  value: formData.car_id, 
+                  label: cars.find(c => String(c.id) === String(formData.car_id))?.car_number || formData.car_id 
+                } : null}
+                onChange={(option: any) => {
+                  const carId = option?.value || '';
+                  const selectedCar = option?.data;
+                  setFormData(prev => ({...prev, car_id: carId, vehicle_type: selectedCar?.vehicle_type || ''}));
+                  
+                  // Auto-fill customer if car is assigned to a customer
+                  if (isAdmin && carId && selectedCar && selectedCar.car_users) {
+                    const customerMember = selectedCar.car_users.find((cu: any) => {
+                      const user = cu.line_user_id;
+                      return user && (typeof user === 'object' ? user.role === 'customer' : false);
+                    })?.line_user_id as Member | undefined;
+
+                    if (customerMember) {
+                      const matchingCustomer = customers.find(c => 
+                        (customerMember.email && c.email && customerMember.email.toLowerCase() === c.email.toLowerCase()) ||
+                        (customerMember.phone && c.phone && customerMember.phone.replace(/\D/g, '') === c.phone.replace(/\D/g, '')) ||
+                        (c.company_name.toLowerCase().includes(customerMember.first_name.toLowerCase()) && customerMember.first_name.length > 2)
+                      );
+                      if (matchingCustomer) {
+                        setFormData(prev => ({...prev, customer_name: matchingCustomer.company_name}));
+                      }
+                    }
+
+                    // Auto-fill driver if car is assigned to a driver
+                    const driverMember = selectedCar.car_users.find((cu: any) => {
+                      const user = cu.line_user_id;
+                      return user && (typeof user === 'object' ? user.role === 'driver' : false);
+                    })?.line_user_id as Member | undefined;
+
+                    if (driverMember) {
+                      setFormData(prev => ({
+                        ...prev, 
+                        driver_id: driverMember.id,
+                        phone: driverMember.phone || prev.phone
+                      }));
+                    }
+                  }
+                }}
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    padding: '0.25rem',
+                    backgroundColor: (!!id && !isAdmin) ? '#f1f5f9' : '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      border: '1px solid #cbd5e1'
+                    }
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: '1rem',
+                    overflow: 'hidden',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                  })
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Truck className="w-4 h-4" /> {t('vehicle_type') || 'Vehicle Type'}
+              </label>
+              <input 
+                type="text" 
+                disabled={!!id && !isAdmin}
+                placeholder={t('vehicle_type') || 'e.g. 4-wheel, 6-wheel'}
+                value={formData.vehicle_type}
+                onChange={e => setFormData({...formData, vehicle_type: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                )}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -1389,11 +2705,15 @@ export const JobReport: React.FC = () => {
                 )}
               >
                 <option value="">{t('select_driver')}</option>
-                {members.filter(m => m.role === 'driver').map(member => (
-                  <option key={member.id} value={member.id}>
-                    {member.first_name} {member.last_name} {member.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)'}
-                  </option>
-                ))}
+                {members.filter(m => m.role === 'driver').map(member => {
+                  const busy = isDriverBusy(member.id);
+                  const statusText = busy ? ` (${t('busy')})` : ` (${t('available')})`;
+                  return (
+                    <option key={member.id} value={member.id} className={busy ? "text-red-500" : "text-green-500"}>
+                      {member.first_name} {member.last_name} {statusText}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -1483,7 +2803,15 @@ export const JobReport: React.FC = () => {
                   type="datetime-local" 
                   disabled={!isEditable || isFieldLocked('arrival_time')}
                   value={formData.arrival_time}
-                  onChange={e => setFormData({...formData, arrival_time: e.target.value})}
+                  onChange={e => {
+                    const arrivalTime = e.target.value;
+                    if (formData.departure_time && arrivalTime && new Date(arrivalTime) < new Date(formData.departure_time)) {
+                      setError(t('arrival_before_departure') || 'Arrival time cannot be before departure time');
+                    } else {
+                      setError('');
+                    }
+                    setFormData({...formData, arrival_time: arrivalTime});
+                  }}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
                     (!isEditable || isFieldLocked('arrival_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
@@ -1525,7 +2853,28 @@ export const JobReport: React.FC = () => {
                   )}
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Truck className="w-4 h-4" /> {t('total_distance')}
+                </label>
+                <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 font-bold flex items-center justify-between">
+                  <span>{totalDistance.toLocaleString()}</span>
+                  <span className="text-xs text-slate-400 font-normal">km</span>
+                </div>
+              </div>
             </div>
+
+            {formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id) && (
+              <div className="p-4 bg-red-50 rounded-2xl border border-red-200 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-red-800">{t('mileage_error')}</p>
+                  <p className="text-xs text-red-700">
+                    {t('mileage_less_than_previous', { mileage: getLastMileage(formData.car_id) })}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1545,18 +2894,38 @@ export const JobReport: React.FC = () => {
               </label>
               
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {photoPreviews.map((preview, index) => (
-                  <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group">
-                    <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                    <button 
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                {photoPreviews.map((preview, index) => {
+                  // Find metadata for this photo
+                  let meta: any = null;
+                  if (index < existingPhotos.length) {
+                    const fileId = existingPhotos[index];
+                    meta = formData.photo_metadata?.find((m: any) => m.file_id === fileId);
+                  } else {
+                    const newPhotoIndex = index - existingPhotos.length;
+                    meta = photos[newPhotoIndex]?.metadata;
+                  }
+
+                  return (
+                    <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group">
+                      <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                      
+                      {meta && (
+                        <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-[8px] text-white leading-tight">
+                          {meta.timestamp && <div>{meta.timestamp}</div>}
+                          {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                        </div>
+                      )}
+
+                      <button 
+                        type="button"
+                        onClick={() => removePhoto(index)}
+                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
                 <label className={clsx(
                   "aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1 transition-colors",
                   !isEditable ? "bg-slate-100 cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"

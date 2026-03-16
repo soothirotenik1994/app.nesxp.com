@@ -114,6 +114,19 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (carStatuses.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const vehicleNum = params.get('vehicle');
+      if (vehicleNum) {
+        const vehicle = carStatuses.find(s => s.carNumber === vehicleNum);
+        if (vehicle) {
+          setSelectedVehicle(vehicle);
+        }
+      }
+    }
+  }, [carStatuses]);
+
+  useEffect(() => {
     if (cars.length === 0) return;
 
     const timer = setInterval(() => {
@@ -136,7 +149,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const filteredStatuses = carStatuses.filter(s => 
-    (s.carNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
+    String(s.carNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
@@ -241,7 +254,14 @@ export const Dashboard: React.FC = () => {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <span className="font-bold text-slate-900 text-base">{v.carNumber}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-base">{v.carNumber}</span>
+                          {cars.find(c => c.car_number === v.carNumber)?.vehicle_type && (
+                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                              {cars.find(c => c.car_number === v.carNumber)?.vehicle_type}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 uppercase font-semibold">
                           {t('driver')}: {v.driverName || 'N/A'}
                         </p>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { directusApi } from '../api/directus';
 import { WorkReport } from '../types';
 import { 
@@ -16,7 +17,8 @@ import {
   Filter,
   FileText,
   X,
-  Copy
+  Copy,
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -24,6 +26,7 @@ import { clsx } from 'clsx';
 
 export const JobHistory: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -67,7 +70,7 @@ export const JobHistory: React.FC = () => {
     
     const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     
-    return `🆔 ${t('case_number') || 'Case No.'} : ${report.case_number || '-'}
+    return `🆔 ID : ${report.id || '-'}
 📅 ${t('report_date')} : ${workDate}
 📁 ${t('customer_name')} : ${report.customer_name}
 
@@ -94,11 +97,11 @@ export const JobHistory: React.FC = () => {
     if (r.status !== 'completed' && r.status !== 'cancelled') return false;
 
     const search = searchTerm.toLowerCase();
-    const customer = (r.customer_name || '').toLowerCase();
-    const origin = (r.origin || '').toLowerCase();
-    const dest = (r.destination || '').toLowerCase();
-    const car = typeof r.car_id === 'object' ? r.car_id.car_number.toLowerCase() : '';
-    const caseNum = (r.case_number || '').toLowerCase();
+    const customer = String(r.customer_name || '').toLowerCase();
+    const origin = String(r.origin || '').toLowerCase();
+    const dest = String(r.destination || '').toLowerCase();
+    const car = typeof r.car_id === 'object' ? String(r.car_id.car_number || '').toLowerCase() : '';
+    const caseNum = String(r.id || '').toLowerCase();
     
     return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
   }).sort((a, b) => {
@@ -194,7 +197,7 @@ export const JobHistory: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm font-bold text-slate-700">
-                            {report.case_number || '-'}
+                            {report.id || '-'}
                           </span>
                         </div>
                       </td>
@@ -220,6 +223,14 @@ export const JobHistory: React.FC = () => {
                         <div className="font-bold text-slate-900 text-sm">
                           {report.customer_name}
                         </div>
+                        {(report.customer_contact_name || report.customer_contact_phone) && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span className="truncate max-w-[150px]">
+                              {report.customer_contact_name || '-'} {report.customer_contact_phone ? `(${report.customer_contact_phone})` : ''}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -230,9 +241,28 @@ export const JobHistory: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                          <Truck className="w-3.5 h-3.5 text-slate-400" />
-                          {car?.car_number || 'N/A'}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                            <Truck className="w-3.5 h-3.5 text-slate-400" />
+                            {car?.car_number || 'N/A'}
+                            {car?.vehicle_type && (
+                              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold ml-1">
+                                {car.vehicle_type}
+                              </span>
+                            )}
+                          </div>
+                          {car?.car_number && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/?vehicle=${car.car_number}`);
+                              }}
+                              className="text-[10px] text-primary font-bold hover:underline flex items-center gap-1 mt-1"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              GPS
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">

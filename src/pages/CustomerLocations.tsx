@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
-import { CustomerLocation } from '../types';
-import { Search, Plus, MapPin, Edit2, Trash2, X, Loader2, AlertCircle, Building2, User, Phone, Mail, FileText, Map } from 'lucide-react';
+import { CustomerLocation, Member } from '../types';
+import { Search, Plus, MapPin, Edit2, Trash2, X, Loader2, AlertCircle, Building2, User, Phone, Mail, FileText, Map, Users } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import Select from 'react-select';
 
 export const CustomerLocations: React.FC = () => {
   const { t } = useTranslation();
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,19 +24,27 @@ export const CustomerLocations: React.FC = () => {
     phone: '',
     email: '',
     address: '',
-    branch: ''
+    branch: '',
+    contact_name: '',
+    contact_phone: '',
+    member_id: '',
+    member_ids: [] as string[]
   });
 
-  const fetchLocations = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await directusApi.getCustomerLocations();
-      setLocations(data);
+      const [locationsData, membersData] = await Promise.all([
+        directusApi.getCustomerLocations(),
+        directusApi.getMembers()
+      ]);
+      setLocations(locationsData);
+      setMembers(membersData.filter(m => m.role === 'customer'));
     } catch (err: any) {
-      console.error('Error fetching locations:', err);
+      console.error('Error fetching data:', err);
       if (err.response?.status !== 401) {
-        setError(err.message || 'Failed to load customer locations');
+        setError(err.message || 'Failed to load data');
       }
     } finally {
       setLoading(false);
@@ -42,19 +52,39 @@ export const CustomerLocations: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchLocations();
+    fetchData();
   }, []);
 
   const handleOpenModal = (location?: CustomerLocation) => {
     if (location) {
       setEditingLocation(location);
+      
+      // Extract member IDs from both member_id and members array
+      const memberIds: string[] = [];
+      
+      const primaryMemberId = typeof location.member_id === 'object' ? location.member_id?.id : location.member_id;
+      if (primaryMemberId) memberIds.push(String(primaryMemberId));
+      
+      if (location.members && Array.isArray(location.members)) {
+        location.members.forEach((m: any) => {
+          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+          if (id && !memberIds.includes(String(id))) {
+            memberIds.push(String(id));
+          }
+        });
+      }
+
       setFormData({
         company_name: location.company_name || '',
         tax_id: location.tax_id || '',
         phone: location.phone || '',
         email: location.email || '',
         address: location.address || '',
-        branch: location.branch || ''
+        branch: location.branch || '',
+        contact_name: location.contact_name || '',
+        contact_phone: location.contact_phone || '',
+        member_id: primaryMemberId || '',
+        member_ids: memberIds
       });
     } else {
       setEditingLocation(null);
@@ -64,7 +94,11 @@ export const CustomerLocations: React.FC = () => {
         phone: '',
         email: '',
         address: '',
-        branch: ''
+        branch: '',
+        contact_name: '',
+        contact_phone: '',
+        member_id: '',
+        member_ids: []
       });
     }
     setIsModalOpen(true);
@@ -75,13 +109,30 @@ export const CustomerLocations: React.FC = () => {
     setSubmitting(true);
     setActionError(null);
     try {
-      if (editingLocation) {
-        await directusApi.updateCustomerLocation(editingLocation.id, formData);
+      const payload: any = {
+        ...formData,
+        member_id: formData.member_ids[0] || null, // Primary member
+      };
+
+      // If members field is supported, send it as M2M
+      if (formData.member_ids.length > 0) {
+        payload.members = formData.member_ids.map(id => ({
+          line_user_id: id
+        }));
       } else {
-        await directusApi.createCustomerLocation(formData);
+        payload.members = [];
+      }
+
+      // Remove member_ids from payload as it's UI only
+      delete payload.member_ids;
+
+      if (editingLocation) {
+        await directusApi.updateCustomerLocation(editingLocation.id, payload);
+      } else {
+        await directusApi.createCustomerLocation(payload);
       }
       setIsModalOpen(false);
-      fetchLocations();
+      fetchData();
     } catch (err: any) {
       console.error('Error saving location:', err);
       setActionError(err.message || 'Failed to save location');
@@ -96,7 +147,7 @@ export const CustomerLocations: React.FC = () => {
       setActionError(null);
       await directusApi.deleteCustomerLocation(deleteId);
       setDeleteId(null);
-      fetchLocations();
+      fetchData();
     } catch (err: any) {
       console.error('Error deleting location:', err);
       setActionError(err.message || t('error_deleting'));
@@ -150,7 +201,7 @@ export const CustomerLocations: React.FC = () => {
               <AlertCircle className="w-4 h-4" />
               {error}
             </div>
-            <button onClick={fetchLocations} className="text-xs font-bold underline">{t('try_again')}</button>
+            <button onClick={fetchData} className="text-xs font-bold underline">{t('try_again')}</button>
           </div>
         )}
 
@@ -213,6 +264,43 @@ export const CustomerLocations: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Building2 className="w-3.5 h-3.5 text-slate-400" />
                         <p className="text-xs text-slate-500">{t('branch')}: {loc.branch}</p>
+                      </div>
+                    )}
+                    {(() => {
+                      const memberIds: string[] = [];
+                      const primaryId = typeof loc.member_id === 'object' ? loc.member_id?.id : loc.member_id;
+                      if (primaryId) memberIds.push(String(primaryId));
+                      
+                      if (loc.members && Array.isArray(loc.members)) {
+                        loc.members.forEach((m: any) => {
+                          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                          if (id && !memberIds.includes(String(id))) {
+                            memberIds.push(String(id));
+                          }
+                        });
+                      }
+
+                      if (memberIds.length === 0) return null;
+
+                      return (
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                          <p className="text-xs text-slate-500">
+                            {t('customer_role')}: {(() => {
+                              const selectedMembers = members.filter(m => memberIds.includes(m.id));
+                              return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
+                            })()}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                    {(loc.contact_name || loc.contact_phone) && (
+                      <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                        <User className="w-3.5 h-3.5 text-primary" />
+                        <div className="flex flex-col">
+                          <p className="text-[10px] font-bold text-primary uppercase leading-none mb-1">{t('contact_person') || 'Contact Person'}</p>
+                          <p className="text-xs text-slate-700 font-medium">{loc.contact_name || '-'} {loc.contact_phone ? `(${loc.contact_phone})` : ''}</p>
+                        </div>
                       </div>
                     )}
                     {loc.address && (
@@ -308,6 +396,29 @@ export const CustomerLocations: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('contact_name')}</label>
+                  <input 
+                    type="text" 
+                    value={formData.contact_name}
+                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('contact_name')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('contact_phone')}</label>
+                  <input 
+                    type="text" 
+                    value={formData.contact_phone}
+                    onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('contact_phone')}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('address')}</label>
                 <textarea 
@@ -317,6 +428,67 @@ export const CustomerLocations: React.FC = () => {
                   placeholder="Full Address"
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('customer_role')}</label>
+                <Select
+                  isMulti
+                  options={members.map(m => ({
+                    value: m.id,
+                    label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
+                  }))}
+                  value={members
+                    .filter(m => formData.member_ids.includes(m.id))
+                    .map(m => ({
+                      value: m.id,
+                      label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
+                    }))
+                  }
+                  onChange={(selectedOptions) => {
+                    const selectedIds = selectedOptions ? (selectedOptions as any[]).map(o => o.value) : [];
+                    
+                    // Update contact info from the first selected member if it was empty or if it's the first one
+                    let newContactName = formData.contact_name;
+                    let newContactPhone = formData.contact_phone;
+                    
+                    if (selectedIds.length > 0 && (!formData.contact_name || formData.member_ids.length === 0)) {
+                      const firstMember = members.find(m => m.id === selectedIds[0]);
+                      if (firstMember) {
+                        newContactName = firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`;
+                        newContactPhone = firstMember.phone || '';
+                      }
+                    }
+
+                    setFormData({
+                      ...formData,
+                      member_ids: selectedIds,
+                      contact_name: newContactName,
+                      contact_phone: newContactPhone
+                    });
+                  }}
+                  placeholder={`-- ${t('select_role')} --`}
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderRadius: '0.75rem',
+                      padding: '2px',
+                      backgroundColor: '#f8fafc',
+                      borderColor: '#e2e8f0',
+                      '&:hover': {
+                        borderColor: '#cbd5e1'
+                      }
+                    }),
+                    menu: (base) => ({
+                      ...base,
+                      borderRadius: '0.75rem',
+                      overflow: 'hidden',
+                      zIndex: 100
+                    })
+                  }}
+                />
+              </div>
+
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button"
