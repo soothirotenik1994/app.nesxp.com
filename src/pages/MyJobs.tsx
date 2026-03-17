@@ -31,7 +31,7 @@ export const MyJobs: React.FC = () => {
   const [profileMissing, setProfileMissing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const userEmail = localStorage.getItem('user_email');
-  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
   const fetchMyJobs = async () => {

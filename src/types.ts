@@ -24,6 +24,7 @@ export interface Car {
   description: string;
   owner_name?: string;
   driver_phone?: string;
+  car_image?: string;
   car_users?: {
     line_user_id: Member;
   }[];
@@ -81,6 +82,7 @@ export interface CustomerLocation {
 
 export interface WorkReport {
   id: string;
+  case_number?: string;
   UUID?: string;
   work_date: string;
   customer_name: string;

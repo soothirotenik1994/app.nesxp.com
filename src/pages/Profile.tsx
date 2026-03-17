@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { directusApi } from '../api/directus';
 import { Member } from '../types';
-import { Loader2, User, Phone, Mail, Save, CheckCircle2 } from 'lucide-react';
+import { Loader2, User, Phone, Mail, Save, CheckCircle2, Camera } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const Profile = () => {
@@ -16,7 +16,8 @@ const Profile = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    email: ''
+    email: '',
+    picture_url: ''
   });
 
   useEffect(() => {
@@ -34,7 +35,8 @@ const Profile = () => {
             first_name: found.first_name || '',
             last_name: found.last_name || '',
             phone: found.phone || '',
-            email: found.email || ''
+            email: found.email || '',
+            picture_url: found.picture_url || ''
           });
         }
       } catch (err) {
@@ -46,6 +48,27 @@ const Profile = () => {
 
     fetchMember();
   }, [lineUserId]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !member) return;
+
+    try {
+      setSubmitting(true);
+      const fileId = await directusApi.uploadFile(file);
+      setFormData(prev => ({ ...prev, picture_url: fileId }));
+      // Update member immediately
+      await directusApi.updateMember(member.id, { picture_url: fileId });
+      setMember(prev => prev ? { ...prev, picture_url: fileId } : null);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error uploading profile picture:', err);
+      alert('Failed to upload picture');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,18 +123,30 @@ const Profile = () => {
                 </div>
               )}
             </div>
-            {member.picture_url ? (
-              <img 
-                src={member.picture_url} 
-                alt={member.display_name} 
-                className="w-24 h-24 rounded-full border-4 border-white mx-auto shadow-lg object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto border-4 border-white/30 text-white text-3xl font-bold">
-                {String(member.display_name || 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="relative inline-block">
+              {member.picture_url ? (
+                <img 
+                  src={directusApi.getFileUrl(member.picture_url)} 
+                  alt={member.display_name} 
+                  className="w-24 h-24 rounded-full border-4 border-white mx-auto shadow-lg object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto border-4 border-white/30 text-white text-3xl font-bold">
+                  {String(member.display_name || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <label className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-slate-50 transition-colors border border-slate-100">
+                <Camera className="w-4 h-4 text-primary" />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={submitting}
+                />
+              </label>
+            </div>
             <h2 className="text-white text-xl font-bold mt-4">{member.display_name}</h2>
             <p className="text-white/70 text-sm">LINE ID: {member.line_user_id.substring(0, 10)}...</p>
           </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Member } from '../types';
-import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle } from 'lucide-react';
+import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -28,7 +28,8 @@ export const Members: React.FC = () => {
     phone: '',
     line_user_id: '',
     password: '',
-    role: 'customer' as 'driver' | 'customer'
+    role: 'customer' as 'driver' | 'customer',
+    picture_url: ''
   });
   const navigate = useNavigate();
 
@@ -74,7 +75,8 @@ export const Members: React.FC = () => {
         phone: member.phone,
         line_user_id: member.line_user_id,
         password: '', // Don't show password
-        role: member.role || 'customer'
+        role: member.role || 'customer',
+        picture_url: member.picture_url || ''
       });
     } else {
       setEditingMember(null);
@@ -85,10 +87,27 @@ export const Members: React.FC = () => {
         phone: '',
         line_user_id: '',
         password: '',
-        role: 'customer'
+        role: 'customer',
+        picture_url: ''
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setSubmitting(true);
+      const fileId = await directusApi.uploadFile(file);
+      setFormData(prev => ({ ...prev, picture_url: fileId }));
+    } catch (err) {
+      console.error('Error uploading profile picture:', err);
+      setActionError('Failed to upload profile picture');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,7 +255,7 @@ export const Members: React.FC = () => {
                       <div className="flex items-center gap-3">
                         {member.picture_url ? (
                           <img 
-                            src={member.picture_url} 
+                            src={directusApi.getFileUrl(member.picture_url)} 
                             alt={member.display_name} 
                             className="w-10 h-10 rounded-full border border-slate-200 object-cover"
                             referrerPolicy="no-referrer"
@@ -302,7 +321,7 @@ export const Members: React.FC = () => {
                         member.role === 'customer' ? "bg-emerald-100 text-emerald-700" :
                         "bg-blue-100 text-blue-700"
                       )}>
-                        {t(`${member.role || 'driver'}_role`)}
+                        {t(`${member.role || 'customer'}_role`)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -439,6 +458,35 @@ export const Members: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('profile_picture') || 'รูปโปรไฟล์'}</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
+                    {formData.picture_url ? (
+                      <img 
+                        src={directusApi.getFileUrl(formData.picture_url)} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <UserPlus className="w-8 h-8 text-slate-300" />
+                    )}
+                  </div>
+                  <label className="flex-1 flex items-center justify-center px-4 py-2.5 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Plus className="w-4 h-4" />
+                      <span className="text-sm font-medium">{formData.picture_url ? t('change_photo') : t('upload_photo')}</span>
+                    </div>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-slate-700">{t('first_name')}</label>

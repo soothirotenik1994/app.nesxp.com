@@ -135,7 +135,7 @@ export const AssignCars: React.FC = () => {
         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
           {member?.picture_url ? (
             <img 
-              src={member.picture_url} 
+              src={directusApi.getFileUrl(member.picture_url)} 
               alt="" 
               className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100" 
               referrerPolicy="no-referrer"

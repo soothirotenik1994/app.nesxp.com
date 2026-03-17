@@ -18,6 +18,7 @@ export const CustomerLocations: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [originalMembers, setOriginalMembers] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     company_name: '',
     tax_id: '',
@@ -40,7 +41,7 @@ export const CustomerLocations: React.FC = () => {
         directusApi.getMembers()
       ]);
       setLocations(locationsData);
-      setMembers(membersData.filter(m => m.role === 'customer'));
+      setMembers(membersData);
     } catch (err: any) {
       console.error('Error fetching data:', err);
       if (err.response?.status !== 401) {
@@ -58,6 +59,7 @@ export const CustomerLocations: React.FC = () => {
   const handleOpenModal = (location?: CustomerLocation) => {
     if (location) {
       setEditingLocation(location);
+      setOriginalMembers(location.members || []);
       
       // Extract member IDs from both member_id and members array
       const memberIds: string[] = [];
@@ -88,6 +90,7 @@ export const CustomerLocations: React.FC = () => {
       });
     } else {
       setEditingLocation(null);
+      setOriginalMembers([]);
       setFormData({
         company_name: '',
         tax_id: '',
@@ -111,16 +114,53 @@ export const CustomerLocations: React.FC = () => {
     try {
       const payload: any = {
         ...formData,
-        member_id: formData.member_ids[0] || null, // Primary member
+        member_id: formData.member_ids[0] && formData.member_ids[0] !== '' ? formData.member_ids[0] : null, // Primary member for backward compatibility
       };
 
-      // If members field is supported, send it as M2M
-      if (formData.member_ids.length > 0) {
-        payload.members = formData.member_ids.map(id => ({
+      // For Directus M2M updates, we need to handle existing relations
+      // To simplify and ensure it works, we'll send the members as a list of junction objects
+      // Note: In Directus, to replace the set, you might need to provide the IDs of existing junction records to delete them,
+      // but if the relationship is configured to "Auto-save", sending the new list might work.
+      // However, a more robust way for Directus M2M is often to handle the junction table directly or use the specific nested syntax.
+      
+      const validMemberIds = formData.member_ids.filter(id => id && id !== '');
+      
+      if (editingLocation) {
+        // For Directus M2M updates, we use the nested syntax to sync the relationship
+        const currentJunctions = originalMembers || [];
+        
+        // Identify junction records to delete
+        const toDelete = currentJunctions
+          .filter(j => {
+            const userId = typeof j.line_user_id === 'object' ? j.line_user_id?.id : j.line_user_id;
+            return userId && !validMemberIds.includes(String(userId));
+          })
+          .map(j => j.id)
+          .filter(Boolean);
+        
+        // Identify new members to add
+        const toCreate = validMemberIds
+          .filter(userId => !currentJunctions.some(j => {
+            const existingUserId = typeof j.line_user_id === 'object' ? j.line_user_id?.id : j.line_user_id;
+            return existingUserId && String(existingUserId) === String(userId);
+          }))
+          .map(userId => ({ line_user_id: userId }));
+
+        // Use the nested action syntax for Directus
+        // Only send if there are changes to avoid potential issues with empty arrays
+        if (toCreate.length > 0 || toDelete.length > 0) {
+          payload.members = {
+            create: toCreate,
+            delete: toDelete
+          };
+        } else {
+          delete payload.members;
+        }
+      } else {
+        // For new records, just send the list of junction objects
+        payload.members = validMemberIds.map(id => ({
           line_user_id: id
         }));
-      } else {
-        payload.members = [];
       }
 
       // Remove member_ids from payload as it's UI only
@@ -432,10 +472,13 @@ export const CustomerLocations: React.FC = () => {
                 <label className="text-sm font-semibold text-slate-700">{t('customer_role')}</label>
                 <Select
                   isMulti
-                  options={members.map(m => ({
-                    value: m.id,
-                    label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
-                  }))}
+                  options={members
+                    .filter(m => m.role === 'customer' || formData.member_ids.includes(m.id))
+                    .map(m => ({
+                      value: m.id,
+                      label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
+                    }))
+                  }
                   value={members
                     .filter(m => formData.member_ids.includes(m.id))
                     .map(m => ({

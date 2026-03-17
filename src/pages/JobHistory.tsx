@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { directusApi } from '../api/directus';
+import { directusApi, DIRECTUS_URL, STATIC_API_KEY } from '../api/directus';
 import { WorkReport } from '../types';
 import { 
   Search, 
@@ -33,6 +33,7 @@ export const JobHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<WorkReport | null>(null);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const userRole = localStorage.getItem('user_role') || 'Driver';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
@@ -56,8 +57,8 @@ export const JobHistory: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const formatTimeDisplay = (time: string | null) => {
-    if (!time) return '-';
+  const formatTimeDisplay = (time: any) => {
+    if (!time || typeof time !== 'string') return '-';
     // Remove seconds if present (e.g. 2023-10-27 14:54:00 -> 2023-10-27 14:54)
     return time.split(':').slice(0, 2).join(':');
   };
@@ -71,6 +72,7 @@ export const JobHistory: React.FC = () => {
     const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     
     return `🆔 ID : ${report.id || '-'}
+🆔 ${t('case_number')} : ${report.case_number || '-'}
 📅 ${t('report_date')} : ${workDate}
 📁 ${t('customer_name')} : ${report.customer_name}
 
@@ -119,11 +121,7 @@ export const JobHistory: React.FC = () => {
     const weightA = getStatusWeight(a.status);
     const weightB = getStatusWeight(b.status);
 
-    if (weightA !== weightB) {
-      return weightA - weightB;
-    }
-
-    return new Date(b.work_date).getTime() - new Date(a.work_date).getTime();
+    return (weightA - weightB) || (new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime());
   });
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
@@ -220,6 +218,11 @@ export const JobHistory: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        {report.case_number && (
+                          <div className="text-[10px] font-bold text-primary mb-0.5">
+                            ID: {report.case_number}
+                          </div>
+                        )}
                         <div className="font-bold text-slate-900 text-sm">
                           {report.customer_name}
                         </div>
@@ -347,16 +350,27 @@ export const JobHistory: React.FC = () => {
                 <div className="space-y-3">
                   <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest">{t('photos')}</h4>
                   <div className="grid grid-cols-2 gap-3">
-                    {selectedReport.photos.map((photoId: any) => (
-                      <div key={photoId} className="aspect-square rounded-xl overflow-hidden border border-slate-200">
-                        <img 
-                          src={`${import.meta.env.VITE_DIRECTUS_URL}/assets/${photoId}`} 
-                          alt="Job" 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                    ))}
+                    {selectedReport.photos.map((photoId: any) => {
+                      const meta = selectedReport.photo_metadata?.find((m: any) => m.file_id === photoId);
+                      return (
+                        <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                          <img 
+                            src={`${DIRECTUS_URL.replace(/\/$/, '')}/assets/${photoId}?access_token=${STATIC_API_KEY}&key=system-large-contain`} 
+                            alt="Job" 
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
+                            onClick={() => setFullscreenImage(`${DIRECTUS_URL.replace(/\/$/, '')}/assets/${photoId}?access_token=${STATIC_API_KEY}`)}
+                          />
+                          {meta && (
+                            <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">
+                              {meta.timestamp && <div>{meta.timestamp}</div>}
+                              {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -388,6 +402,28 @@ export const JobHistory: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fullscreen Image Preview */}
+      {fullscreenImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={() => setFullscreenImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img 
+            src={fullscreenImage} 
+            alt="Fullscreen" 
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+          />
         </div>
       )}
     </div>

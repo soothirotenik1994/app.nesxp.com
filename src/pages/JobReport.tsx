@@ -3,11 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import Select from 'react-select';
-import usePlacesAutocomplete, {
-  getGeocode,
-  getLatLng,
-} from "use-places-autocomplete";
-import { directusApi, api } from '../api/directus';
+import { directusApi, api, DIRECTUS_URL, STATIC_API_KEY } from '../api/directus';
 import { lineService } from '../services/lineService';
 import { Car, Member, CustomerLocation } from '../types';
 import clsx from 'clsx';
@@ -93,7 +89,7 @@ export const JobReport: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
-  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
   const [cars, setCars] = useState<Car[]>([]);
@@ -107,6 +103,7 @@ export const JobReport: React.FC = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cancelReasonInput, setCancelReasonInput] = useState('');
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     work_date: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
@@ -137,39 +134,6 @@ export const JobReport: React.FC = () => {
   });
 
   const [allReports, setAllReports] = useState<any[]>([]);
-
-  // Google Maps Autocomplete for Origin
-  const {
-    ready: originReady,
-    value: originValue,
-    suggestions: { status: originStatus, data: originData },
-    setValue: setOriginValue,
-    clearSuggestions: clearOriginSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      componentRestrictions: { country: "th" },
-    },
-    debounce: 300,
-  });
-
-  // Google Maps Autocomplete for Destination
-  const {
-    ready: destReady,
-    value: destValue,
-    suggestions: { status: destStatus, data: destData },
-    setValue: setDestValue,
-    clearSuggestions: clearDestSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      componentRestrictions: { country: "th" },
-    },
-    debounce: 300,
-  });
-
-  useEffect(() => {
-    if (formData.origin) setOriginValue(formData.origin, false);
-    if (formData.destination) setDestValue(formData.destination, false);
-  }, [formData.origin, formData.destination]);
 
   const isDriverBusy = (driverId: string) => {
     return allReports.some(r => 
@@ -362,7 +326,10 @@ export const JobReport: React.FC = () => {
           if (report.photos && Array.isArray(report.photos)) {
             const photoIds = report.photos.map((p: any) => typeof p === 'string' ? p : p.id);
             setExistingPhotos(photoIds);
-            const previews = photoIds.map((fileId: string) => `${import.meta.env.VITE_DIRECTUS_URL}/assets/${fileId}`);
+            const previews = photoIds.map((fileId: string) => {
+              const baseUrl = DIRECTUS_URL.replace(/\/$/, '');
+              return `${baseUrl}/assets/${fileId}?access_token=${STATIC_API_KEY}&key=system-large-contain`;
+            });
             setPhotoPreviews(previews);
           }
         } else {
@@ -510,19 +477,23 @@ export const JobReport: React.FC = () => {
       
       if (photos.length > 0) {
         for (const photoObj of photos) {
-          const formDataFile = new FormData();
-          formDataFile.append('file', photoObj.file);
-          const response = await api.post('/files', formDataFile);
-          const fileId = response.data.data.id;
-          uploadedPhotoIds.push(fileId);
-          
-          if (photoObj.metadata) {
-            newPhotoMetadata.push({
-              file_id: fileId,
-              latitude: photoObj.metadata.latitude,
-              longitude: photoObj.metadata.longitude,
-              timestamp: photoObj.metadata.timestamp
-            });
+          try {
+            const uploadedFile = await directusApi.uploadFile(photoObj.file);
+            const fileId = uploadedFile.id;
+            uploadedPhotoIds.push(fileId);
+            
+            if (photoObj.metadata) {
+              newPhotoMetadata.push({
+                file_id: fileId,
+                latitude: photoObj.metadata.latitude,
+                longitude: photoObj.metadata.longitude,
+                timestamp: photoObj.metadata.timestamp
+              });
+            }
+          } catch (uploadErr: any) {
+            console.error('Error uploading file:', uploadErr.response?.data || uploadErr.message);
+            const detail = uploadErr.response?.data?.errors?.[0]?.message || uploadErr.message;
+            throw new Error(`Failed to upload photo: ${detail}`);
           }
         }
       }
@@ -559,9 +530,13 @@ export const JobReport: React.FC = () => {
       const reportData: any = {};
       
       const formatTime = (t: string) => {
-        if (!t) return undefined;
-        // t is YYYY-MM-DDTHH:mm from datetime-local
-        return t.replace('T', ' ') + ':00';
+        if (!t) return null;
+        try {
+          // Directus handles ISO 8601 strings well
+          return new Date(t).toISOString();
+        } catch (e) {
+          return null;
+        }
       };
 
       // Add fields only if they have values to support partial updates
@@ -575,14 +550,18 @@ export const JobReport: React.FC = () => {
       if (arrival) reportData.arrival_time = arrival;
 
       if (formData.mileage_start !== '') {
-        reportData.mileage_start = parseInt(formData.mileage_start.toString());
+        const val = parseInt(formData.mileage_start.toString());
+        if (!isNaN(val)) reportData.mileage_start = val;
       }
       
       if (formData.mileage_end !== '') {
-        reportData.mileage_end = parseInt(formData.mileage_end.toString());
-        // If driver finishes the job, mark as completed
-        if (formData.status === 'accepted') {
-          reportData.status = 'completed';
+        const val = parseInt(formData.mileage_end.toString());
+        if (!isNaN(val)) {
+          reportData.mileage_end = val;
+          // If driver finishes the job, mark as completed
+          if (formData.status === 'accepted') {
+            reportData.status = 'completed';
+          }
         }
       }
 
@@ -594,17 +573,20 @@ export const JobReport: React.FC = () => {
         // New report OR Admin can edit everything
         // For new reports, we include the basic info
         if (formData.work_date) {
-          reportData.work_date = formatTime(formData.work_date);
+          const wd = formatTime(formData.work_date);
+          if (wd) reportData.work_date = wd;
         }
         if (formData.customer_name) reportData.customer_name = formData.customer_name;
-        if (formData.customer_id) reportData.customer_id = formData.customer_id;
+        if (formData.customer_id && formData.customer_id !== '') reportData.customer_id = formData.customer_id;
         if (formData.customer_contact_name) reportData.customer_contact_name = formData.customer_contact_name;
         if (formData.customer_contact_phone) reportData.customer_contact_phone = formData.customer_contact_phone;
         if (formData.origin) reportData.origin = formData.origin;
         if (formData.destination) reportData.destination = formData.destination;
         if (formData.phone) reportData.phone = formData.phone;
-        if (formData.car_id) reportData.car_id = formData.car_id;
-        if (formData.driver_id) reportData.driver_id = formData.driver_id;
+        if (formData.car_id && formData.car_id !== '') reportData.car_id = formData.car_id;
+        if (formData.driver_id && formData.driver_id !== '') reportData.driver_id = formData.driver_id;
+        if (formData.vehicle_type) reportData.vehicle_type = formData.vehicle_type;
+        reportData.status = formData.status;
       }
 
       if (uploadedPhotoIds.length > 0 || existingPhotos.length > 0) {
@@ -1233,7 +1215,13 @@ export const JobReport: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error in handleSubmit:', error);
-      const errorMsg = error.response?.data?.errors?.[0]?.message || error.message || t('error_saving_report');
+      console.error('Error response data:', error.response?.data);
+      
+      let errorMsg = error.message || t('error_saving_report');
+      if (error.response?.data?.errors) {
+        const directusErrors = error.response.data.errors;
+        errorMsg = directusErrors.map((e: any) => e.message).join(', ');
+      }
       
       setStatusConfig({
         type: 'error',
@@ -2486,9 +2474,8 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('origin')}
-                value={originValue}
+                value={formData.origin}
                 onChange={e => {
-                  setOriginValue(e.target.value);
                   setFormData({...formData, origin: e.target.value});
                 }}
                 className={clsx(
@@ -2496,30 +2483,6 @@ export const JobReport: React.FC = () => {
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
-              {originStatus === "OK" && (
-                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-2xl shadow-xl mt-1 overflow-hidden">
-                  {originData.map(({ place_id, description }) => (
-                    <li 
-                      key={place_id} 
-                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0"
-                      onClick={async () => {
-                        setOriginValue(description, false);
-                        clearOriginSuggestions();
-                        try {
-                          const results = await getGeocode({ address: description });
-                          const { lat, lng } = await getLatLng(results[0]);
-                          setFormData(prev => ({ ...prev, origin: description, origin_lat: lat, origin_lng: lng }));
-                        } catch (error) {
-                          console.error("Error fetching geocode:", error);
-                          setFormData(prev => ({ ...prev, origin: description }));
-                        }
-                      }}
-                    >
-                      {description}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
             <div className="space-y-1.5 relative">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -2530,9 +2493,8 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('destination')}
-                value={destValue}
+                value={formData.destination}
                 onChange={e => {
-                  setDestValue(e.target.value);
                   setFormData({...formData, destination: e.target.value});
                 }}
                 className={clsx(
@@ -2540,30 +2502,6 @@ export const JobReport: React.FC = () => {
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
-              {destStatus === "OK" && (
-                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-2xl shadow-xl mt-1 overflow-hidden">
-                  {destData.map(({ place_id, description }) => (
-                    <li 
-                      key={place_id} 
-                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0"
-                      onClick={async () => {
-                        setDestValue(description, false);
-                        clearDestSuggestions();
-                        try {
-                          const results = await getGeocode({ address: description });
-                          const { lat, lng } = await getLatLng(results[0]);
-                          setFormData(prev => ({ ...prev, destination: description, destination_lat: lat, destination_lng: lng }));
-                        } catch (error) {
-                          console.error("Error fetching geocode:", error);
-                          setFormData(prev => ({ ...prev, destination: description }));
-                        }
-                      }}
-                    >
-                      {description}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           </div>
         </div>
@@ -2879,89 +2817,95 @@ export const JobReport: React.FC = () => {
         )}
 
         {/* Photos & Notes Section */}
-        {id && (
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-emerald-50 rounded-lg">
-                <Camera className="w-5 h-5 text-emerald-600" />
-              </div>
-              <h3 className="font-bold text-slate-800">{t('photos')} {t('and')} {t('notes')}</h3>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <Camera className="w-5 h-5 text-emerald-600" />
             </div>
+            <h3 className="font-bold text-slate-800">{t('photos')} {t('and')} {t('notes')}</h3>
+          </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Camera className="w-4 h-4" /> {t('upload_photos')}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Camera className="w-4 h-4" /> {t('upload_photos')}
+            </label>
+            
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {photoPreviews.map((preview, index) => {
+                // Find metadata for this photo
+                let meta: any = null;
+                if (index < existingPhotos.length) {
+                  const fileId = existingPhotos[index];
+                  meta = formData.photo_metadata?.find((m: any) => m.file_id === fileId);
+                } else {
+                  const newPhotoIndex = index - existingPhotos.length;
+                  meta = photos[newPhotoIndex]?.metadata;
+                }
+
+                return (
+                  <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group">
+                    <img 
+                      src={preview} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      onClick={() => setFullscreenImage(preview)}
+                    />
+                    
+                    {meta && (
+                      <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-[8px] text-white leading-tight">
+                        {meta.timestamp && <div>{meta.timestamp}</div>}
+                        {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                      </div>
+                    )}
+
+                    <button 
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              <label className={clsx(
+                "aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1 transition-colors",
+                !isEditable ? "bg-slate-100 cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"
+              )}>
+                <Plus className="w-6 h-6 text-slate-400" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase">{t('add_photo')}</span>
+                <input 
+                  type="file" 
+                  multiple 
+                  disabled={!isEditable}
+                  accept="image/*" 
+                  onChange={handlePhotoChange} 
+                  className="hidden" 
+                />
               </label>
-              
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {photoPreviews.map((preview, index) => {
-                  // Find metadata for this photo
-                  let meta: any = null;
-                  if (index < existingPhotos.length) {
-                    const fileId = existingPhotos[index];
-                    meta = formData.photo_metadata?.find((m: any) => m.file_id === fileId);
-                  } else {
-                    const newPhotoIndex = index - existingPhotos.length;
-                    meta = photos[newPhotoIndex]?.metadata;
-                  }
-
-                  return (
-                    <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group">
-                      <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                      
-                      {meta && (
-                        <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-[8px] text-white leading-tight">
-                          {meta.timestamp && <div>{meta.timestamp}</div>}
-                          {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
-                        </div>
-                      )}
-
-                      <button 
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-                <label className={clsx(
-                  "aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1 transition-colors",
-                  !isEditable ? "bg-slate-100 cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"
-                )}>
-                  <Plus className="w-6 h-6 text-slate-400" />
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t('add_photo')}</span>
-                  <input 
-                    type="file" 
-                    multiple 
-                    disabled={!isEditable}
-                    accept="image/*" 
-                    onChange={handlePhotoChange} 
-                    className="hidden" 
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <FileText className="w-4 h-4" /> {t('notes')}
-              </label>
-              <textarea 
-                rows={3}
-                disabled={!isEditable}
-                placeholder={t('notes')}
-                value={formData.notes}
-                onChange={e => setFormData({...formData, notes: e.target.value})}
-                className={clsx(
-                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
-                  !isEditable ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                )}
-              />
             </div>
           </div>
-        )}
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <FileText className="w-4 h-4" /> {t('notes')}
+            </label>
+            <textarea 
+              rows={3}
+              disabled={!isEditable}
+              placeholder={t('notes')}
+              value={formData.notes}
+              onChange={e => setFormData({...formData, notes: e.target.value})}
+              className={clsx(
+                "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
+                !isEditable ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+              )}
+            />
+          </div>
+        </div>
+
 
         <button 
           type="submit"
@@ -2981,6 +2925,28 @@ export const JobReport: React.FC = () => {
           )}
         </button>
       </form>
+
+      {/* Fullscreen Image Preview */}
+      {fullscreenImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={() => setFullscreenImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img 
+            src={fullscreenImage} 
+            alt="Fullscreen" 
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+          />
+        </div>
+      )}
 
       {/* Status Modal */}
       {showStatusModal && (

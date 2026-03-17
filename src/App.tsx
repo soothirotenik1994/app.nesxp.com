@@ -12,7 +12,9 @@ import { JobReport } from './pages/JobReport';
 import { JobHistory } from './pages/JobHistory';
 import { JobCalendar } from './pages/JobCalendar';
 import { MyJobs } from './pages/MyJobs';
+import { Reports } from './pages/Reports';
 import { SmsSettings } from './pages/SmsSettings';
+import { SystemSettings } from './pages/SystemSettings';
 import Profile from './pages/Profile';
 import { useEffect } from 'react';
 import { setAuthToken } from './api/directus';
@@ -39,6 +41,7 @@ export default function App() {
             <Route path="/members" element={<Members />} />
             <Route path="/cars" element={<Cars />} />
             <Route path="/locations" element={<CustomerLocations />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/admins" element={<Admins />} />
             <Route path="/jobs/new" element={<JobReport />} />
             <Route path="/jobs/edit/:id" element={<JobReport />} />
@@ -46,6 +49,7 @@ export default function App() {
             <Route path="/jobs/calendar" element={<JobCalendar />} />
             <Route path="/jobs/history" element={<JobHistory />} />
             <Route path="/settings/sms" element={<SmsSettings />} />
+            <Route path="/settings/system" element={<SystemSettings />} />
             <Route path="/permissions" element={<Members />} />
             <Route path="/permissions/:memberId" element={<AssignCars />} />
           </Route>

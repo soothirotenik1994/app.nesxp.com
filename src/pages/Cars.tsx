@@ -23,7 +23,8 @@ export const Cars: React.FC = () => {
     vehicle_type: '',
     description: '',
     owner_name: '',
-    driver_phone: ''
+    driver_phone: '',
+    car_image: ''
   });
 
   const fetchCars = async () => {
@@ -88,7 +89,8 @@ export const Cars: React.FC = () => {
         vehicle_type: car.vehicle_type || '',
         description: car.description,
         owner_name: car.owner_name || '',
-        driver_phone: car.driver_phone || ''
+        driver_phone: car.driver_phone || '',
+        car_image: car.car_image || ''
       });
     } else {
       setEditingCar(null);
@@ -97,10 +99,27 @@ export const Cars: React.FC = () => {
         vehicle_type: '',
         description: '',
         owner_name: '',
-        driver_phone: ''
+        driver_phone: '',
+        car_image: ''
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setSubmitting(true);
+      const fileId = await directusApi.uploadFile(file);
+      setFormData(prev => ({ ...prev, car_image: fileId }));
+    } catch (err) {
+      console.error('Error uploading car image:', err);
+      setActionError('Failed to upload car image');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,8 +224,17 @@ export const Cars: React.FC = () => {
             filteredCars.map((car) => (
               <div key={car.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 group-hover:border-blue-200 transition-colors">
-                    <CarIcon className="w-6 h-6 text-slate-400 group-hover:text-primary" />
+                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 group-hover:border-blue-200 transition-colors overflow-hidden">
+                    {car.car_image ? (
+                      <img 
+                        src={directusApi.getFileUrl(car.car_image)} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <CarIcon className="w-6 h-6 text-slate-400 group-hover:text-primary" />
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <button 
@@ -349,6 +377,33 @@ export const Cars: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('car_image') || 'รูปภาพรถ'}</label>
+                <div className="flex items-center gap-4">
+                  {formData.car_image && (
+                    <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+                      <img 
+                        src={directusApi.getFileUrl(formData.car_image)} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+                  <label className="flex-1 flex items-center justify-center px-4 py-2.5 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Plus className="w-4 h-4" />
+                      <span className="text-sm font-medium">{formData.car_image ? t('change_photo') : t('upload_photo')}</span>
+                    </div>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
                   <input 

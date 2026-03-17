@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser } from '../types';
 
-const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-const STATIC_API_KEY = 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4';
+export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+export const STATIC_API_KEY = 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -65,8 +65,7 @@ export const directusApi = {
         params: {
           filter: {
             email: { _eq: email },
-            password: { _eq: password },
-            role: { _eq: 'driver' }
+            password: { _eq: password }
           }
         }
       });
@@ -295,6 +294,31 @@ export const directusApi = {
 
   deleteWorkReport: async (id: string): Promise<void> => {
     await api.delete(`/items/work_reports/${id}`);
+  },
+
+  getFileUrl: (fileId: string) => {
+    if (!fileId) return '';
+    if (fileId.startsWith('http')) return fileId;
+    return `${DIRECTUS_URL}/assets/${fileId}?access_token=${STATIC_API_KEY}`;
+  },
+
+  importFileFromUrl: async (url: string, folderId?: string) => {
+    const response = await api.post('/files/import', {
+      url,
+      folder: folderId
+    });
+    return response.data.data?.id || response.data.data;
+  },
+
+  uploadFile: async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/files', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
   },
 
   getCustomerLocation: async (id: string): Promise<any> => {

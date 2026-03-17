@@ -12,6 +12,8 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const userName = localStorage.getItem('user_name') || t('admin_user');
+  const userRole = localStorage.getItem('user_role') || t('super_admin');
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -40,8 +42,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900">{t('admin_user')}</p>
-            <p className="text-xs text-slate-500">{t('super_admin')}</p>
+            <p className="text-sm font-medium text-slate-900">{userRole}</p>
+            <p className="text-xs text-slate-500">{userName}</p>
           </div>
           <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
             <User className="w-6 h-6 text-slate-600" />

@@ -45,6 +45,17 @@ export const LineCallback: React.FC = () => {
         const lineProfile = profileResponse.data;
         const lineUserId = lineProfile.userId;
 
+        // If we have a picture URL from LINE, try to import it to Directus
+        let directusPictureId = lineProfile.pictureUrl;
+        if (lineProfile.pictureUrl) {
+          try {
+            setStatus('Storing profile picture...');
+            directusPictureId = await directusApi.importFileFromUrl(lineProfile.pictureUrl);
+          } catch (picErr) {
+            console.warn('Failed to import profile picture to Directus:', picErr);
+          }
+        }
+
         setStatus('Finding member profile...');
         // Search for member in Directus by line_user_id
         const members = await directusApi.getMembers();
@@ -54,16 +65,18 @@ export const LineCallback: React.FC = () => {
           // Try to get email from id_token
           let email = '';
           try {
-            if (id_token) {
+            if (id_token && typeof id_token === 'string') {
               // Decode JWT payload
               const base64Url = id_token.split('.')[1];
-              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-              const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-              }).join(''));
-              
-              const payload = JSON.parse(jsonPayload);
-              email = payload.email || '';
+              if (base64Url) {
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+                  return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                const payload = JSON.parse(jsonPayload);
+                email = payload.email || '';
+              }
             }
           } catch (e) {
             console.warn('Failed to decode id_token:', e);
@@ -77,7 +90,7 @@ export const LineCallback: React.FC = () => {
               setStatus('Linking LINE account...');
               member = await directusApi.updateMember(member.id, {
                 line_user_id: lineUserId,
-                picture_url: lineProfile.pictureUrl,
+                picture_url: directusPictureId,
                 display_name: lineProfile.displayName
               });
             }
@@ -89,7 +102,7 @@ export const LineCallback: React.FC = () => {
             member = await directusApi.createMember({
               line_user_id: lineUserId,
               display_name: lineProfile.displayName,
-              picture_url: lineProfile.pictureUrl,
+              picture_url: directusPictureId,
               first_name: lineProfile.displayName,
               last_name: '',
               email: email,
@@ -97,11 +110,19 @@ export const LineCallback: React.FC = () => {
               phone: ''
             });
           }
+        } else {
+          // Update profile picture if it changed or was external
+          if (member.picture_url !== directusPictureId) {
+            await directusApi.updateMember(member.id, {
+              picture_url: directusPictureId,
+              display_name: lineProfile.displayName
+            }).catch(() => {});
+          }
         }
 
         setStatus('Logging in...');
-        // Use the role from the member profile, default to 'Customer'
-        const role = member.role || 'Customer';
+        // Use the role from the member profile, default to 'customer'
+        const role = member.role || 'customer';
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_name', member.display_name || `${member.first_name} ${member.last_name}`);
         localStorage.setItem('user_email', member.email || '');
@@ -111,7 +132,7 @@ export const LineCallback: React.FC = () => {
         
         // If we have a picture, save it
         if (member.picture_url) {
-          localStorage.setItem('user_picture', member.picture_url);
+          localStorage.setItem('user_picture', directusApi.getFileUrl(member.picture_url));
         }
 
         navigate('/jobs/my');

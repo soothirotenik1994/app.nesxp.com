@@ -4,7 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 export const ProtectedRoute: React.FC = () => {
   const token = localStorage.getItem('admin_token');
   const memberId = localStorage.getItem('member_id');
-  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const userRole = localStorage.getItem('user_role') || 'customer';
   const location = useLocation();
   
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';

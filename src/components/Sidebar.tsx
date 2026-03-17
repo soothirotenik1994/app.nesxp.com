@@ -36,11 +36,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
   
   const menuItems = [
     { name: t('dashboard'), path: '/', icon: LayoutDashboard },
+    { name: t('reports'), path: '/reports', icon: ShieldCheck },
     { name: t('drivers'), path: '/members', icon: Users },
     { name: t('vehicles'), path: '/cars', icon: Car },
     { name: t('customer_locations'), path: '/locations', icon: MapPin },
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog },
     { name: t('sms_settings'), path: '/settings/sms', icon: MessageSquare },
+    { name: t('system_settings'), path: '/settings/system', icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -109,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {isAdmin && (
               <>
-                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Management</div>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('management')}</div>
                 {menuItems.map((item) => {
                   const isActive = location.pathname === item.path;
                   return (
