@@ -102,6 +102,7 @@ export const JobReport: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [originalCustomerAndCar, setOriginalCustomerAndCar] = useState<{customerId: string, carId: string} | null>(null);
   const [cancelReasonInput, setCancelReasonInput] = useState('');
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
@@ -322,6 +323,10 @@ export const JobReport: React.FC = () => {
           
           setFormData(initialData);
           setInitialValues(initialData);
+          setOriginalCustomerAndCar({
+            customerId: String(initialData.customer_id),
+            carId: String(initialData.car_id)
+          });
           
           if (report.photos && Array.isArray(report.photos)) {
             const photoIds = report.photos.map((p: any) => typeof p === 'string' ? p : p.id);
@@ -598,8 +603,45 @@ export const JobReport: React.FC = () => {
 
       if (id) {
         console.log('Updating existing report...');
+        
+        // Check if customer or car changed
+        if (originalCustomerAndCar) {
+          const newCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+          const newCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
+
+          if (String(newCustomerId) !== String(originalCustomerAndCar.customerId) || String(newCarId) !== String(originalCustomerAndCar.carId)) {
+            console.log('Customer or Car changed, unassigning old car from old customer...');
+            await unassignCarFromCustomer(originalCustomerAndCar.customerId, originalCustomerAndCar.carId);
+          }
+        }
+
         await directusApi.updateWorkReport(id, reportData);
         console.log('Update successful');
+
+        // Auto-link new car to new customer if changed or if it's a new assignment
+        const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+        const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
+        
+        if (currentCustomerId && currentCarId) {
+          const customerLoc = customers.find(c => String(c.id) === String(currentCustomerId));
+          if (customerLoc) {
+            const memberIds: string[] = [];
+            const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+            if (primaryId) memberIds.push(String(primaryId));
+            
+            if (customerLoc.members && Array.isArray(customerLoc.members)) {
+              customerLoc.members.forEach((m: any) => {
+                const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
+              });
+            }
+
+            for (const mid of memberIds) {
+              await directusApi.linkCarToMember(currentCarId, mid);
+            }
+            console.log('Car linked to all members of new/updated customer');
+          }
+        }
 
         // Send notifications if status changed to completed
         if (reportData.status === 'completed') {
@@ -932,21 +974,33 @@ export const JobReport: React.FC = () => {
         try {
           const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false';
           const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
-          if (customerLoc && customerLoc.member_id) {
-            const member = typeof customerLoc.member_id === 'object' 
+          if (customerLoc) {
+            // 1. Auto-link car to ALL customer member accounts
+            const memberIds: string[] = [];
+            const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+            if (primaryId) memberIds.push(String(primaryId));
+            
+            if (customerLoc.members && Array.isArray(customerLoc.members)) {
+              customerLoc.members.forEach((m: any) => {
+                const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
+              });
+            }
+
+            if (formData.car_id) {
+              for (const mid of memberIds) {
+                await directusApi.linkCarToMember(formData.car_id, mid);
+              }
+              console.log('Car auto-linked to all customer member accounts');
+            }
+            
+            // 2. Send notification to primary member if they have LINE
+            const primaryMember = typeof customerLoc.member_id === 'object' 
               ? customerLoc.member_id 
               : members.find(m => String(m.id) === String(customerLoc.member_id));
             
-            const memberId = member?.id;
-            const customerLineId = member?.line_user_id;
+            const customerLineId = primaryMember?.line_user_id;
 
-            // 1. Auto-link car to customer member account
-            if (memberId && formData.car_id) {
-              await directusApi.linkCarToMember(formData.car_id, memberId);
-              console.log('Car auto-linked to customer member account');
-            }
-            
-            // 2. Send notification
             if (notificationsEnabled && customerLineId) {
               const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
               const driver = members.find(m => String(m.id) === String(formData.driver_id));
@@ -1728,16 +1782,15 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const unassignCarFromCustomer = async () => {
+  const unassignCarFromCustomer = async (targetCustomerId?: string, targetCarId?: string) => {
     try {
-      if (!formData.customer_id || !formData.car_id) return;
-
-      console.log('Attempting to unassign car from customer...');
+      const customerId = targetCustomerId || (typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id);
+      const carId = targetCarId || (typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id);
       
-      // 1. Get Customer Location to find member_id
-      const customerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
-      if (!customerId) return;
+      if (!customerId || !carId) return;
 
+      console.log(`Attempting to unassign car ${carId} from customer ${customerId}...`);
+      
       const customerLocation = await directusApi.getCustomerLocation(customerId);
       
       const memberIds: string[] = [];
@@ -1753,14 +1806,16 @@ export const JobReport: React.FC = () => {
         });
       }
 
+      // Add driver to unassign list
+      const driverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+      if (driverId && !memberIds.includes(String(driverId))) {
+        memberIds.push(String(driverId));
+      }
+
       if (memberIds.length === 0) {
         console.log('No members linked to this customer location');
         return;
       }
-
-      // 2. Get Car ID
-      const carId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
-      if (!carId) return;
 
       // Unassign for all members
       for (const memberId of memberIds) {
@@ -1885,6 +1940,9 @@ export const JobReport: React.FC = () => {
     
     setSubmitting(true);
     try {
+      // Unassign car from customer before deleting the report
+      await unassignCarFromCustomer();
+      
       await directusApi.deleteWorkReport(id);
       navigate('/jobs/history');
     } catch (error: any) {
@@ -1946,6 +2004,7 @@ export const JobReport: React.FC = () => {
     // Direct cancellation for pending jobs or by admin
     setSubmitting(true);
     try {
+      await unassignCarFromCustomer();
       await directusApi.updateWorkReport(id, { status: 'cancelled' });
       setFormData(prev => ({ ...prev, status: 'cancelled' }));
       setStatusConfig({
@@ -1972,6 +2031,7 @@ export const JobReport: React.FC = () => {
     if (!id) return;
     setSubmitting(true);
     try {
+      await unassignCarFromCustomer();
       await directusApi.updateWorkReport(id, { status: 'cancelled' });
       setFormData(prev => ({ ...prev, status: 'cancelled' }));
       setStatusConfig({

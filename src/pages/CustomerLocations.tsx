@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { CustomerLocation, Member } from '../types';
@@ -8,6 +9,7 @@ import Select from 'react-select';
 
 export const CustomerLocations: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [locations, setLocations] = useState<CustomerLocation[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,23 +109,27 @@ export const CustomerLocations: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleReset = () => {
+    if (editingLocation) {
+      handleOpenModal(editingLocation);
+    } else {
+      handleOpenModal();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setActionError(null);
     try {
+      const { member_ids, ...rest } = formData;
       const payload: any = {
-        ...formData,
-        member_id: formData.member_ids[0] && formData.member_ids[0] !== '' ? formData.member_ids[0] : null, // Primary member for backward compatibility
+        ...rest,
+        member_id: member_ids[0] && member_ids[0] !== '' ? member_ids[0] : null, // Primary member for backward compatibility
       };
 
       // For Directus M2M updates, we need to handle existing relations
-      // To simplify and ensure it works, we'll send the members as a list of junction objects
-      // Note: In Directus, to replace the set, you might need to provide the IDs of existing junction records to delete them,
-      // but if the relationship is configured to "Auto-save", sending the new list might work.
-      // However, a more robust way for Directus M2M is often to handle the junction table directly or use the specific nested syntax.
-      
-      const validMemberIds = formData.member_ids.filter(id => id && id !== '');
+      const validMemberIds = member_ids.filter(id => id && id !== '');
       
       if (editingLocation) {
         // For Directus M2M updates, we use the nested syntax to sync the relationship
@@ -147,7 +153,6 @@ export const CustomerLocations: React.FC = () => {
           .map(userId => ({ line_user_id: userId }));
 
         // Use the nested action syntax for Directus
-        // Only send if there are changes to avoid potential issues with empty arrays
         if (toCreate.length > 0 || toDelete.length > 0) {
           payload.members = {
             create: toCreate,
@@ -162,9 +167,6 @@ export const CustomerLocations: React.FC = () => {
           line_user_id: id
         }));
       }
-
-      // Remove member_ids from payload as it's UI only
-      delete payload.member_ids;
 
       if (editingLocation) {
         await directusApi.updateCustomerLocation(editingLocation.id, payload);
@@ -325,10 +327,31 @@ export const CustomerLocations: React.FC = () => {
                       return (
                         <div className="flex items-center gap-2">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <p className="text-xs text-slate-500">
-                            {t('customer_role')}: {(() => {
+                          <div className="flex -space-x-2 overflow-hidden">
+                            {members.filter(m => memberIds.includes(m.id)).map((m, i) => (
+                              <div key={m.id} className="inline-block h-6 w-6 rounded-full ring-2 ring-white overflow-hidden bg-slate-100" title={m.display_name || `${m.first_name} ${m.last_name}`}>
+                                {m.picture_url ? (
+                                  <img 
+                                    src={directusApi.getFileUrl(m.picture_url)} 
+                                    alt="" 
+                                    className="h-full w-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                    {(m.display_name || m.first_name || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-slate-500 ml-1">
+                            {(() => {
                               const selectedMembers = members.filter(m => memberIds.includes(m.id));
-                              return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
+                              if (selectedMembers.length <= 2) {
+                                return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
+                              }
+                              return `${selectedMembers[0].display_name || selectedMembers[0].first_name} +${selectedMembers.length - 1}`;
                             })()}
                           </p>
                         </div>
@@ -438,7 +461,27 @@ export const CustomerLocations: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">{t('contact_name')}</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-semibold text-slate-700">{t('contact_name')}</label>
+                    {formData.member_ids.length > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const firstMember = members.find(m => String(m.id) === String(formData.member_ids[0]));
+                          if (firstMember) {
+                            setFormData({
+                              ...formData,
+                              contact_name: firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`,
+                              contact_phone: firstMember.phone || ''
+                            });
+                          }
+                        }}
+                        className="text-[10px] font-bold text-primary hover:underline"
+                      >
+                        {t('use_member_info')}
+                      </button>
+                    )}
+                  </div>
                   <input 
                     type="text" 
                     value={formData.contact_name}
@@ -469,43 +512,63 @@ export const CustomerLocations: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('customer_role')}</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-700">{t('customer_role')}</label>
+                  <button 
+                    type="button"
+                    onClick={() => navigate('/members')}
+                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {t('add_member')}
+                  </button>
+                </div>
                 <Select
                   isMulti
                   options={members
                     .filter(m => m.role === 'customer' || formData.member_ids.includes(m.id))
                     .map(m => ({
                       value: m.id,
-                      label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
+                      label: m.display_name || `${m.first_name} ${m.last_name}`,
+                      email: m.email,
+                      picture: m.picture_url
                     }))
                   }
                   value={members
                     .filter(m => formData.member_ids.includes(m.id))
                     .map(m => ({
                       value: m.id,
-                      label: `${m.display_name || `${m.first_name} ${m.last_name}`} (${m.email})`
+                      label: m.display_name || `${m.first_name} ${m.last_name}`,
+                      email: m.email,
+                      picture: m.picture_url
                     }))
                   }
+                  formatOptionLabel={(option: any) => (
+                    <div className="flex items-center gap-2">
+                      {option.picture ? (
+                        <img 
+                          src={directusApi.getFileUrl(option.picture)} 
+                          alt="" 
+                          className="w-6 h-6 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-400">
+                          {option.label.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{option.label}</span>
+                        {option.email && <span className="text-[10px] text-slate-400 leading-none">{option.email}</span>}
+                      </div>
+                    </div>
+                  )}
                   onChange={(selectedOptions) => {
                     const selectedIds = selectedOptions ? (selectedOptions as any[]).map(o => o.value) : [];
                     
-                    // Update contact info from the first selected member if it was empty or if it's the first one
-                    let newContactName = formData.contact_name;
-                    let newContactPhone = formData.contact_phone;
-                    
-                    if (selectedIds.length > 0 && (!formData.contact_name || formData.member_ids.length === 0)) {
-                      const firstMember = members.find(m => m.id === selectedIds[0]);
-                      if (firstMember) {
-                        newContactName = firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`;
-                        newContactPhone = firstMember.phone || '';
-                      }
-                    }
-
                     setFormData({
                       ...formData,
-                      member_ids: selectedIds,
-                      contact_name: newContactName,
-                      contact_phone: newContactPhone
+                      member_ids: selectedIds
                     });
                   }}
                   placeholder={`-- ${t('select_role')} --`}
@@ -532,7 +595,7 @@ export const CustomerLocations: React.FC = () => {
                 />
               </div>
 
-              <div className="pt-4 flex gap-3">
+              <div className="pt-4 flex flex-col sm:flex-row gap-3">
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -541,9 +604,16 @@ export const CustomerLocations: React.FC = () => {
                   {t('cancel')}
                 </button>
                 <button 
+                  type="button"
+                  onClick={handleReset}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {t('reset')}
+                </button>
+                <button 
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center"
+                  className="flex-[2] px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center"
                 >
                   {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t('save')}
                 </button>
