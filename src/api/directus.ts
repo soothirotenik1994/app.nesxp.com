@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser } from '../types';
 
 export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4';
+export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -266,7 +266,7 @@ export const directusApi = {
   getWorkReports: async (): Promise<any[]> => {
     const response = await api.get('/items/work_reports', {
       params: {
-        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*',
+        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
         sort: '-date_created'
       }
     });
@@ -276,7 +276,7 @@ export const directusApi = {
   getWorkReport: async (id: string): Promise<any> => {
     const response = await api.get(`/items/work_reports/${id}`, {
       params: {
-        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*'
+        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
       }
     });
     return response.data.data;
@@ -296,10 +296,15 @@ export const directusApi = {
     await api.delete(`/items/work_reports/${id}`);
   },
 
-  getFileUrl: (fileId: string) => {
+  getFileUrl: (fileId: string, options?: { key?: string }) => {
     if (!fileId) return '';
     if (fileId.startsWith('http')) return fileId;
-    return `${DIRECTUS_URL}/assets/${fileId}?access_token=${STATIC_API_KEY}`;
+    const baseUrl = DIRECTUS_URL.replace(/\/$/, '');
+    let url = `${baseUrl}/assets/${fileId}?access_token=${STATIC_API_KEY}`;
+    if (options?.key) {
+      url += `&key=${options.key}`;
+    }
+    return url;
   },
 
   importFileFromUrl: async (url: string, folderId?: string) => {

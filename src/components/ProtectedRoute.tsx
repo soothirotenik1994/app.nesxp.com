@@ -15,10 +15,9 @@ export const ProtectedRoute: React.FC = () => {
 
   // If driver tries to access admin pages, redirect to logistics
   const adminPaths = ['/members', '/cars', '/admins', '/permissions'];
-  const isDashboard = location.pathname === '/';
   
   if (!isAdmin) {
-    if (adminPaths.some(path => location.pathname.startsWith(path)) || isDashboard) {
+    if (adminPaths.some(path => location.pathname.startsWith(path))) {
       return <Navigate to="/jobs/new" replace />;
     }
   }

@@ -59,6 +59,7 @@ export const Login: React.FC = () => {
         localStorage.setItem('user_name', `${member.first_name} ${member.last_name}`);
         localStorage.setItem('user_email', member.email);
         localStorage.setItem('member_id', member.id);
+        localStorage.setItem('is_admin', 'false');
         navigate('/jobs/my');
       } else {
         console.log('No staff member found with these credentials');
@@ -169,10 +170,20 @@ export const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const channelId = import.meta.env.VITE_LINE_CHANNEL_ID;
-                  const redirectUri = encodeURIComponent(import.meta.env.VITE_LINE_REDIRECT_URI);
+                  // Use the specific LINE Login Channel ID from the screenshot
+                  const channelId = '2009240188';
+                  const redirectUri = 'https://ais-dev-gxjnrsyiqcxwz7c4mvte75-260301993622.asia-east1.run.app/line/callback';
+                  
+                  console.log('Starting LINE Login with:', { channelId, redirectUri });
+                  
+                  if (!channelId || !redirectUri) {
+                    setError('LINE Configuration Error: VITE_LINE_CHANNEL_ID or VITE_LINE_REDIRECT_URI is missing in environment variables.');
+                    console.error('LINE Config missing:', { channelId, redirectUri });
+                    return;
+                  }
+
                   const state = Math.random().toString(36).substring(7);
-                  const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${state}&scope=profile%20openid%20email`;
+                  const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=profile%20openid%20email`;
                   window.location.href = url;
                 }}
                 className="w-full bg-[#06C755] text-white py-3 rounded-xl font-semibold hover:bg-[#05b34c] transition-colors flex items-center justify-center gap-2"

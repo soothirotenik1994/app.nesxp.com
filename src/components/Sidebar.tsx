@@ -40,7 +40,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
   
   const menuItems = [
-    { name: t('dashboard'), path: '/', icon: LayoutDashboard },
     { name: t('reports'), path: '/reports', icon: ShieldCheck },
     { name: t('drivers'), path: '/members', icon: Users },
     { name: t('vehicles'), path: '/cars', icon: Car },
@@ -49,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   ];
 
   const logisticsItems = [
+    { name: t('dashboard'), path: '/', icon: LayoutDashboard },
     { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar },
     { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList },
     { name: t('job_history'), path: '/jobs/history', icon: History },
@@ -56,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog },
-    { name: t('sms_settings'), path: '/settings/sms', icon: MessageSquare },
+    { name: t('line_settings'), path: '/settings/line', icon: MessageSquare },
     { name: t('system_settings'), path: '/settings/system', icon: Settings },
   ];
 
@@ -65,6 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     localStorage.removeItem('member_id');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_name');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('is_admin');
     localStorage.removeItem('view_mode');
     navigate('/login');
   };

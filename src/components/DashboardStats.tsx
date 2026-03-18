@@ -7,16 +7,18 @@ interface StatsProps {
   onlineVehicles: number;
   offlineVehicles: number;
   totalMembers: number;
+  showOnlyTotal?: boolean;
 }
 
 export const DashboardStats: React.FC<StatsProps> = ({
   totalVehicles,
   onlineVehicles,
   offlineVehicles,
-  totalMembers
+  totalMembers,
+  showOnlyTotal = false
 }) => {
   const { t } = useTranslation();
-  const stats = [
+  const allStats = [
     {
       name: t('total_vehicles'),
       value: totalVehicles,
@@ -47,8 +49,10 @@ export const DashboardStats: React.FC<StatsProps> = ({
     }
   ];
 
+  const stats = showOnlyTotal ? [allStats[0]] : allStats;
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+    <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${showOnlyTotal ? 'md:grid-cols-1 lg:grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
       {stats.map((stat) => (
         <div key={stat.name} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">

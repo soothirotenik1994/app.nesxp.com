@@ -12,26 +12,32 @@ export const LineCallback: React.FC = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('LineCallback: Current URL:', window.location.href);
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const errorParam = searchParams.get('error');
 
+      console.log('LineCallback: Params:', { code: !!code, state, errorParam });
+
       if (errorParam) {
+        console.error('LineCallback: Error from LINE:', errorParam);
         setError(`LINE Login Error: ${errorParam}`);
         return;
       }
 
       if (!code) {
+        console.error('LineCallback: No code received');
         setError('No authorization code received');
         return;
       }
 
       try {
         setStatus('Exchanging code for token...');
+        console.log('LineCallback: Exchanging code for token...');
         // Exchange code for token via our server proxy
         const tokenResponse = await axios.post('/api/auth/line/token', {
           code,
-          redirect_uri: import.meta.env.VITE_LINE_REDIRECT_URI || `${window.location.origin}/line/callback`
+          redirect_uri: 'https://ais-dev-gxjnrsyiqcxwz7c4mvte75-260301993622.asia-east1.run.app/line/callback'
         });
 
         const { id_token, access_token } = tokenResponse.data;
@@ -96,33 +102,49 @@ export const LineCallback: React.FC = () => {
             }
           }
 
+          // If still not found, auto-register as customer
           if (!member) {
-            // Auto-register as Customer (Requirement: First time must be 'customer')
-            setStatus('Registering new account...');
+            setStatus('Registering as customer...');
             member = await directusApi.createMember({
               line_user_id: lineUserId,
-              display_name: lineProfile.displayName,
-              picture_url: directusPictureId,
-              first_name: lineProfile.displayName,
-              last_name: '',
               email: email,
+              first_name: lineProfile.displayName,
+              last_name: '(LINE)',
               role: 'customer',
-              phone: ''
-            });
-          }
-        } else {
-          // Update profile picture if it changed or was external
-          if (member.picture_url !== directusPictureId) {
-            await directusApi.updateMember(member.id, {
               picture_url: directusPictureId,
               display_name: lineProfile.displayName
-            }).catch(() => {});
+            });
           }
         }
 
+        // Check if member exists and has a valid role
+        if (!member) {
+          console.error('LineCallback: Member not found in system');
+          setError('ขออภัย ไม่พบข้อมูลผู้ใช้งานในระบบ กรุณาติดต่อผู้ดูแลระบบเพื่อลงทะเบียน');
+          return;
+        }
+
+        // Default to customer if role is missing
+        if (!member.role) {
+          console.log('LineCallback: Member has no role, defaulting to customer');
+          member.role = 'customer';
+          await directusApi.updateMember(member.id, { role: 'customer' }).catch(() => {});
+        }
+
+        // Allow all roles for now to ensure everyone can log in, 
+        // as filtering is handled at the data level.
+        const role = member.role.toLowerCase();
+        console.log('LineCallback: Logging in with role:', role);
+
+        // Update profile picture if it changed or was external
+        if (member.picture_url !== directusPictureId) {
+          await directusApi.updateMember(member.id, {
+            picture_url: directusPictureId,
+            display_name: lineProfile.displayName
+          }).catch(() => {});
+        }
+
         setStatus('Logging in...');
-        // Use the role from the member profile, default to 'customer'
-        const role = member.role || 'customer';
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_name', member.display_name || `${member.first_name} ${member.last_name}`);
         localStorage.setItem('user_email', member.email || '');

@@ -13,7 +13,7 @@ import { JobHistory } from './pages/JobHistory';
 import { JobCalendar } from './pages/JobCalendar';
 import { MyJobs } from './pages/MyJobs';
 import { Reports } from './pages/Reports';
-import { SmsSettings } from './pages/SmsSettings';
+import { LineSettings } from './pages/LineSettings';
 import { SystemSettings } from './pages/SystemSettings';
 import Profile from './pages/Profile';
 import { useEffect } from 'react';
@@ -48,7 +48,7 @@ export default function App() {
             <Route path="/jobs/my" element={<MyJobs />} />
             <Route path="/jobs/calendar" element={<JobCalendar />} />
             <Route path="/jobs/history" element={<JobHistory />} />
-            <Route path="/settings/sms" element={<SmsSettings />} />
+            <Route path="/settings/line" element={<LineSettings />} />
             <Route path="/settings/system" element={<SystemSettings />} />
             <Route path="/permissions" element={<Members />} />
             <Route path="/permissions/:memberId" element={<AssignCars />} />

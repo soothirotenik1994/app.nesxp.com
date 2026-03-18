@@ -34,14 +34,56 @@ export const JobHistory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<WorkReport | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const memberId = localStorage.getItem('member_id');
+  const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
   const fetchReports = async () => {
+    if (!memberId && !isAdmin) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await directusApi.getWorkReports();
-      setReports(data);
+      const allReports = await directusApi.getWorkReports();
+      
+      let myReports = [];
+      
+      if (isAdmin) {
+        myReports = allReports;
+      } else {
+        const members = await directusApi.getMembers();
+        const currentMember = members.find(m => String(m.id) === String(memberId));
+
+        if (currentMember) {
+          if (currentMember.role === 'customer') {
+            myReports = allReports.filter(r => {
+              const customerLoc = typeof r.customer_id === 'object' ? r.customer_id : null;
+              if (!customerLoc) return false;
+              
+              const memberIds: string[] = [];
+              const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+              if (primaryId) memberIds.push(String(primaryId));
+              
+              if (customerLoc.members && Array.isArray(customerLoc.members)) {
+                customerLoc.members.forEach((m: any) => {
+                  const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                  if (id) memberIds.push(String(id));
+                });
+              }
+                
+              return memberIds.includes(String(currentMember.id));
+            });
+          } else {
+            myReports = allReports.filter(r => {
+              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+              return String(driverId) === String(currentMember.id);
+            });
+          }
+        }
+      }
+      setReports(myReports);
     } catch (error) {
       console.error('Error fetching reports:', error);
     } finally {
@@ -355,12 +397,11 @@ export const JobHistory: React.FC = () => {
                       return (
                         <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
                           <img 
-                            src={`${DIRECTUS_URL.replace(/\/$/, '')}/assets/${photoId}?access_token=${STATIC_API_KEY}&key=system-large-contain`} 
+                            src={directusApi.getFileUrl(photoId, { key: 'system-large-contain' })} 
                             alt="Job" 
                             className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                             referrerPolicy="no-referrer"
-                            crossOrigin="anonymous"
-                            onClick={() => setFullscreenImage(`${DIRECTUS_URL.replace(/\/$/, '')}/assets/${photoId}?access_token=${STATIC_API_KEY}`)}
+                            onClick={() => setFullscreenImage(directusApi.getFileUrl(photoId))}
                           />
                           {meta && (
                             <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">

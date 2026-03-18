@@ -57,8 +57,10 @@ export const Dashboard: React.FC = () => {
   const fetchData = async () => {
     setError(null);
     try {
-      const isAdminUser = localStorage.getItem('is_admin') === 'true';
-      const userRole = localStorage.getItem('user_role');
+      const userRoleRaw = localStorage.getItem('user_role');
+      const userRole = userRoleRaw?.toLowerCase();
+      const isAdminUser = localStorage.getItem('is_admin') === 'true' && 
+                          (userRole === 'admin' || userRole === 'administrator');
       const memberId = localStorage.getItem('member_id');
 
       // Fetch members and cars
@@ -83,14 +85,73 @@ export const Dashboard: React.FC = () => {
         }
       }
 
-      let finalCars = carsData;
-      if (!isAdminUser && userRole === 'customer' && memberId) {
-        finalCars = carsData.filter(car => 
-          car.car_users?.some((cu: any) => {
-            const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
-            return String(cuId) === String(memberId);
-          })
+      let finalCars: Car[] = [];
+      if (isAdminUser) {
+        finalCars = carsData;
+      } else if (memberId) {
+        // 1. Get cars from active jobs (so GPS tracking from reports works)
+        // For customers, we ONLY show cars from their active jobs as requested
+        let jobCars: Car[] = [];
+        try {
+          const allReports = await directusApi.getWorkReports();
+          const myActiveReports = allReports.filter(r => {
+            // Only active jobs
+            if (r.status === 'completed' || r.status === 'cancelled') return false;
+
+            if (userRole === 'customer') {
+              const customerLoc = typeof r.customer_id === 'object' ? r.customer_id : null;
+              if (!customerLoc) return false;
+              
+              const memberIds: string[] = [];
+              const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+              if (primaryId) memberIds.push(String(primaryId));
+              
+              if (customerLoc.members && Array.isArray(customerLoc.members)) {
+                customerLoc.members.forEach((m: any) => {
+                  const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                  if (id) memberIds.push(String(id));
+                });
+              }
+              return memberIds.includes(String(memberId));
+            } else if (userRole === 'driver') {
+              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+              return String(driverId) === String(memberId);
+            }
+            return false;
+          });
+
+          // Extract car IDs from active reports
+          const activeCarIds = new Set(myActiveReports.map(r => {
+            const carId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
+            return String(carId);
+          }));
+
+          // Find these cars in carsData
+          jobCars = carsData.filter(car => activeCarIds.has(String(car.id)));
+        } catch (e) {
+          console.error('Error fetching job cars:', e);
+        }
+
+        // 2. Get cars with direct permissions (car_users) - only for non-customers or if needed
+        // But the user specifically said "only cars in jobs" for customers
+        let permittedCars: Car[] = [];
+        if (userRole !== 'customer') {
+          permittedCars = carsData.filter(car => 
+            car.car_users?.some((cu: any) => {
+              const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
+              return String(cuId) === String(memberId);
+            })
+          );
+        }
+
+        // Combine and unique by car ID
+        const combined = [...permittedCars, ...jobCars];
+        finalCars = combined.filter((car, index, self) =>
+          index === self.findIndex((c) => c.id === car.id)
         );
+      } else {
+        // Non-admin without memberId sees nothing
+        finalCars = [];
       }
 
       setMembers(membersData);
@@ -185,7 +246,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <DashboardStats {...stats} />
+      <DashboardStats {...stats} showOnlyTotal={localStorage.getItem('user_role')?.toLowerCase() === 'customer'} />
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-2xl flex items-center justify-between">

@@ -23,7 +23,8 @@ async function startServer() {
 
     try {
       console.log("Logging in to GPS provider...");
-      const response = await axios.post("https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=f184dc44-454a-7a69-50c5-0d5087c1e20b");
+      const gpsToken = process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+      const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`);
       if (response.data?.result?.sessionId) {
         sessionId = response.data.result.sessionId;
         lastLoginTime = now;
@@ -96,20 +97,22 @@ async function startServer() {
   app.post("/api/auth/line/token", async (req, res) => {
     try {
       const { code, redirect_uri } = req.body;
+      console.log('Backend: Exchanging LINE code for token...', { code: !!code, redirect_uri });
       const response = await axios.post("https://api.line.me/oauth2/v2.1/token", new URLSearchParams({
         grant_type: "authorization_code",
         code,
         redirect_uri,
-        client_id: process.env.VITE_LINE_CHANNEL_ID!,
-        client_secret: process.env.LINE_CHANNEL_SECRET!,
+        client_id: "2009240188",
+        client_secret: "b551a30a28f9ad6c169df9e66788e747",
       }).toString(), {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       });
+      console.log('Backend: LINE token exchange success');
       res.json(response.data);
     } catch (error: any) {
-      console.error("LINE token exchange error:", error.response?.data || error.message);
+      console.error("Backend: LINE token exchange error:", error.response?.data || error.message);
       res.status(500).json({ error: "Failed to exchange LINE code" });
     }
   });
@@ -153,69 +156,6 @@ async function startServer() {
       console.error("LINE error details:", errorData);
       res.status(500).json({ 
         error: "Failed to send LINE message", 
-        details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
-      });
-    }
-  });
-
-  // SMS Sending Endpoint
-  app.post("/api/sms/send", async (req, res) => {
-    try {
-      const { msisdn, message } = req.body;
-      const username = process.env.THSMS_USERNAME;
-      const password = process.env.THSMS_PASSWORD;
-      const sender = process.env.THSMS_SENDER || "Co-Branding";
-
-      if (!username || !password) {
-        console.error("SMS Error: THSMS_USERNAME or THSMS_PASSWORD is not configured");
-        return res.status(500).json({ error: "THSMS credentials are not configured" });
-      }
-
-      // Normalize phone numbers: convert 08... to 668...
-      const normalizePhone = (phone: string) => {
-        const clean = phone.replace(/\D/g, '');
-        if (clean.startsWith('0')) {
-          // THSMS REST API often expects 08... directly or 66... 
-          // Based on their screenshot example "084xxxxxxx", we can try keeping 0 or 66
-          // But usually 08... is safer for their legacy API
-          return clean; 
-        }
-        return clean;
-      };
-
-      const normalizedMsisdn = Array.isArray(msisdn) 
-        ? msisdn.map(normalizePhone).join(',') 
-        : normalizePhone(msisdn);
-
-      console.log(`Sending SMS via REST API to: ${normalizedMsisdn} using sender: ${sender}`);
-
-      // Using the REST API as shown in the user's screenshot
-      const response = await axios.get("https://thsms.com/api/rest", {
-        params: {
-          username: username,
-          password: password,
-          method: 'send',
-          from: sender,
-          to: normalizedMsisdn,
-          message: message
-        },
-        timeout: 10000
-      });
-
-      console.log("THSMS Response:", response.data);
-      
-      // THSMS REST API returns XML by default, but axios might parse it or return string
-      // The screenshot shows XML response. We'll return it as is or handle success
-      if (typeof response.data === 'string' && response.data.includes('success')) {
-        res.json({ status: 'success', raw: response.data });
-      } else {
-        res.json(response.data);
-      }
-    } catch (error: any) {
-      const errorData = error.response?.data || error.message;
-      console.error("SMS error details:", errorData);
-      res.status(500).json({ 
-        error: "Failed to send SMS", 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
       });
     }

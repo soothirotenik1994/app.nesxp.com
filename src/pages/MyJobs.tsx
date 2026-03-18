@@ -30,13 +30,14 @@ export const MyJobs: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const memberId = localStorage.getItem('member_id');
   const userEmail = localStorage.getItem('user_email');
   const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
   const fetchMyJobs = async () => {
-    if (!userEmail) {
-      setError(t('user_email_not_found'));
+    if (!memberId && !isAdmin) {
+      setError(t('user_not_found') || 'User not found');
       setLoading(false);
       return;
     }
@@ -50,12 +51,12 @@ export const MyJobs: React.FC = () => {
       let myReports = [];
       
       if (isAdmin) {
-        // Admin sees everything, no need to check line_users
+        // Admin sees everything
         myReports = allReports;
       } else {
         // Find member profile
         const members = await directusApi.getMembers();
-        const currentMember = members.find(m => m.email === userEmail);
+        const currentMember = members.find(m => String(m.id) === String(memberId));
 
         if (currentMember) {
           if (currentMember.role === 'customer') {

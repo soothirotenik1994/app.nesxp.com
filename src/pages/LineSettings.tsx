@@ -5,7 +5,7 @@ import { MessageSquare, Save, AlertCircle, Send, Loader2, CheckCircle2, XCircle,
 import { lineService } from '../services/lineService';
 import { directusApi } from '../api/directus';
 
-export const SmsSettings: React.FC = () => {
+export const LineSettings: React.FC = () => {
   const { t } = useTranslation();
   const [isEnabled, setIsEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -16,7 +16,7 @@ export const SmsSettings: React.FC = () => {
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
-    const savedSetting = localStorage.getItem('sms_enabled');
+    const savedSetting = localStorage.getItem('line_notifications_enabled');
     if (savedSetting !== null) {
       setIsEnabled(savedSetting === 'true');
     }
@@ -38,7 +38,7 @@ export const SmsSettings: React.FC = () => {
 
   const handleSave = () => {
     setIsSaving(true);
-    localStorage.setItem('sms_enabled', isEnabled.toString());
+    localStorage.setItem('line_notifications_enabled', isEnabled.toString());
     
     setTimeout(() => {
       setIsSaving(false);
@@ -268,8 +268,8 @@ export const SmsSettings: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('sms_settings')}</h1>
-          <p className="text-slate-500">{t('sms_config_desc')}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('line_settings')}</h1>
+          <p className="text-slate-500">{t('line_config_desc')}</p>
         </div>
       </div>
 
@@ -280,7 +280,7 @@ export const SmsSettings: React.FC = () => {
               <MessageSquare className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">{t('sms_notifications')}</h2>
+              <h2 className="text-lg font-semibold text-slate-900">{t('line_notifications')}</h2>
               <p className="text-sm text-slate-500">Manage how the system sends LINE notifications to drivers</p>
             </div>
           </div>
@@ -290,10 +290,10 @@ export const SmsSettings: React.FC = () => {
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div className="space-y-0.5">
               <label className="text-base font-semibold text-slate-900">
-                {t('enable_sms')}
+                {t('enable_line_notifications')}
               </label>
               <p className="text-sm text-slate-500">
-                {t('sms_will_be_sent')}
+                {t('line_notification_will_be_sent')}
               </p>
             </div>
             <button

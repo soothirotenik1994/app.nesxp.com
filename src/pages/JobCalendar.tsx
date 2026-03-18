@@ -20,15 +20,75 @@ export const JobCalendar: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      const memberId = localStorage.getItem('member_id');
+      const userRole = localStorage.getItem('user_role') || 'customer';
+      const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
+
       try {
-        const [jobs, carsData] = await Promise.all([
+        const [allJobs, carsData] = await Promise.all([
           directusApi.getWorkReports(),
           directusApi.getCars()
         ]);
         
-        setCars(carsData);
+        let filteredJobs = [];
+        let filteredCars = [];
 
-        const calendarEvents = jobs.map((job: WorkReport) => {
+        if (isAdmin) {
+          filteredJobs = allJobs;
+          filteredCars = carsData;
+        } else {
+          const members = await directusApi.getMembers();
+          const currentMember = members.find(m => String(m.id) === String(memberId));
+
+          if (currentMember) {
+            if (currentMember.role === 'customer') {
+              // Filter jobs for customer
+              filteredJobs = allJobs.filter(r => {
+                const customerLoc = typeof r.customer_id === 'object' ? r.customer_id : null;
+                if (!customerLoc) return false;
+                
+                const memberIds: string[] = [];
+                const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+                if (primaryId) memberIds.push(String(primaryId));
+                
+                if (customerLoc.members && Array.isArray(customerLoc.members)) {
+                  customerLoc.members.forEach((m: any) => {
+                    const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                    if (id) memberIds.push(String(id));
+                  });
+                }
+                  
+                return memberIds.includes(String(currentMember.id));
+              });
+
+              // Filter cars for customer (those linked via car_users)
+              filteredCars = carsData.filter(car => 
+                car.car_users?.some((cu: any) => {
+                  const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
+                  return String(cuId) === String(currentMember.id);
+                })
+              );
+            } else {
+              // Filter jobs for driver
+              filteredJobs = allJobs.filter(r => {
+                const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+                return String(driverId) === String(currentMember.id);
+              });
+
+              // Filter cars for driver (those they are assigned to)
+              filteredCars = carsData.filter(car => 
+                car.car_users?.some((cu: any) => {
+                  const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
+                  return String(cuId) === String(currentMember.id);
+                })
+              );
+            }
+          }
+        }
+
+        setCars(filteredCars);
+
+        const calendarEvents = filteredJobs.map((job: WorkReport) => {
           const car = typeof job.car_id === 'object' ? job.car_id : null;
           const carNumber = car?.car_number || job.car_id;
           

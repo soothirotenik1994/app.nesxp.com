@@ -332,8 +332,7 @@ export const JobReport: React.FC = () => {
             const photoIds = report.photos.map((p: any) => typeof p === 'string' ? p : p.id);
             setExistingPhotos(photoIds);
             const previews = photoIds.map((fileId: string) => {
-              const baseUrl = DIRECTUS_URL.replace(/\/$/, '');
-              return `${baseUrl}/assets/${fileId}?access_token=${STATIC_API_KEY}&key=system-large-contain`;
+              return directusApi.getFileUrl(fileId, { key: 'system-large-contain' });
             });
             setPhotoPreviews(previews);
           }
@@ -676,7 +675,7 @@ export const JobReport: React.FC = () => {
         
         // Send LINE notification to driver
         try {
-          const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false'; // Reusing the same setting for now
+          const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false'; // Reusing the same setting for now
           const driver = members.find(m => String(m.id) === String(formData.driver_id));
           const lineId = driver?.line_user_id;
 
@@ -972,7 +971,7 @@ export const JobReport: React.FC = () => {
 
         // Send LINE notification to customer and auto-link car
         try {
-          const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false';
+          const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
           const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
           if (customerLoc) {
             // 1. Auto-link car to ALL customer member accounts
@@ -1297,9 +1296,11 @@ export const JobReport: React.FC = () => {
       
       const message = `⚠️ รายงานปัญหาจากคนขับ\n\n👤 คนขับ: ${driverName}\n🚚 รถ: ${selectedCar?.car_number || 'N/A'}\n🆔 เคส: ${id || 'N/A'}\n🚩 ปัญหา: ${type === 'delay' ? 'ล่าช้า (Delay)' : 'อุบัติเหตุ (Accident)'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}`;
       
+      const adminGroupId = import.meta.env.VITE_LINE_ADMIN_GROUP_ID || 'ADMIN_GROUP_ID_HERE';
+      
       // Send to Admin Group (via lineService if configured, or just log for now)
       // In a real app, you'd have an admin group chat ID
-      await lineService.sendPushMessage('ADMIN_GROUP_ID_HERE', {
+      await lineService.sendPushMessage(adminGroupId, {
         type: "text",
         text: message
       });
@@ -1322,7 +1323,7 @@ export const JobReport: React.FC = () => {
   const sendCustomerStatusNotification = async (status: 'accepted' | 'completed') => {
     try {
       console.log(`Starting customer notification for status: ${status}, customer_id: ${formData.customer_id}`);
-      const notificationsEnabled = localStorage.getItem('sms_enabled') !== 'false';
+      const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
       if (!notificationsEnabled) {
         console.log('Notifications disabled in localStorage');
         return;
@@ -1361,14 +1362,19 @@ export const JobReport: React.FC = () => {
       const statusColor = '#e54d42'; // NES Red
 
       // Send notification to each member
+      console.log(`Found ${memberIds.length} members to notify:`, memberIds);
+      
       for (const memberId of memberIds) {
         const member = members.find(m => String(m.id) === String(memberId));
-        const customerLineId = member?.line_user_id;
+        const customerLineIdRaw = member?.line_user_id;
+        const customerLineId = typeof customerLineIdRaw === 'object' ? (customerLineIdRaw as any)?.id : customerLineIdRaw;
         
         if (!customerLineId) {
-          console.log('Customer LINE ID not found for member:', memberId);
+          console.log(`Customer LINE ID not found for member: ${memberId}. Member data:`, member);
           continue;
         }
+
+        console.log(`Preparing message for member ${memberId} with LINE ID ${customerLineId}`);
 
         const flexContents: any = {
         type: "bubble",
@@ -1646,7 +1652,8 @@ export const JobReport: React.FC = () => {
     try {
       console.log(`Starting driver notification for status: ${status}, driver_id: ${formData.driver_id}`);
       const driver = members.find(m => String(m.id) === String(formData.driver_id));
-      const driverLineId = driver?.line_user_id;
+      const driverLineIdRaw = driver?.line_user_id;
+      const driverLineId = typeof driverLineIdRaw === 'object' ? (driverLineIdRaw as any)?.id : driverLineIdRaw;
       
       if (!driverLineId) {
         console.log('Driver LINE ID not found, skipping notification. Driver ID:', formData.driver_id);
@@ -1776,9 +1783,9 @@ export const JobReport: React.FC = () => {
         to: driverLineId,
         messages: driverMessages
       });
-      console.log('Driver completion notification sent');
-    } catch (err) {
-      console.error('Error sending driver status notification:', err);
+      console.log(`Driver completion notification sent to ${driverLineId}`);
+    } catch (err: any) {
+      console.error('Error sending driver status notification:', err.response?.data || err.message);
     }
   };
 
@@ -2109,9 +2116,22 @@ export const JobReport: React.FC = () => {
 📌 ${t('notes')} : ${formData.notes || '-'}`;
   };
 
-  const isEditable = !id || isAdmin || formData.status === 'accepted';
+  const isCustomer = userRole.toLowerCase() === 'customer';
+  const isEditable = (!id || isAdmin || formData.status === 'accepted') && !isCustomer;
   const isPendingCancel = formData.status === 'cancel_pending';
   const selectedMember = members.find(m => String(m.id) === String(formData.driver_id));
+  const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+
+  const InfoRow: React.FC<{ icon: React.ReactNode, label: string, value: string | React.ReactNode, className?: string }> = ({ icon, label, value, className }) => (
+    <div className={clsx("flex flex-col gap-1", className)}>
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+        {icon} {label}
+      </label>
+      <div className="text-sm font-bold text-slate-700 bg-slate-50/50 px-4 py-3 rounded-2xl border border-slate-100">
+        {value || '-'}
+      </div>
+    </div>
+  );
 
   const isFieldLocked = (fieldName: string) => {
     if (isAdmin) return false;
@@ -2184,6 +2204,162 @@ export const JobReport: React.FC = () => {
             {t('create_new_report')}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (isCustomer && id) {
+    return (
+      <div className="max-w-2xl mx-auto pb-12 space-y-6">
+        {/* Header Section */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">{t('job_details')}</h2>
+            <p className="text-slate-500">{t('tracking_your_delivery') || 'ติดตามสถานะการขนส่งของคุณ'}</p>
+          </div>
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Status Timeline */}
+        <StatusTimeline status={formData.status} />
+
+        {/* Driver & Vehicle Card */}
+        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
+              {selectedMember?.picture_url ? (
+                <img 
+                  src={directusApi.getFileUrl(selectedMember.picture_url)} 
+                  alt={selectedMember.display_name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <User className="w-8 h-8" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{t('driver_name')}</p>
+              <h3 className="text-lg font-bold text-slate-900">
+                {selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : t('not_assigned')}
+              </h3>
+              <div className="flex items-center gap-3 mt-1">
+                {formData.phone && (
+                  <a 
+                    href={`tel:${formData.phone}`}
+                    className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                  >
+                    <Phone className="w-3 h-3" /> {formData.phone}
+                  </a>
+                )}
+              </div>
+            </div>
+            {selectedCar?.car_number && (
+              <button 
+                onClick={() => navigate(`/?vehicle=${selectedCar.car_number}`)}
+                className="bg-primary text-white p-4 rounded-2xl shadow-lg shadow-blue-100 hover:scale-105 active:scale-95 transition-all"
+                title="Track GPS"
+              >
+                <MapPin className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('car_number')}</p>
+              <div className="flex items-center gap-2 text-slate-700">
+                <Truck className="w-4 h-4 text-primary" />
+                <span className="font-bold">{selectedCar?.car_number || '-'}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('vehicle_type')}</p>
+              <div className="flex items-center gap-2 text-slate-700">
+                <Package className="w-4 h-4 text-primary" />
+                <span className="font-bold">{formData.vehicle_type || '-'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Job Details Grid */}
+        <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InfoRow icon={<Calendar className="w-3 h-3" />} label={t('report_date')} value={formData.work_date.replace('T', ' ')} />
+            <InfoRow icon={<Building2 className="w-3 h-3" />} label={t('customer_name')} value={formData.customer_name} />
+            <InfoRow icon={<MapPin className="w-3 h-3 text-emerald-500" />} label={t('origin')} value={formData.origin} />
+            <InfoRow icon={<MapPin className="w-3 h-3 text-red-500" />} label={t('destination')} value={formData.destination} />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
+            <div className="text-center space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('standby_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.standby_time ? new Date(formData.standby_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('departure_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.departure_time ? new Date(formData.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('arrival_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.arrival_time ? new Date(formData.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+            </div>
+          </div>
+
+          {formData.notes && (
+            <div className="pt-6 border-t border-slate-50">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('notes')}</p>
+              <p className="text-sm text-slate-600 italic leading-relaxed bg-slate-50 p-4 rounded-2xl">
+                "{formData.notes}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Photos Section */}
+        {photoPreviews.length > 0 && (
+          <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-primary" /> {t('photos')}
+              </h3>
+              <span className="text-xs font-bold text-slate-400">{photoPreviews.length} {t('images') || 'รูปภาพ'}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {photoPreviews.map((preview, index) => (
+                <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
+                  <img 
+                    src={preview} 
+                    alt="Job Photo" 
+                    className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform duration-500"
+                    onClick={() => setFullscreenImage(preview)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fullscreen Image Preview */}
+        {fullscreenImage && (
+          <div 
+            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setFullscreenImage(null)}
+          >
+            <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
+              <X className="w-8 h-8" />
+            </button>
+            <img src={fullscreenImage} alt="Fullscreen" className="max-w-full max-h-full object-contain rounded-lg" />
+          </div>
+        )}
       </div>
     );
   }
@@ -2733,7 +2909,7 @@ export const JobReport: React.FC = () => {
               )}
             />
             {(() => {
-              const smsEnabled = localStorage.getItem('sms_enabled') !== 'false';
+              const smsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
               if (!smsEnabled) {
                 return (
                   <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-1">
@@ -2909,7 +3085,6 @@ export const JobReport: React.FC = () => {
                       alt="Preview" 
                       className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
                       referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
                       onClick={() => setFullscreenImage(preview)}
                     />
                     
@@ -3003,7 +3178,6 @@ export const JobReport: React.FC = () => {
             alt="Fullscreen" 
             className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             referrerPolicy="no-referrer"
-            crossOrigin="anonymous"
           />
         </div>
       )}
