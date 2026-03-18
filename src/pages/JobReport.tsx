@@ -1033,18 +1033,93 @@ export const JobReport: React.FC = () => {
                           type: "text",
                           text: "แจ้งเตือนการส่งสินค้า",
                           weight: "bold",
-                          size: "3xl",
-                          color: "#2c5494",
-                          margin: "md"
-                        },
-                        {
-                          type: "separator",
-                          margin: "md"
+                          size: "xl",
+                          color: "#e54d42",
+                          margin: "md",
+                          align: "center"
                         },
                         {
                           type: "box",
                           layout: "vertical",
                           margin: "lg",
+                          contents: [
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                {
+                                  type: "text",
+                                  text: "ต้นทาง",
+                                  size: "xxs",
+                                  color: "#2c5494",
+                                  weight: "bold"
+                                },
+                                {
+                                  type: "text",
+                                  text: "กำลังส่งสินค้า",
+                                  size: "xxs",
+                                  color: "#aaaaaa",
+                                  align: "center"
+                                },
+                                {
+                                  type: "text",
+                                  text: "ปลายทาง",
+                                  size: "xxs",
+                                  color: "#aaaaaa",
+                                  align: "end"
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "vertical",
+                              contents: [
+                                {
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "box",
+                                      layout: "vertical",
+                                      contents: [],
+                                      height: "6px",
+                                      backgroundColor: "#eeeeee",
+                                      flex: 1
+                                    },
+                                    {
+                                      type: "box",
+                                      layout: "vertical",
+                                      contents: [],
+                                      height: "6px",
+                                      backgroundColor: "#eeeeee",
+                                      flex: 1
+                                    }
+                                  ],
+                                  cornerRadius: "lg"
+                                },
+                                {
+                                  type: "box",
+                                  layout: "vertical",
+                                  contents: [],
+                                  width: "14px",
+                                  height: "14px",
+                                  cornerRadius: "7px",
+                                  borderWidth: "2px",
+                                  borderColor: "#2c5494",
+                                  backgroundColor: "#ffffff",
+                                  position: "absolute",
+                                  offsetTop: "-4px",
+                                  offsetStart: "0%"
+                                }
+                              ],
+                              margin: "sm"
+                            }
+                          ]
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          margin: "xl",
                           spacing: "sm",
                           contents: [
                             {
@@ -1055,7 +1130,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "🆔 เลขที่เคส",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1075,7 +1150,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "🏢 บริษัท",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1096,7 +1171,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "📦 สถานะ",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1117,7 +1192,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "📍 ต้นทาง",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1138,7 +1213,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "🏁 ปลายทาง",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1159,7 +1234,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "🚚 รถ",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1179,7 +1254,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "👤 คนขับ",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1199,7 +1274,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "📞 เบอร์คนขับ",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1219,7 +1294,7 @@ export const JobReport: React.FC = () => {
                                   type: "text",
                                   text: "📅 วันที่",
                                   size: "sm",
-                                  color: "#8c8c8c",
+                                  color: "#2c5494",
                                   flex: 2
                                 },
                                 {
@@ -1401,18 +1476,95 @@ export const JobReport: React.FC = () => {
               type: "text",
               text: "แจ้งเตือนการส่งสินค้า",
               weight: "bold",
-              size: "3xl",
+              size: "xl",
               color: statusColor,
-              margin: "md"
-            },
-            {
-              type: "separator",
-              margin: "md"
+              margin: "md",
+              align: "center"
             },
             {
               type: "box",
               layout: "vertical",
               margin: "lg",
+              contents: [
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    {
+                      type: "text",
+                      text: "ต้นทาง",
+                      size: "xxs",
+                      color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
+                      weight: status === 'accepted' ? "bold" : "regular"
+                    },
+                    {
+                      type: "text",
+                      text: "กำลังส่งสินค้า",
+                      size: "xxs",
+                      color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
+                      align: "center",
+                      weight: status === 'accepted' ? "bold" : "regular"
+                    },
+                    {
+                      type: "text",
+                      text: "ปลายทาง",
+                      size: "xxs",
+                      color: status === 'completed' ? "#2c5494" : "#aaaaaa",
+                      align: "end",
+                      weight: status === 'completed' ? "bold" : "regular"
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "vertical",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [],
+                          height: "6px",
+                          backgroundColor: status === 'completed' ? "#2c5494" : (status === 'accepted' ? "#2c5494" : "#eeeeee"),
+                          flex: 1
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [],
+                          height: "6px",
+                          backgroundColor: status === 'completed' ? "#2c5494" : "#eeeeee",
+                          flex: 1
+                        }
+                      ],
+                      cornerRadius: "lg"
+                    },
+                    {
+                      type: "box",
+                      layout: "vertical",
+                      contents: [],
+                      width: "14px",
+                      height: "14px",
+                      cornerRadius: "7px",
+                      borderWidth: "2px",
+                      borderColor: "#2c5494",
+                      backgroundColor: "#ffffff",
+                      position: "absolute",
+                      offsetTop: "-4px",
+                      offsetStart: status === 'accepted' ? "48%" : "95%"
+                    }
+                  ],
+                  margin: "sm"
+                }
+              ]
+            },
+            {
+              type: "box",
+              layout: "vertical",
+              margin: "xl",
               spacing: "sm",
               contents: [
                 {
@@ -1608,24 +1760,7 @@ export const JobReport: React.FC = () => {
 
       // Only add footer for 'accepted' status (กำลังส่งสินค้า)
       if (status === 'accepted') {
-        flexContents.footer = {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "button",
-              style: "primary",
-              color: "#2c5494",
-              action: {
-                type: "message",
-                label: "รถของฉัน",
-                text: "รถของฉัน"
-              },
-              height: "md"
-            }
-          ],
-          paddingAll: "md"
-        };
+        // Footer removed as requested
       }
 
       const customerMessages = [

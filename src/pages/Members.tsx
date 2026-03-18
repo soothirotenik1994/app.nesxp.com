@@ -554,13 +554,9 @@ export const Members: React.FC = () => {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>
-                <input 
-                  type="text" 
-                  value={formData.line_user_id}
-                  onChange={(e) => setFormData({...formData, line_user_id: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                />
+                <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 text-sm font-mono break-all">
+                  {formData.line_user_id || t('not_linked') || 'Not linked to LINE'}
+                </div>
               </div>
               <div className="pt-4 flex gap-3">
                 <button 
