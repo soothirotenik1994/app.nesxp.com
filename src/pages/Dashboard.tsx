@@ -64,20 +64,42 @@ export const Dashboard: React.FC = () => {
       const memberId = localStorage.getItem('member_id');
 
       // Fetch members and cars
-      let membersData = [];
-      let carsData = [];
+      let membersData: Member[] = [];
+      let carsData: Car[] = [];
 
       try {
-        const [m, c] = await Promise.all([
-          directusApi.getMembers(),
-          directusApi.getCars()
-        ]);
-        membersData = m;
-        carsData = c;
+        // Optimization: If not admin, we might not need to fetch ALL members
+        // but for now we keep it simple and try to fetch both.
+        // If one fails, we handle it gracefully.
+        
+        if (isAdminUser) {
+          const [m, c] = await Promise.all([
+            directusApi.getMembers(),
+            directusApi.getCars()
+          ]);
+          membersData = m;
+          carsData = c;
+        } else {
+          // For non-admins, we still need cars to filter, but maybe we don't need all members
+          // Try fetching cars first as they are critical for the dashboard
+          carsData = await directusApi.getCars();
+          try {
+            membersData = await directusApi.getMembers();
+          } catch (mErr) {
+            console.warn('Could not fetch all members, continuing with cars only');
+          }
+        }
       } catch (fetchErr: any) {
         console.error('Initial fetch error:', fetchErr);
+        
+        // If it's a 401, the interceptor will handle the redirect, 
+        // but we should still stop execution here.
+        if (fetchErr.response?.status === 401) {
+          return;
+        }
+
         // If cars fail, we can't show much, but if only members fail, we might continue
-        if (fetchErr.message?.includes('line_users')) {
+        if (fetchErr.message?.includes('line_users') || fetchErr.response?.data?.errors?.[0]?.message?.includes('line_users')) {
           // Only members failed, try fetching cars separately
           carsData = await directusApi.getCars();
         } else {

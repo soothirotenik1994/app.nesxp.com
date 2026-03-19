@@ -38,8 +38,12 @@ export const Login: React.FC = () => {
         localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
         localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
         localStorage.setItem('user_email', user.email);
+        localStorage.setItem('member_id', user.id);
+        if (user.avatar) {
+          localStorage.setItem('user_picture', directusApi.getFileUrl(user.avatar));
+        }
         
-        navigate(isAdmin ? '/' : '/jobs/my');
+        navigate('/');
         return; // Success
       } catch (adminErr: any) {
         console.log('Admin login failed or not an admin, trying staff login...');
@@ -59,8 +63,11 @@ export const Login: React.FC = () => {
         localStorage.setItem('user_name', `${member.first_name} ${member.last_name}`);
         localStorage.setItem('user_email', member.email);
         localStorage.setItem('member_id', member.id);
+        if (member.picture_url) {
+          localStorage.setItem('user_picture', directusApi.getFileUrl(member.picture_url));
+        }
         localStorage.setItem('is_admin', 'false');
-        navigate('/jobs/my');
+        navigate('/');
       } else {
         console.log('No staff member found with these credentials');
         setError(t('login_error'));
@@ -87,19 +94,22 @@ export const Login: React.FC = () => {
     }
   };
 
+  const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
+  const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 p-2 overflow-hidden">
             <img 
-              src="https://img2.pic.in.th/4863801.jpg" 
-              alt="NES Logo" 
+              src={websiteLogo} 
+              alt={websiteName} 
               className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t('login_title')}</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{websiteName}</h1>
           <p className="text-slate-500 mt-2">{t('login_subtitle')}</p>
         </div>
 

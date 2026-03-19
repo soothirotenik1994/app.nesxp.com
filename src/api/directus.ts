@@ -22,11 +22,13 @@ export const setAuthToken = (token: string | null) => {
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('admin_token');
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
+      // console.log('Using admin token:', token.substring(0, 5) + '...');
     } else {
       // Use static key if no admin token
       config.headers.Authorization = `Bearer ${STATIC_API_KEY}`;
+      // console.log('Using static API key');
     }
     return config;
   },
@@ -38,9 +40,17 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      console.warn('401 Unauthorized detected at:', window.location.pathname);
       localStorage.removeItem('admin_token');
       setAuthToken(null);
-      if (!window.location.pathname.includes('/login')) {
+      
+      // Only redirect if we're not already on the login page
+      // and if we're not trying to log in (to avoid infinite loops)
+      const isLoginPage = window.location.pathname.includes('/login');
+      const isAuthRequest = error.config?.url?.includes('/auth/login');
+      
+      if (!isLoginPage && !isAuthRequest) {
+        console.log('Redirecting to login due to 401...');
         window.location.href = '/login';
       }
     }
@@ -396,7 +406,7 @@ export const directusApi = {
   getCurrentUser: async (): Promise<any> => {
     const response = await api.get('/users/me', {
       params: {
-        fields: 'id,first_name,last_name,email,role.name'
+        fields: 'id,first_name,last_name,email,role.name,avatar'
       }
     });
     return response.data.data;

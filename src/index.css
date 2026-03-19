@@ -16,3 +16,43 @@
 .bg-secondary { background-color: var(--color-secondary); }
 .text-secondary { color: var(--color-secondary); }
 .border-secondary { border-color: var(--color-secondary); }
+
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+
+/* Dark mode scrollbar for sidebar and other primary-colored areas */
+.bg-primary::-webkit-scrollbar-thumb,
+.bg-primary *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bg-primary::-webkit-scrollbar-thumb:hover,
+.bg-primary *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.bg-primary, .bg-primary * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}

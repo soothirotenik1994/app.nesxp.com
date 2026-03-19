@@ -7,6 +7,7 @@ import {
   Car, 
   ShieldCheck, 
   UserCog,
+  Shield,
   LogOut,
   Menu,
   X,
@@ -23,6 +24,8 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { ROLE_PERMISSIONS } from '../config/menuPermissions';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -36,29 +39,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const userRole = localStorage.getItem('user_role') || 'customer';
-  const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
   
+  // ดึงชื่อ Role จาก localStorage (ที่เก็บไว้ตอน Login)
+  const userRole = localStorage.getItem('user_role') || 'Driver';
+  const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
+
+  // ฟังก์ชันเช็คสิทธิ์การแสดงผลเมนู (ใช้ค่าจากไฟล์ config)
+  const isVisible = (key: string) => {
+    const permissions = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['Driver'];
+    return (permissions as any)[key] === true;
+  };
+
   const menuItems = [
-    { name: t('reports'), path: '/reports', icon: ShieldCheck },
-    { name: t('drivers'), path: '/members', icon: Users },
-    { name: t('vehicles'), path: '/cars', icon: Car },
-    { name: t('customer_locations'), path: '/locations', icon: MapPin },
-    { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText },
-  ];
+    { name: t('reports'), path: '/reports', icon: ShieldCheck, key: 'reports' },
+    { name: t('drivers'), path: '/members', icon: Users, key: 'drivers' },
+    { name: t('vehicles'), path: '/cars', icon: Car, key: 'vehicles' },
+    { name: t('customer_locations'), path: '/locations', icon: MapPin, key: 'locations' },
+    { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText, key: 'new_job' },
+  ].filter(item => isVisible(item.key));
 
   const logisticsItems = [
-    { name: t('dashboard'), path: '/', icon: LayoutDashboard },
-    { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar },
-    { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList },
-    { name: t('job_history'), path: '/jobs/history', icon: History },
-  ];
+    { name: t('dashboard'), path: '/', icon: LayoutDashboard, key: 'dashboard' },
+    { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar, key: 'calendar' },
+    { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList, key: 'all_jobs' },
+    { name: t('job_history'), path: '/jobs/history', icon: History, key: 'history' },
+  ].filter(item => isAdmin ? isVisible(item.key) : true); // Non-admins see all logistics for now
   
   const settingsItems = [
-    { name: t('admins'), path: '/admins', icon: UserCog },
-    { name: t('line_settings'), path: '/settings/line', icon: MessageSquare },
-    { name: t('system_settings'), path: '/settings/system', icon: Settings },
-  ];
+    { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
+    { name: t('line_settings'), path: '/settings/line', icon: MessageSquare, key: 'line_settings' },
+    { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
+  ].filter(item => isVisible(item.key));
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -70,6 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     localStorage.removeItem('view_mode');
     navigate('/login');
   };
+
+  const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
+  const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
 
   return (
     <>
@@ -91,14 +105,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden">
                 <img 
-                  src="https://img2.pic.in.th/4863801.jpg" 
-                  alt="NES Logo" 
+                  src={websiteLogo} 
+                  alt={websiteName} 
                   className="w-full h-full object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-bold tracking-tight leading-none">NES Tracking</span>
+                <span className="text-xl font-bold tracking-tight leading-none">{websiteName}</span>
                 <span className="text-[10px] font-medium text-white/50 uppercase mt-1 tracking-widest">
                   {userRole}
                 </span>
@@ -111,9 +125,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            {isAdmin && (
+            <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Logistics</div>
+            {logisticsItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    isActive 
+                      ? "bg-white/20 text-white border border-white/30" 
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  )}
+                  onClick={() => setIsOpen(false)}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.name}</span>
+                </Link>
+              );
+            })}
+
+            {isAdmin && menuItems.length > 0 && (
               <>
-                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('management')}</div>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('management')}</div>
                 {menuItems.map((item) => {
                   const isActive = location.pathname === item.path;
                   return (
@@ -136,28 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               </>
             )}
 
-            <div className={cn("px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest", isAdmin && "mt-4")}>Logistics</div>
-            {logisticsItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-                    isActive 
-                      ? "bg-white/20 text-white border border-white/30" 
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
-                  )}
-                  onClick={() => setIsOpen(false)}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.name}</span>
-                </Link>
-              );
-            })}
-
-            {isAdmin && (
+            {isAdmin && settingsItems.length > 0 && (
               <>
                 <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('system_settings')}</div>
                 {settingsItems.map((item) => {

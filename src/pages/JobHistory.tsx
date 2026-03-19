@@ -18,9 +18,11 @@ import {
   FileText,
   X,
   Copy,
-  User
+  User,
+  Download
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import * as XLSX from 'xlsx';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { clsx } from 'clsx';
 
@@ -32,6 +34,8 @@ export const JobHistory: React.FC = () => {
   const itemsPerPage = 10;
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedReport, setSelectedReport] = useState<WorkReport | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const memberId = localStorage.getItem('member_id');
@@ -136,9 +140,56 @@ export const JobHistory: React.FC = () => {
 📌 ${t('notes')} : ${report.notes || '-'}`;
   };
 
+  const handleExportExcel = () => {
+    const dataToExport = filteredReports.map(r => {
+      const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
+      const car = typeof r.car_id === 'object' ? r.car_id : null;
+      const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
+      
+      return {
+        'ID': r.id || '-',
+        'Case Number': r.case_number || '-',
+        'Status': t(`status_${r.status || 'pending'}`),
+        'Date': workDate,
+        'Customer Name': r.customer_name || '-',
+        'Contact Name': r.customer_contact_name || '-',
+        'Contact Phone': r.customer_contact_phone || '-',
+        'Origin': r.origin || '-',
+        'Destination': r.destination || '-',
+        'Vehicle Number': car?.car_number || '-',
+        'Vehicle Type': car?.vehicle_type || '-',
+        'Driver Name': driver ? `${driver.first_name} ${driver.last_name}` : '-',
+        'Driver Phone': r.phone || '-',
+        'Standby Time': formatTimeDisplay(r.standby_time),
+        'Departure Time': formatTimeDisplay(r.departure_time),
+        'Arrival Time': formatTimeDisplay(r.arrival_time),
+        'Mileage Start': r.mileage_start || '-',
+        'Mileage End': r.mileage_end || '-',
+        'Notes': r.notes || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Job History");
+    
+    const fileName = `Job_History_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const filteredReports = reports.filter(r => {
     // Only show finished jobs (completed or cancelled)
     if (r.status !== 'completed' && r.status !== 'cancelled') return false;
+
+    // Date filtering
+    if (startDate || endDate) {
+      const reportDateStr = r.work_date || r.date_created || '';
+      if (!reportDateStr) return false;
+      
+      const reportDate = parseISO(reportDateStr);
+      if (startDate && reportDate < startOfDay(parseISO(startDate))) return false;
+      if (endDate && reportDate > endOfDay(parseISO(endDate))) return false;
+    }
 
     const search = searchTerm.toLowerCase();
     const customer = String(r.customer_name || '').toLowerCase();
@@ -182,17 +233,55 @@ export const JobHistory: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input 
-              type="text"
-              placeholder={t('search_jobs_placeholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-            />
+        <div className="p-6 border-b border-slate-100 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input 
+                type="text"
+                placeholder={t('search_jobs_placeholder')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              />
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent border-none outline-none text-sm text-slate-600"
+                />
+                <span className="text-slate-300">-</span>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent border-none outline-none text-sm text-slate-600"
+                />
+                {(startDate || endDate) && (
+                  <button 
+                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                    className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  >
+                    <X className="w-3 h-3 text-slate-400" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
+              >
+                <Download className="w-4 h-4" />
+                {t('export_excel') || 'Export Excel'}
+              </button>
+            </div>
           </div>
+
           <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
             <Filter className="w-4 h-4" />
             {t('total')}: {filteredReports.length}

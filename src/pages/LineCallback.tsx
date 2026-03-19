@@ -157,7 +157,7 @@ export const LineCallback: React.FC = () => {
           localStorage.setItem('user_picture', directusApi.getFileUrl(member.picture_url));
         }
 
-        navigate('/jobs/my');
+        navigate('/');
       } catch (err: any) {
         console.error('LINE Callback Error:', err);
         setError(err.response?.data?.error || err.message || 'An error occurred during LINE login');

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Member } from '../types';
-import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus } from 'lucide-react';
+import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -21,6 +21,33 @@ export const Members: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('members_columns');
+    return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'source', 'line_uid', 'vehicles', 'actions'];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('members_columns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const toggleColumn = (id: string) => {
+    setVisibleColumns(prev => 
+      prev.includes(id) 
+        ? prev.filter(c => c !== id) 
+        : [...prev, id]
+    );
+  };
+
+  const columns = [
+    { id: 'name', label: t('name') },
+    { id: 'contact', label: t('contact_info') },
+    { id: 'role', label: t('role') },
+    { id: 'source', label: t('registration_source') },
+    { id: 'line_uid', label: t('line_uid') },
+    { id: 'vehicles', label: t('assigned_vehicles') },
+    { id: 'actions', label: t('actions') },
+  ];
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -208,8 +235,65 @@ export const Members: React.FC = () => {
               className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span>{t('showing_members', { count: filteredMembers.length })}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>{t('showing_members', { count: filteredMembers.length })}</span>
+            </div>
+            
+            <div className="relative">
+              <button 
+                onClick={() => setShowColumnSettings(!showColumnSettings)}
+                className={clsx(
+                  "p-2 rounded-xl border transition-all flex items-center gap-2",
+                  showColumnSettings 
+                    ? "bg-primary text-white border-primary shadow-lg shadow-blue-100" 
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                )}
+                title={t('display_settings') || 'แสดงผล'}
+              >
+                <Settings2 className="w-5 h-5" />
+                <span className="hidden sm:inline text-sm font-semibold">{t('display_settings') || 'แสดงผล'}</span>
+              </button>
+
+              {showColumnSettings && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[60]" 
+                    onClick={() => setShowColumnSettings(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-[61] animate-in fade-in zoom-in duration-200">
+                    <div className="px-4 py-2 border-b border-slate-50 mb-1">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('show_hide_columns') || 'เลือกข้อมูลที่ต้องการแสดง'}</p>
+                    </div>
+                    {columns.map(col => (
+                      <button
+                        key={col.id}
+                        onClick={() => toggleColumn(col.id)}
+                        className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors group"
+                      >
+                        <span className={clsx(
+                          "text-sm font-medium transition-colors",
+                          visibleColumns.includes(col.id) ? "text-slate-900" : "text-slate-400"
+                        )}>
+                          {col.label}
+                        </span>
+                        {visibleColumns.includes(col.id) && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </button>
+                    ))}
+                    <div className="px-2 pt-2 mt-1 border-t border-slate-50">
+                      <button 
+                        onClick={() => setVisibleColumns(columns.map(c => c.id))}
+                        className="w-full px-3 py-2 text-xs font-bold text-primary hover:bg-blue-50 rounded-lg transition-colors text-left"
+                      >
+                        {t('reset_columns') || 'รีเซ็ตคอลัมน์'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -227,195 +311,218 @@ export const Members: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                <th className="px-6 py-4">{t('name')}</th>
-                <th className="px-6 py-4">{t('contact_info')}</th>
-                <th className="px-6 py-4">{t('role')}</th>
-                <th className="px-6 py-4">{t('assigned_vehicles')}</th>
-                <th className="px-6 py-4 text-right">{t('actions')}</th>
+                {visibleColumns.includes('name') && <th className="px-6 py-4">{t('name')}</th>}
+                {visibleColumns.includes('contact') && <th className="px-6 py-4">{t('contact_info')}</th>}
+                {visibleColumns.includes('role') && <th className="px-6 py-4">{t('role')}</th>}
+                {visibleColumns.includes('source') && <th className="px-6 py-4">{t('registration_source')}</th>}
+                {visibleColumns.includes('line_uid') && <th className="px-6 py-4">{t('line_uid')}</th>}
+                {visibleColumns.includes('vehicles') && <th className="px-6 py-4">{t('assigned_vehicles')}</th>}
+                {visibleColumns.includes('actions') && <th className="px-6 py-4 text-right">{t('actions')}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={visibleColumns.length} className="px-6 py-12 text-center">
                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                     <p className="text-slate-500">{t('loading')}</p>
                   </td>
                 </tr>
               ) : filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={visibleColumns.length} className="px-6 py-12 text-center text-slate-400">
                     {t('no_data')}
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
                   <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {member.picture_url ? (
-                          <img 
-                            src={directusApi.getFileUrl(member.picture_url)} 
-                            alt={member.display_name} 
-                            className="w-10 h-10 rounded-full border border-slate-200 object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
-                            {String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase()}
-                            {String(member.last_name || '').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-slate-900">
-                              {member.first_name || member.last_name 
-                                ? `${member.first_name} ${member.last_name}`.trim()
-                                : member.display_name || t('not_specified')}
-                            </p>
-                            <span className={clsx(
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
-                              member.line_user_id ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
-                            )}>
-                              {member.line_user_id ? 'LINE' : 'Admin'}
-                            </span>
-                            {member.car_users && member.car_users.length > 0 && (
-                              <span className="bg-blue-100 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                                {member.car_users.length} {t('vehicles')}
-                              </span>
+                    {visibleColumns.includes('name') && (
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {member.picture_url ? (
+                            <img 
+                              src={directusApi.getFileUrl(member.picture_url)} 
+                              alt={member.display_name} 
+                              className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
+                              {String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase()}
+                              {String(member.last_name || '').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-900">
+                                {member.first_name || member.last_name 
+                                  ? `${member.first_name} ${member.last_name}`.trim()
+                                  : member.display_name || t('not_specified')}
+                              </p>
+                              {member.car_users && member.car_users.length > 0 && (
+                                <span className="bg-blue-100 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                                  {member.car_users.length} {t('vehicles')}
+                                </span>
+                              )}
+                            </div>
+                            {member.display_name && (member.first_name || member.last_name) && (
+                              <p className="text-xs text-primary font-medium">LINE: {member.display_name}</p>
                             )}
                           </div>
-                          {member.display_name && (member.first_name || member.last_name) && (
-                            <p className="text-xs text-primary font-medium">LINE: {member.display_name}</p>
-                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          {member.email ? (
-                            <a href={`mailto:${member.email}`} className="hover:text-primary hover:underline transition-colors">
-                              {member.email}
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
-                          )}
+                      </td>
+                    )}
+                    {visibleColumns.includes('contact') && (
+                      <td className="px-6 py-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                            {member.email ? (
+                              <a href={`mailto:${member.email}`} className="hover:text-primary hover:underline transition-colors">
+                                {member.email}
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            {member.phone ? (
+                              <a href={`tel:${member.phone}`} className="hover:text-primary hover:underline transition-colors">
+                                {member.phone}
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          {member.phone ? (
-                            <a href={`tel:${member.phone}`} className="hover:text-primary hover:underline transition-colors">
-                              {member.phone}
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={clsx(
-                        "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                        member.role === 'customer' ? "bg-emerald-100 text-emerald-700" :
-                        "bg-blue-100 text-blue-700"
-                      )}>
-                        {t(`${member.role || 'customer'}_role`)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {member.role === 'customer' && (
-                        <div className="flex flex-wrap gap-1.5 max-w-[250px]">
-                          {(() => {
-                            // Find permissions for this member
-                            const memberPermissions = allPermissions.filter(p => {
-                              if (!p.line_user_id) return false;
-                              const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
-                              return String(id) === String(member.id);
-                            });
-                            const memberCars = allCars.filter(car => memberPermissions.some(p => {
-                              if (!p.car_id) return false;
-                              const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
-                              return String(id) === String(car.id);
-                            }));
-                            
-                            if (memberCars.length > 0) {
-                              return memberCars.map((car) => (
-                                <span 
-                                  key={car.id}
-                                  className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
-                                  title={`${t('driver_name')}: ${car.owner_name || 'N/A'}`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    <CarIcon className="w-3 h-3" />
-                                    {car.car_number}
-                                  </div>
-                                  {car.owner_name && (
-                                    <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
-                                      {car.owner_name}
-                                    </span>
-                                  )}
-                                </span>
-                              ));
-                            }
-                            
-                            // Fallback to nested data if manual join fails
-                            if (member.car_users && member.car_users.length > 0) {
-                              return member.car_users.map((cu: any) => {
-                                const car = cu.car_id;
-                                return (
+                      </td>
+                    )}
+                    {visibleColumns.includes('role') && (
+                      <td className="px-6 py-4">
+                        <span className={clsx(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          member.role === 'customer' ? "bg-emerald-100 text-emerald-700" :
+                          "bg-blue-100 text-blue-700"
+                        )}>
+                          {t(`${member.role || 'customer'}_role`)}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.includes('source') && (
+                      <td className="px-6 py-4">
+                        <span className={clsx(
+                          "text-[10px] font-bold px-2 py-1 rounded-md",
+                          member.line_user_id ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
+                        )}>
+                          {member.line_user_id ? 'LINE' : 'Admin'}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.includes('line_uid') && (
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-mono text-slate-500 break-all max-w-[150px]">
+                          {member.line_user_id || '-'}
+                        </p>
+                      </td>
+                    )}
+                    {visibleColumns.includes('vehicles') && (
+                      <td className="px-6 py-4">
+                        {member.role === 'customer' && (
+                          <div className="flex flex-wrap gap-1.5 max-w-[250px]">
+                            {(() => {
+                              // Find permissions for this member
+                              const memberPermissions = allPermissions.filter(p => {
+                                if (!p.line_user_id) return false;
+                                const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+                                return String(id) === String(member.id);
+                              });
+                              const memberCars = allCars.filter(car => memberPermissions.some(p => {
+                                if (!p.car_id) return false;
+                                const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+                                return String(id) === String(car.id);
+                              }));
+                              
+                              if (memberCars.length > 0) {
+                                return memberCars.map((car) => (
                                   <span 
-                                    key={car?.id || Math.random()}
+                                    key={car.id}
                                     className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
-                                    title={`${t('driver_name')}: ${car?.owner_name || 'N/A'}`}
+                                    title={`${t('driver_name')}: ${car.owner_name || 'N/A'}`}
                                   >
                                     <div className="flex items-center gap-1">
                                       <CarIcon className="w-3 h-3" />
-                                      {car?.car_number || cu.car_number || t('unknown_car')}
+                                      {car.car_number}
                                     </div>
-                                    {car?.owner_name && (
+                                    {car.owner_name && (
                                       <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
                                         {car.owner_name}
                                       </span>
                                     )}
                                   </span>
-                                );
-                              });
-                            }
+                                ));
+                              }
+                              
+                              // Fallback to nested data if manual join fails
+                              if (member.car_users && member.car_users.length > 0) {
+                                return member.car_users.map((cu: any) => {
+                                  const car = cu.car_id;
+                                  return (
+                                    <span 
+                                      key={car?.id || Math.random()}
+                                      className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
+                                      title={`${t('driver_name')}: ${car?.owner_name || 'N/A'}`}
+                                    >
+                                      <div className="flex items-center gap-1">
+                                        <CarIcon className="w-3 h-3" />
+                                        {car?.car_number || cu.car_number || t('unknown_car')}
+                                      </div>
+                                      {car?.owner_name && (
+                                        <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
+                                          {car.owner_name}
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
+                                });
+                              }
 
-                            return <span className="text-slate-400 text-xs italic">{t('no_data')}</span>;
-                          })()}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {member.role === 'customer' && (
-                          <button 
-                            onClick={() => navigate(`/permissions/${member.id}`)}
-                            className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-colors"
-                            title={t('assign_cars')}
-                          >
-                            <ExternalLink className="w-5 h-5" />
-                          </button>
+                              return <span className="text-slate-400 text-xs italic">{t('no_data')}</span>;
+                            })()}
+                          </div>
                         )}
-                        <button 
-                          onClick={() => handleOpenModal(member)}
-                          className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
-                          title={t('edit')}
-                        >
-                          <Edit2 className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => setDeleteId(member.id)}
-                          className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                          title={t('delete')}
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
+                      </td>
+                    )}
+                    {visibleColumns.includes('actions') && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {member.role === 'customer' && (
+                            <button 
+                              onClick={() => navigate(`/permissions/${member.id}`)}
+                              className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-colors"
+                              title={t('assign_cars')}
+                            >
+                              <ExternalLink className="w-5 h-5" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleOpenModal(member)}
+                            className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
+                            title={t('edit')}
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => setDeleteId(member.id)}
+                            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                            title={t('delete')}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -540,17 +647,28 @@ export const Members: React.FC = () => {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('role')}</label>
-                <select 
-                  required
-                  value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value as any})}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
-                >
-                  <option value="driver">{t('driver_role')}</option>
-                  <option value="customer">{t('customer_role')}</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('registration_source')}</label>
+                  <div className={clsx(
+                    "px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider inline-block",
+                    formData.line_user_id ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
+                  )}>
+                    {formData.line_user_id ? 'LINE' : 'Admin'}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('role')}</label>
+                  <select 
+                    required
+                    value={formData.role}
+                    onChange={(e) => setFormData({...formData, role: e.target.value as any})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
+                  >
+                    <option value="driver">{t('driver_role')}</option>
+                    <option value="customer">{t('customer_role')}</option>
+                  </select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>

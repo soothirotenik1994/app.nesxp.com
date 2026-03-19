@@ -1,22 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Menu, User, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useNavigate } from 'react-router-dom';
 import { setAuthToken } from '../api/directus';
+import { ProfileModal } from './ProfileModal';
 
 interface TopBarProps {
   onMenuClick: () => void;
+  onProfileClick: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const userName = localStorage.getItem('user_name') || t('admin_user');
-  const userRole = localStorage.getItem('user_role') || t('super_admin');
-
+  const [userInfo, setUserInfo] = useState({
+    name: localStorage.getItem('user_name') || t('admin_user'),
+    role: localStorage.getItem('user_role') || t('super_admin'),
+    picture: localStorage.getItem('user_picture') || ''
+  });
+  
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
+    // Clear all auth-related items from localStorage
+    const itemsToRemove = [
+      'admin_token',
+      'user_role',
+      'user_name',
+      'user_email',
+      'member_id',
+      'is_admin',
+      'user_picture',
+      'line_user_id'
+    ];
+    itemsToRemove.forEach(item => localStorage.removeItem(item));
+    
     setAuthToken(null);
     navigate('/login');
   };
@@ -42,12 +59,25 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
 
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900">{userRole}</p>
-            <p className="text-xs text-slate-500">{userName}</p>
+            <p className="text-sm font-medium text-slate-900">{userInfo.role}</p>
+            <p className="text-xs text-slate-500">{userInfo.name}</p>
           </div>
-          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
-            <User className="w-6 h-6 text-slate-600" />
-          </div>
+          <button 
+            onClick={onProfileClick}
+            className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 hover:bg-slate-200 transition-colors overflow-hidden"
+            title={t('profile')}
+          >
+            {userInfo.picture ? (
+              <img 
+                src={userInfo.picture} 
+                alt="Profile" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <User className="w-6 h-6 text-slate-600" />
+            )}
+          </button>
           <button 
             onClick={handleLogout}
             className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"

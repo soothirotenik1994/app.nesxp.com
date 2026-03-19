@@ -15,9 +15,8 @@ import { MyJobs } from './pages/MyJobs';
 import { Reports } from './pages/Reports';
 import { LineSettings } from './pages/LineSettings';
 import { SystemSettings } from './pages/SystemSettings';
-import Profile from './pages/Profile';
 import { useEffect } from 'react';
-import { setAuthToken } from './api/directus';
+import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
@@ -25,7 +24,26 @@ export default function App() {
     const token = localStorage.getItem('admin_token');
     if (token) {
       setAuthToken(token);
+      
+      // Refresh user info
+      directusApi.getCurrentUser().then(user => {
+        const role = user.role?.name || 'Driver';
+        const isAdmin = role.toLowerCase() === 'administrator' || role.toLowerCase() === 'admin';
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
+        localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
+        localStorage.setItem('user_email', user.email);
+        
+        // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
+        localStorage.removeItem('menu_permissions');
+      }).catch(err => {
+        console.error('Error refreshing user info:', err);
+      });
     }
+
+    // Update document title
+    const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
+    document.title = websiteName;
   }, []);
 
   return (
@@ -33,7 +51,6 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/line/callback" element={<LineCallback />} />
-        <Route path="/profile/:lineUserId" element={<Profile />} />
         
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>

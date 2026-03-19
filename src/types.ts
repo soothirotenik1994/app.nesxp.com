@@ -11,6 +11,7 @@ export interface Member {
   role?: 'driver' | 'customer';
   created_at: string;
   date_created?: string;
+  registration_source?: 'line' | 'admin';
   car_users?: {
     car_id: Car;
   }[];
@@ -59,7 +60,10 @@ export interface AdminUser {
   first_name: string;
   last_name: string;
   email: string;
-  role?: string;
+  phone?: string;
+  line_user_id?: string;
+  role?: string | { id: string; name: string };
+  avatar?: string;
   status?: string;
 }
 
