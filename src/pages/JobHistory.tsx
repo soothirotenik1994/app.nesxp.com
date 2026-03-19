@@ -233,9 +233,9 @@ export const JobHistory: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
+        <div className="p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1">
+            <div className="relative flex-1 w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input 
                 type="text"
@@ -246,45 +246,44 @@ export const JobHistory: React.FC = () => {
               />
             </div>
             
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <input 
-                  type="date" 
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-transparent border-none outline-none text-sm text-slate-600"
-                />
-                <span className="text-slate-300">-</span>
-                <input 
-                  type="date" 
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-transparent border-none outline-none text-sm text-slate-600"
-                />
-                {(startDate || endDate) && (
-                  <button 
-                    onClick={() => { setStartDate(''); setEndDate(''); }}
-                    className="p-1 hover:bg-slate-200 rounded-full transition-colors"
-                  >
-                    <X className="w-3 h-3 text-slate-400" />
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={handleExportExcel}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
-              >
-                <Download className="w-4 h-4" />
-                {t('export_excel') || 'Export Excel'}
-              </button>
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 w-full sm:w-auto">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent border-none outline-none text-sm text-slate-600 w-full sm:w-auto"
+              />
+              <span className="text-slate-300">-</span>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent border-none outline-none text-sm text-slate-600 w-full sm:w-auto"
+              />
+              {(startDate || endDate) && (
+                <button 
+                  onClick={() => { setStartDate(''); setEndDate(''); }}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                >
+                  <X className="w-3 h-3 text-slate-400" />
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-            <Filter className="w-4 h-4" />
-            {t('total')}: {filteredReports.length}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
+            >
+              <Download className="w-4 h-4" />
+              {t('export_excel')}
+            </button>
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-500 whitespace-nowrap">
+              <Filter className="w-4 h-4" />
+              {t('total')}: {filteredReports.length}
+            </div>
           </div>
         </div>
 
@@ -459,7 +458,7 @@ export const JobHistory: React.FC = () => {
 
       {/* Report Modal */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-900">{t('job_report')}</h3>
@@ -538,7 +537,7 @@ export const JobHistory: React.FC = () => {
       {/* Fullscreen Image Preview */}
       {fullscreenImage && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setFullscreenImage(null)}
         >
           <button 

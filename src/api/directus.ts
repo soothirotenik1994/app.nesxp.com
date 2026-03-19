@@ -369,6 +369,32 @@ export const directusApi = {
     await api.delete(`/items/customer_locations/${id}`);
   },
 
+  getSystemSettings: async (): Promise<any> => {
+    try {
+      const response = await api.get('/items/system_settings/1');
+      return response.data.data;
+    } catch (error) {
+      console.warn('System settings not found in Directus, using defaults');
+      return null;
+    }
+  },
+
+  updateSystemSettings: async (data: any): Promise<any> => {
+    try {
+      // Try to update ID 1, if fails, create it
+      try {
+        const response = await api.patch('/items/system_settings/1', data);
+        return response.data.data;
+      } catch (e) {
+        const response = await api.post('/items/system_settings', { id: 1, ...data });
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Error updating system settings:', error);
+      throw error;
+    }
+  },
+
   linkCarToMember: async (carId: string, memberId: string): Promise<any> => {
     try {
       // Check if already linked

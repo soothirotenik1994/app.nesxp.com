@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
+import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
 import { directusApi } from '../api/directus';
 
 export const SystemSettings: React.FC = () => {
@@ -15,7 +15,32 @@ export const SystemSettings: React.FC = () => {
     staticApiKey: localStorage.getItem('static_api_key') || 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4',
     websiteName: localStorage.getItem('website_name') || 'NES Tracking',
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
+    appUrl: localStorage.getItem('app_url') || window.location.origin,
   });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await directusApi.getSystemSettings();
+        if (settings) {
+          setFormData(prev => ({
+            ...prev,
+            websiteName: settings.website_name || prev.websiteName,
+            websiteLogo: settings.website_logo || prev.websiteLogo,
+            appUrl: settings.app_url || prev.appUrl,
+          }));
+          
+          // Sync to localStorage for immediate use in app
+          if (settings.website_name) localStorage.setItem('website_name', settings.website_name);
+          if (settings.website_logo) localStorage.setItem('website_logo', settings.website_logo);
+          if (settings.app_url) localStorage.setItem('app_url', settings.app_url);
+        }
+      } catch (error) {
+        console.error('Failed to fetch settings from Directus:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,21 +59,36 @@ export const SystemSettings: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    localStorage.setItem('directus_url', formData.directusUrl);
-    localStorage.setItem('static_api_key', formData.staticApiKey);
-    localStorage.setItem('website_name', formData.websiteName);
-    localStorage.setItem('website_logo', formData.websiteLogo);
-    
-    setTimeout(() => {
-      setIsSaving(false);
-      setShowSuccess(true);
+    try {
+      // Save to Directus
+      await directusApi.updateSystemSettings({
+        website_name: formData.websiteName,
+        website_logo: formData.websiteLogo,
+        app_url: formData.appUrl,
+      });
+
+      // Save to localStorage
+      localStorage.setItem('directus_url', formData.directusUrl);
+      localStorage.setItem('static_api_key', formData.staticApiKey);
+      localStorage.setItem('website_name', formData.websiteName);
+      localStorage.setItem('website_logo', formData.websiteLogo);
+      localStorage.setItem('app_url', formData.appUrl);
+      
       setTimeout(() => {
-        setShowSuccess(false);
-        window.location.reload(); // Reload to apply new settings to API client
-      }, 1500);
-    }, 800);
+        setIsSaving(false);
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          window.location.reload(); // Reload to apply new settings to API client
+        }, 1500);
+      }, 800);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      setIsSaving(false);
+      alert('Failed to save settings to Directus. Please check your permissions or if the collection "system_settings" exists.');
+    }
   };
 
   return (
@@ -122,6 +162,21 @@ export const SystemSettings: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <LinkIcon className="w-4 h-4 text-slate-400" />
+              {t('app_url')}
+            </label>
+            <input 
+              type="text" 
+              value={formData.appUrl}
+              onChange={(e) => setFormData({...formData, appUrl: e.target.value})}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              placeholder="https://your-app-url.com"
+            />
+            <p className="text-[10px] text-slate-400">Used for generating deep links and LINE notifications</p>
           </div>
           
           {formData.websiteLogo && (

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, isSameMonth } from 'date-fns';
 import { clsx } from 'clsx';
+import * as XLSX from 'xlsx';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -125,6 +126,43 @@ export const Reports: React.FC = () => {
       lastActive: lastActiveDate ? format(parseISO(lastActiveDate), 'MMM dd, HH:mm') : '-'
     };
   }).sort((a, b) => b.count - a.count).slice(0, 10);
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredData.map(r => {
+      const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
+      const car = typeof r.car_id === 'object' ? r.car_id : null;
+      const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
+      
+      return {
+        'ID': r.id || '-',
+        'Case Number': r.case_number || '-',
+        'Status': t(`status_${r.status || 'pending'}`),
+        'Date': workDate,
+        'Customer Name': r.customer_name || '-',
+        'Contact Name': r.customer_contact_name || '-',
+        'Contact Phone': r.customer_contact_phone || '-',
+        'Origin': r.origin || '-',
+        'Destination': r.destination || '-',
+        'Vehicle Number': car?.car_number || '-',
+        'Vehicle Type': car?.vehicle_type || '-',
+        'Driver Name': driver ? `${driver.first_name} ${driver.last_name}` : '-',
+        'Driver Phone': r.phone || '-',
+        'Standby Time': r.standby_time || '-',
+        'Departure Time': r.departure_time || '-',
+        'Arrival Time': r.arrival_time || '-',
+        'Mileage Start': r.mileage_start || '-',
+        'Mileage End': r.mileage_end || '-',
+        'Notes': r.notes || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Reports");
+    
+    const fileName = `Reports_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
 
   // 1. Job Status Distribution
   const statusData = [
@@ -224,6 +262,13 @@ export const Reports: React.FC = () => {
               className="text-sm outline-none bg-transparent"
             />
           </div>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
+          >
+            <Download className="w-4 h-4" />
+            {t('export_excel')}
+          </button>
           <button 
             onClick={fetchData}
             className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"

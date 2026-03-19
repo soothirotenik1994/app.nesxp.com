@@ -154,7 +154,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-md relative animate-in zoom-in-95 duration-200">
         <button 
           onClick={onClose}

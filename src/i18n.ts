@@ -38,6 +38,7 @@ const resources = {
       "manage_admins": "Manage system administrators",
       "new_job_assignment": "New Job Assignment",
       "system_settings": "System Settings",
+      "app_url": "App URL",
       "line_settings": "LINE Settings",
       "line_notifications": "LINE Notifications",
       "enable_line_notifications": "Enable LINE Notifications",
@@ -293,7 +294,8 @@ const resources = {
       "enter_cancel_reason": "Please enter a reason for cancellation",
       "contact_name": "Contact Name",
       "contact_phone": "Contact Phone",
-      "arrival_before_departure_error": "Arrival time cannot be before departure time"
+      "arrival_before_departure_error": "Arrival time cannot be before departure time",
+      "export_excel": "Export Excel"
     }
   },
   th: {
@@ -309,6 +311,7 @@ const resources = {
       "manage_admins": "จัดการผู้ดูแลระบบ",
       "new_job_assignment": "มอบหมายงานใหม่",
       "system_settings": "ตั้งค่าระบบ",
+      "app_url": "URL แอป",
       "line_settings": "ตั้งค่า LINE",
       "line_notifications": "การแจ้งเตือน LINE",
       "enable_line_notifications": "เปิดใช้งานการแจ้งเตือน LINE",
@@ -383,7 +386,7 @@ const resources = {
       "date": "วันที่",
       "total": "ทั้งหมด",
       "phone": "เบอร์โทร",
-      "registration_source": "แหล่งที่มา",
+      "registration_source": "สมาชิก",
       "line_uid": "LINE UID",
       "line_id": "LINE User ID",
       "read_only": "ดูได้อย่างเดียว",
@@ -586,7 +589,8 @@ const resources = {
       "enter_cancel_reason": "กรุณาระบุเหตุผลที่ต้องการยกเลิกงาน",
       "contact_name": "ผู้ติดต่อ",
       "contact_phone": "เบอร์โทรศัพท์",
-      "arrival_before_departure_error": "เวลาถึงต้องไม่น้อยกว่าเวลาออกเดินทาง"
+      "arrival_before_departure_error": "เวลาถึงต้องไม่น้อยกว่าเวลาออกเดินทาง",
+      "export_excel": "ส่งออก Excel"
     }
   }
 };

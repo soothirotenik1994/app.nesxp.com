@@ -320,7 +320,7 @@ export const MyJobs: React.FC = () => {
                   className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-100"
                 >
                   <Download className="w-4 h-4" />
-                  {t('export_excel') || 'Export Excel'}
+                  {t('export_excel')}
                 </button>
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-500 whitespace-nowrap">
                   <Filter className="w-4 h-4" />

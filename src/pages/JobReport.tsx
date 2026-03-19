@@ -2486,7 +2486,7 @@ export const JobReport: React.FC = () => {
         {/* Fullscreen Image Preview */}
         {fullscreenImage && (
           <div 
-            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
             onClick={() => setFullscreenImage(null)}
           >
             <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
@@ -3299,7 +3299,7 @@ export const JobReport: React.FC = () => {
       {/* Fullscreen Image Preview */}
       {fullscreenImage && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setFullscreenImage(null)}
         >
           <button 
@@ -3319,7 +3319,7 @@ export const JobReport: React.FC = () => {
 
       {/* Status Modal */}
       {showStatusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="flex flex-col items-center text-center">
               <div className={clsx(
