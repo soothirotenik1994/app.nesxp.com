@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Car as CarType } from '../types';
-import { Search, Plus, Car as CarIcon, MoreVertical, Edit2, Trash2, X, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Plus, Car as CarIcon, MoreVertical, Edit2, Trash2, X, Loader2, AlertCircle, Save } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 export const Cars: React.FC = () => {
@@ -16,6 +16,7 @@ export const Cars: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<CarType | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -31,36 +32,16 @@ export const Cars: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      let carsData = [];
-      let membersData = [];
-      let permissionsData = [];
-
-      try {
-        const [c, m, p] = await Promise.all([
-          directusApi.getCars(),
-          directusApi.getMembers(),
-          directusApi.getCarPermissions()
-        ]);
-        carsData = c;
-        membersData = m;
-        permissionsData = p;
-      } catch (fetchErr: any) {
-        console.error('Initial fetch error in Cars:', fetchErr);
-        if (fetchErr.message?.includes('line_users')) {
-          const [c, p] = await Promise.all([
-            directusApi.getCars(),
-            directusApi.getCarPermissions()
-          ]);
-          carsData = c;
-          permissionsData = p;
-        } else {
-          throw fetchErr;
-        }
-      }
-
-      setCars(carsData);
-      setAllMembers(membersData);
-      setAllPermissions(permissionsData);
+      const carsDataResult = await directusApi.getCars();
+      console.log('Fetched cars:', carsDataResult);
+      setCars(carsDataResult);
+      
+      const [membersDataResult, permissionsDataResult] = await Promise.all([
+        directusApi.getMembers(),
+        directusApi.getCarPermissions()
+      ]);
+      setAllMembers(membersDataResult);
+      setAllPermissions(permissionsDataResult);
     } catch (err: any) {
       console.error('Error fetching cars:', err);
       // Only set error if it's not a 401 (which is handled by the interceptor)
@@ -84,13 +65,20 @@ export const Cars: React.FC = () => {
   const handleOpenModal = (car?: CarType) => {
     if (car) {
       setEditingCar(car);
+      // Ensure car_image is just the ID string if it's an object, handle null safely
+      const carImageId = (car.car_image && typeof car.car_image === 'object') 
+        ? (car.car_image as any).id 
+        : car.car_image;
+      
+      console.log('Opening modal for car:', car.id, 'Image ID:', carImageId);
+      
       setFormData({
-        car_number: car.car_number,
+        car_number: car.car_number || '',
         vehicle_type: car.vehicle_type || '',
-        description: car.description,
+        description: car.description || '',
         owner_name: car.owner_name || '',
         driver_phone: car.driver_phone || '',
-        car_image: car.car_image || ''
+        car_image: carImageId || ''
       });
     } else {
       setEditingCar(null);
@@ -111,27 +99,70 @@ export const Cars: React.FC = () => {
     if (!file) return;
 
     try {
-      setSubmitting(true);
+      setUploadingImage(true);
+      setActionError(null);
+      console.log('Uploading file:', file.name);
       const fileId = await directusApi.uploadFile(file);
+      console.log('File uploaded successfully, ID:', fileId);
       setFormData(prev => ({ ...prev, car_image: fileId }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error uploading car image:', err);
-      setActionError('Failed to upload car image');
+      const errorMsg = err.response?.data?.errors?.[0]?.message || err.message || 'Failed to upload car image';
+      setActionError(`Upload Error: ${errorMsg}`);
     } finally {
-      setSubmitting(false);
+      setUploadingImage(false);
     }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, car_image: '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setActionError(null);
+    
+    console.log('Submitting car data:', formData);
+    
     try {
+      let carId = editingCar?.id;
+      // Prepare data for submission, ensuring empty strings are null for file fields if needed
+      const submissionData = {
+        ...formData,
+        car_image: formData.car_image || null
+      };
+      
+      console.log('Submission data (processed):', submissionData);
+
       if (editingCar) {
-        await directusApi.updateCar(editingCar.id, formData);
+        console.log('Updating car:', editingCar.id);
+        const updatedCar = await directusApi.updateCar(editingCar.id, submissionData);
+        console.log('Update response:', updatedCar);
       } else {
-        await directusApi.createCar(formData);
+        console.log('Creating new car');
+        const newCar = await directusApi.createCar(submissionData);
+        carId = newCar.id;
+        console.log('New car created, response:', newCar);
       }
+
+      // Sync car_users with owner_name to enforce "One car, one driver"
+      const selectedMember = allMembers.find(m => (m.first_name + ' ' + m.last_name).trim() === formData.owner_name);
+      if (carId) {
+        // 1. Clear existing assignments for this car to enforce the rule
+        const car = cars.find(c => String(c.id) === String(carId));
+        if (car && car.car_users && car.car_users.length > 0) {
+          await Promise.all(car.car_users.map((cu: any) => 
+            directusApi.deleteCarPermission(cu.id).catch(() => {})
+          ));
+        }
+
+        // 2. Add the new driver assignment if one was selected
+        if (selectedMember) {
+          await directusApi.addCarPermission(selectedMember.id, carId);
+        }
+      }
+
       setIsModalOpen(false);
       fetchCars();
     } catch (err: any) {
@@ -222,120 +253,130 @@ export const Cars: React.FC = () => {
             </div>
           ) : (
             filteredCars.map((car) => (
-              <div key={car.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 group-hover:border-blue-200 transition-colors overflow-hidden">
-                    {car.car_image ? (
-                      <img 
-                        src={directusApi.getFileUrl(car.car_image)} 
-                        alt="" 
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <CarIcon className="w-6 h-6 text-slate-400 group-hover:text-primary" />
-                    )}
-                  </div>
-                  <div className="flex gap-1">
+              <div key={car.id} className="bg-white rounded-2xl border border-slate-200 hover:border-primary/30 transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md">
+                {/* Car Image Display */}
+                <div className="relative h-48 bg-slate-100 overflow-hidden">
+                  {(() => {
+                    const imageId = typeof car.car_image === 'object' ? (car.car_image as any)?.id : car.car_image;
+                    if (imageId) {
+                      return (
+                        <img 
+                          src={directusApi.getFileUrl(car.car_image)} 
+                          alt={car.car_number} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          referrerPolicy="no-referrer"
+                        />
+                      );
+                    }
+                    return (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                        <CarIcon className="w-16 h-16 text-slate-200" />
+                      </div>
+                    );
+                  })()}
+                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => handleOpenModal(car)}
-                      className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                      className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-primary transition-colors shadow-sm"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={() => setDeleteId(car.id)}
-                      className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                      className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-red-500 transition-colors shadow-sm"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-lg font-bold text-slate-900">{car.car_number}</h3>
-                    {car.vehicle_type && (
-                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                  {car.vehicle_type && (
+                    <div className="absolute bottom-3 left-3">
+                      <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
                         {car.vehicle_type}
                       </span>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-slate-900">{car.car_number}</h3>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                      {t('online')}
+                    </div>
                   </div>
-                  <div className="mt-2 space-y-2">
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('driver_name')}</p>
-                      <p className="text-sm text-primary font-bold">{car.owner_name || 'N/A'}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('driver_name')}</p>
+                      <p className="text-sm text-slate-700 font-bold truncate">{car.owner_name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('phone')}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>
                       {car.driver_phone ? (
-                        <a href={`tel:${car.driver_phone}`} className="text-sm text-slate-600 font-medium hover:text-primary transition-colors">
+                        <a href={`tel:${car.driver_phone}`} className="text-sm text-primary font-bold hover:underline">
                           {car.driver_phone}
                         </a>
                       ) : (
-                        <p className="text-sm text-slate-400 italic text-xs">{t('no_data')}</p>
+                        <p className="text-sm text-slate-300 italic">{t('no_data')}</p>
                       )}
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('members')}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(() => {
-                          // Find permissions for this car
-                          const carPermissions = allPermissions.filter(p => {
-                            if (!p.car_id) return false;
-                            const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
-                            return String(id) === String(car.id);
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('members')}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(() => {
+                        // Find permissions for this car
+                        const carPermissions = allPermissions.filter(p => {
+                          if (!p.car_id) return false;
+                          const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+                          return String(id) === String(car.id);
+                        });
+                        const carMembers = allMembers.filter(member => carPermissions.some(p => {
+                          if (!p.line_user_id) return false;
+                          const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+                          return String(id) === String(member.id);
+                        }));
+                        
+                        if (carMembers.length > 0) {
+                          return carMembers.map((member) => {
+                            const name = member.display_name || `${member.first_name} ${member.last_name}`;
+                            return (
+                              <span 
+                                key={member.id}
+                                className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
+                              >
+                                {name}
+                              </span>
+                            );
                           });
-                          const carMembers = allMembers.filter(member => carPermissions.some(p => {
-                            if (!p.line_user_id) return false;
-                            const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
-                            return String(id) === String(member.id);
-                          }));
-                          
-                          if (carMembers.length > 0) {
-                            return carMembers.map((member) => {
-                              const name = member.display_name || `${member.first_name} ${member.last_name}`;
-                              return (
-                                <span 
-                                  key={member.id}
-                                  className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
-                                >
-                                  {name}
-                                </span>
-                              );
-                            });
-                          }
+                        }
 
-                          // Fallback to nested data
-                          if (car.car_users && car.car_users.length > 0) {
-                            return car.car_users.map((cu) => {
-                              const member = cu.line_user_id;
-                              const name = member?.display_name || (member?.first_name ? `${member.first_name} ${member.last_name}` : t('unknown_car'));
-                              return (
-                                <span 
-                                  key={(cu as any).id || Math.random()}
-                                  className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
-                                >
-                                  {name}
-                                </span>
-                              );
-                            });
-                          }
+                        // Fallback to nested data
+                        if (car.car_users && car.car_users.length > 0) {
+                          return car.car_users.map((cu) => {
+                            const member = cu.line_user_id;
+                            const name = member?.display_name || (member?.first_name ? `${member.first_name} ${member.last_name}` : t('unknown_car'));
+                            return (
+                              <span 
+                                key={(cu as any).id || Math.random()}
+                                className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
+                              >
+                                {name}
+                              </span>
+                            );
+                          });
+                        }
 
-                          return <span className="text-slate-400 text-[10px] italic">{t('no_data')}</span>;
-                        })()}
-                      </div>
+                        return <span className="text-slate-400 text-[10px] italic">{t('no_data')}</span>;
+                      })()}
                     </div>
                   </div>
-                  <p className="text-sm text-slate-500 mt-3 line-clamp-2">
+
+                  <p className="text-sm text-slate-500 line-clamp-2 italic mb-4">
                     {car.description || t('no_description')}
                   </p>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('status')}</span>
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
-                    {t('online')}
-                  </span>
                 </div>
               </div>
             ))
@@ -370,38 +411,68 @@ export const Cars: React.FC = () => {
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xl font-bold text-slate-900">
-                {editingCar ? t('edit_vehicle') : t('add_vehicle')}
+                {editingCar ? t('edit_vehicle') || 'แก้ไขรถ' : t('add_vehicle') || 'เพิ่มรถ'}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-6 h-6 text-slate-400" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('car_image') || 'รูปภาพรถ'}</label>
-                <div className="flex items-center gap-4">
-                  {formData.car_image && (
-                    <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+                <div className="space-y-3">
+                  {formData.car_image ? (
+                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group">
                       <img 
                         src={directusApi.getFileUrl(formData.car_image)} 
                         alt="" 
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <label className="p-2 bg-white rounded-full text-slate-600 hover:text-primary cursor-pointer transition-colors">
+                          <Plus className="w-5 h-5" />
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                          />
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="p-2 bg-white rounded-full text-slate-600 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <label className="w-full aspect-video flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 hover:border-primary/30 transition-all group">
+                      {uploadingImage ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                          <span className="text-xs font-bold text-slate-400">กำลังอัพโหลด...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                            <Plus className="w-6 h-6 text-slate-400 group-hover:text-primary" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-500">{t('upload_photo') || 'อัพโหลดรูปภาพ'}</span>
+                          <span className="text-[10px] text-slate-400 mt-1">PNG, JPG สูงสุด 10MB</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={uploadingImage}
+                      />
+                    </label>
                   )}
-                  <label className="flex-1 flex items-center justify-center px-4 py-2.5 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Plus className="w-4 h-4" />
-                      <span className="text-sm font-medium">{formData.car_image ? t('change_photo') : t('upload_photo')}</span>
-                    </div>
-                    <input 
-                      type="file" 
-                      className="hidden" 
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
-                  </label>
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -410,7 +481,7 @@ export const Cars: React.FC = () => {
                   type="text" 
                   required
                   value={formData.car_number}
-                  onChange={(e) => setFormData({...formData, car_number: e.target.value})}
+                  onChange={(e) => setFormData(prev => ({...prev, car_number: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                   placeholder="3ฒธ2714"
                 />
@@ -420,7 +491,7 @@ export const Cars: React.FC = () => {
                 <input 
                   type="text" 
                   value={formData.vehicle_type}
-                  onChange={(e) => setFormData({...formData, vehicle_type: e.target.value})}
+                  onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                   placeholder="4 ล้อตู้ทึบ"
                 />
@@ -432,17 +503,17 @@ export const Cars: React.FC = () => {
                   onChange={(e) => {
                     const selectedMember = allMembers.find(m => String(m.id) === e.target.value);
                     if (selectedMember) {
-                      setFormData({
-                        ...formData, 
+                      setFormData(prev => ({
+                        ...prev, 
                         owner_name: `${selectedMember.first_name} ${selectedMember.last_name}`.trim(),
                         driver_phone: selectedMember.phone || ''
-                      });
+                      }));
                     } else {
-                      setFormData({
-                        ...formData, 
+                      setFormData(prev => ({
+                        ...prev, 
                         owner_name: '',
                         driver_phone: ''
-                      });
+                      }));
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
@@ -462,7 +533,7 @@ export const Cars: React.FC = () => {
                 <input 
                   type="tel" 
                   value={formData.driver_phone}
-                  onChange={(e) => setFormData({...formData, driver_phone: e.target.value})}
+                  onChange={(e) => setFormData(prev => ({...prev, driver_phone: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                   placeholder="081-234-5678"
                 />
@@ -472,7 +543,7 @@ export const Cars: React.FC = () => {
                 <textarea 
                   rows={3}
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none"
                   placeholder="Toyota Hilux White..."
                 />
@@ -483,14 +554,21 @@ export const Cars: React.FC = () => {
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
                 >
-                  {t('cancel')}
+                  {t('cancel') || 'ยกเลิก'}
                 </button>
                 <button 
                   type="submit"
-                  disabled={submitting}
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center"
+                  disabled={submitting || uploadingImage}
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center gap-2"
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t('save')}
+                  {(submitting || uploadingImage) ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      {t('save') || 'บันทึก'}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

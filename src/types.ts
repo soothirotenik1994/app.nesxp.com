@@ -25,7 +25,7 @@ export interface Car {
   description: string;
   owner_name?: string;
   driver_phone?: string;
-  car_image?: string;
+  car_image?: string | { id: string };
   car_users?: {
     line_user_id: Member;
   }[];

@@ -37,7 +37,10 @@ export default function App() {
         // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
         localStorage.removeItem('menu_permissions');
       }).catch(err => {
-        console.error('Error refreshing user info:', err);
+        // Only log if it's not a 401 (which is handled by the interceptor)
+        if (err.response?.status !== 401) {
+          console.error('Error refreshing user info:', err);
+        }
       });
     }
 
@@ -65,7 +68,6 @@ export default function App() {
             <Route path="/jobs/my" element={<MyJobs />} />
             <Route path="/jobs/calendar" element={<JobCalendar />} />
             <Route path="/jobs/history" element={<JobHistory />} />
-            <Route path="/settings/line" element={<LineSettings />} />
             <Route path="/settings/system" element={<SystemSettings />} />
             <Route path="/permissions" element={<Members />} />
             <Route path="/permissions/:memberId" element={<AssignCars />} />

@@ -96,11 +96,11 @@ export const Members: React.FC = () => {
     if (member) {
       setEditingMember(member);
       setFormData({
-        first_name: member.first_name,
-        last_name: member.last_name,
-        email: member.email,
-        phone: member.phone,
-        line_user_id: member.line_user_id,
+        first_name: member.first_name || '',
+        last_name: member.last_name || '',
+        email: member.email || '',
+        phone: member.phone || '',
+        line_user_id: member.line_user_id || '',
         password: '', // Don't show password
         role: member.role || 'customer',
         picture_url: member.picture_url || ''
@@ -429,9 +429,8 @@ export const Members: React.FC = () => {
                     )}
                     {visibleColumns.includes('vehicles') && (
                       <td className="px-6 py-4">
-                        {member.role === 'customer' && (
-                          <div className="flex flex-wrap gap-1.5 max-w-[250px]">
-                            {(() => {
+                        <div className="flex flex-wrap gap-1.5 max-w-[250px]">
+                          {(() => {
                               // Find permissions for this member
                               const memberPermissions = allPermissions.filter(p => {
                                 if (!p.line_user_id) return false;
@@ -489,9 +488,8 @@ export const Members: React.FC = () => {
                               }
 
                               return <span className="text-slate-400 text-xs italic">{t('no_data')}</span>;
-                            })()}
-                          </div>
-                        )}
+                          })()}
+                        </div>
                       </td>
                     )}
                     {visibleColumns.includes('actions') && (

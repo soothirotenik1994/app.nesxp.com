@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { directusApi } from '../api/directus';
+import { LineSettings } from './LineSettings';
 
 export const SystemSettings: React.FC = () => {
   const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'general' | 'line'>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -48,12 +50,13 @@ export const SystemSettings: React.FC = () => {
 
     setIsUploading(true);
     try {
-      const uploadedFile = await directusApi.uploadFile(file);
-      const fileUrl = directusApi.getFileUrl(uploadedFile.id);
+      const fileId = await directusApi.uploadFile(file);
+      const fileUrl = directusApi.getFileUrl(fileId);
       setFormData({ ...formData, websiteLogo: fileUrl });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading file:', error);
-      alert('Failed to upload logo. Please check your Directus permissions.');
+      const errorMsg = error.response?.data?.errors?.[0]?.message || error.message || 'Failed to upload logo';
+      alert(`Upload Error: ${errorMsg}`);
     } finally {
       setIsUploading(false);
     }
@@ -100,7 +103,35 @@ export const SystemSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
+            activeTab === 'general' 
+              ? 'bg-white text-primary shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          {t('general_settings')}
+        </button>
+        <button
+          onClick={() => setActiveTab('line')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
+            activeTab === 'line' 
+              ? 'bg-white text-primary shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          {t('line_settings')}
+        </button>
+      </div>
+
+      {activeTab === 'general' ? (
+        <>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
@@ -269,6 +300,10 @@ export const SystemSettings: React.FC = () => {
           </button>
         </div>
       </div>
+      </>
+      ) : (
+        <LineSettings hideHeader={true} />
+      )}
 
       {showSuccess && (
         <div className="fixed bottom-8 right-8 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">

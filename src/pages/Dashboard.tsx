@@ -90,7 +90,10 @@ export const Dashboard: React.FC = () => {
           }
         }
       } catch (fetchErr: any) {
-        console.error('Initial fetch error:', fetchErr);
+        // Only log if it's not a 401 (which is handled by the interceptor)
+        if (fetchErr.response?.status !== 401) {
+          console.error('Initial fetch error:', fetchErr);
+        }
         
         // If it's a 401, the interceptor will handle the redirect, 
         // but we should still stop execution here.

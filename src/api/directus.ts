@@ -10,11 +10,15 @@ export const api = axios.create({
 
 // Set auth token if available
 export const setAuthToken = (token: string | null) => {
-  if (token) {
+  if (token && token !== 'null' && token !== 'undefined') {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
     // If no admin token, use the static API key for staff access
-    api.defaults.headers.common['Authorization'] = `Bearer ${STATIC_API_KEY}`;
+    if (STATIC_API_KEY) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${STATIC_API_KEY}`;
+    } else {
+      delete api.defaults.headers.common['Authorization'];
+    }
   }
 };
 
@@ -24,11 +28,9 @@ api.interceptors.request.use(
     const token = localStorage.getItem('admin_token');
     if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
-      // console.log('Using admin token:', token.substring(0, 5) + '...');
-    } else {
+    } else if (STATIC_API_KEY) {
       // Use static key if no admin token
       config.headers.Authorization = `Bearer ${STATIC_API_KEY}`;
-      // console.log('Using static API key');
     }
     return config;
   },
@@ -41,7 +43,17 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       console.warn('401 Unauthorized detected at:', window.location.pathname);
+      
+      // Clear all auth data
       localStorage.removeItem('admin_token');
+      localStorage.removeItem('member_id');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('is_admin');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('user_picture');
+      localStorage.removeItem('menu_permissions');
+      
       setAuthToken(null);
       
       // Only redirect if we're not already on the login page
@@ -159,7 +171,7 @@ export const directusApi = {
   getCars: async (): Promise<Car[]> => {
     const response = await api.get('/items/cars', {
       params: {
-        fields: '*,car_users.*,car_users.line_user_id.*',
+        fields: '*,car_image.*,car_users.*,car_users.line_user_id.*',
         limit: -1
       }
     });
@@ -242,7 +254,8 @@ export const directusApi = {
   getAdmins: async (): Promise<AdminUser[]> => {
     const response = await api.get('/users', {
       params: {
-        fields: '*,role.name'
+        fields: '*,role.name',
+        limit: -1
       }
     });
     return response.data.data;
@@ -277,7 +290,8 @@ export const directusApi = {
     const response = await api.get('/items/work_reports', {
       params: {
         fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
-        sort: '-date_created'
+        sort: '-date_created',
+        limit: -1
       }
     });
     return response.data.data;
@@ -306,11 +320,21 @@ export const directusApi = {
     await api.delete(`/items/work_reports/${id}`);
   },
 
-  getFileUrl: (fileId: string, options?: { key?: string }) => {
+  getFileUrl: (fileId: any, options?: { key?: string }) => {
     if (!fileId) return '';
-    if (fileId.startsWith('http')) return fileId;
+    
+    // Handle if fileId is an object (common in Directus when expanded)
+    let id = fileId;
+    if (typeof fileId === 'object' && fileId !== null) {
+      id = fileId.id || '';
+    }
+    
+    if (typeof id !== 'string') return '';
+    if (!id) return '';
+
+    if (id.startsWith('http')) return id;
     const baseUrl = DIRECTUS_URL.replace(/\/$/, '');
-    let url = `${baseUrl}/assets/${fileId}?access_token=${STATIC_API_KEY}`;
+    let url = `${baseUrl}/assets/${id}?access_token=${STATIC_API_KEY}`;
     if (options?.key) {
       url += `&key=${options.key}`;
     }
@@ -325,7 +349,7 @@ export const directusApi = {
     return response.data.data?.id || response.data.data;
   },
 
-  uploadFile: async (file: File): Promise<any> => {
+  uploadFile: async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
     const response = await api.post('/files', formData, {
@@ -333,7 +357,7 @@ export const directusApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data.data;
+    return response.data.data.id;
   },
 
   getCustomerLocation: async (id: string): Promise<any> => {
@@ -349,7 +373,8 @@ export const directusApi = {
     const response = await api.get('/items/customer_locations', {
       params: {
         fields: '*,member_id.*,members.*,members.line_user_id.*',
-        sort: '-date_created'
+        sort: '-date_created',
+        limit: -1
       }
     });
     return response.data.data;
@@ -397,22 +422,28 @@ export const directusApi = {
 
   linkCarToMember: async (carId: string, memberId: string): Promise<any> => {
     try {
+      console.log(`linkCarToMember: carId=${carId}, memberId=${memberId}`);
       // Check if already linked
       const existing = await api.get('/items/car_users', {
         params: {
           filter: {
             car_id: { _eq: carId },
             line_user_id: { _eq: memberId }
-          }
+          },
+          limit: -1
         }
       });
       
       if (existing.data.data.length === 0) {
-        return await api.post('/items/car_users', {
+        console.log(`Creating new link in car_users for car ${carId} and member ${memberId}`);
+        const response = await api.post('/items/car_users', {
           car_id: carId,
           line_user_id: memberId
         });
+        console.log('Link creation response:', response.data.data);
+        return response.data.data;
       }
+      console.log(`Link already exists for car ${carId} and member ${memberId}`);
       return existing.data.data[0];
     } catch (error) {
       console.error('Error linking car to member:', error);
@@ -423,7 +454,8 @@ export const directusApi = {
   getRoles: async (): Promise<any[]> => {
     const response = await api.get('/roles', {
       params: {
-        fields: 'id,name'
+        fields: 'id,name',
+        limit: -1
       }
     });
     return response.data.data;
@@ -437,4 +469,16 @@ export const directusApi = {
     });
     return response.data.data;
   },
+
+  logout: () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('member_id');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('is_admin');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_picture');
+    localStorage.removeItem('menu_permissions');
+    setAuthToken(null);
+  }
 };

@@ -19,8 +19,7 @@ export const Login: React.FC = () => {
     setError('');
 
     // Clear old tokens to avoid interceptor issues with invalid/expired tokens
-    localStorage.removeItem('admin_token');
-    setAuthToken(null);
+    directusApi.logout();
 
     try {
       // 1. Try Admin Login first

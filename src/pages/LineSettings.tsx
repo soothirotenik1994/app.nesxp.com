@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { MessageSquare, Save, AlertCircle, Send, Loader2, CheckCircle2, XCircle, User } from 'lucide-react';
+import { MessageSquare, Save, AlertCircle, Send, Loader2, CheckCircle2, XCircle, User, Key } from 'lucide-react';
 import { lineService } from '../services/lineService';
 import { directusApi } from '../api/directus';
 
-export const LineSettings: React.FC = () => {
+interface LineSettingsProps {
+  hideHeader?: boolean;
+}
+
+export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }) => {
   const { t } = useTranslation();
   const [isEnabled, setIsEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [testLineId, setTestLineId] = useState('');
+  const [channelAccessToken, setChannelAccessToken] = useState('');
+  const [channelSecret, setChannelSecret] = useState('');
+  const [testMessage, setTestMessage] = useState('🔔 ทดสอบระบบการแจ้งเตือน\n\nนี่คือข้อความทดสอบจากระบบ Nationwide Express Tracker');
+  const [notificationTemplate, setNotificationTemplate] = useState('🔔 มีงานใหม่มอบหมายให้คุณ\n\n🏢 ลูกค้า: {{customer_name}}\n📍 ต้นทาง: {{origin}}\n🏁 ปลายทาง: {{destination}}\n🚚 รถ: {{car_plate}}\n📅 วันที่: {{work_date}}');
   const [driverLineId, setDriverLineId] = useState<string | null>(null);
+  const [sampleCarImage, setSampleCarImage] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingTemplate, setIsTestingTemplate] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
@@ -21,30 +31,68 @@ export const LineSettings: React.FC = () => {
       setIsEnabled(savedSetting === 'true');
     }
 
-    // Fetch a sample driver's LINE ID
-    const fetchDriverLineId = async () => {
+    // Fetch system settings for LINE templates
+    const fetchSettings = async () => {
       try {
-        const members = await directusApi.getMembers();
+        const settings = await directusApi.getSystemSettings();
+        if (settings) {
+          if (settings.line_channel_access_token) setChannelAccessToken(settings.line_channel_access_token);
+          if (settings.line_channel_secret) setChannelSecret(settings.line_channel_secret);
+          if (settings.line_test_message) setTestMessage(settings.line_test_message);
+          if (settings.line_notification_template) setNotificationTemplate(settings.line_notification_template);
+        }
+      } catch (error) {
+        console.error('Failed to fetch system settings:', error);
+      }
+    };
+
+    // Fetch a sample driver's LINE ID and a sample car image
+    const fetchSamples = async () => {
+      try {
+        const [members, cars] = await Promise.all([
+          directusApi.getMembers(),
+          directusApi.getCars()
+        ]);
+
         const driver = members.find(m => m.role === 'driver' && m.line_user_id);
         if (driver) {
           setDriverLineId(driver.line_user_id);
         }
+
+        const carWithImage = cars.find(c => c.car_image);
+        if (carWithImage) {
+          setSampleCarImage(directusApi.getFileUrl(carWithImage.car_image));
+        }
       } catch (error) {
-        console.error('Failed to fetch driver LINE ID:', error);
+        console.error('Failed to fetch samples:', error);
       }
     };
-    fetchDriverLineId();
+
+    fetchSettings();
+    fetchSamples();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     localStorage.setItem('line_notifications_enabled', isEnabled.toString());
     
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await directusApi.updateSystemSettings({
+        line_channel_access_token: channelAccessToken,
+        line_channel_secret: channelSecret,
+        line_test_message: testMessage,
+        line_notification_template: notificationTemplate
+      });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
-    }, 500);
+    } catch (error) {
+      console.error('Failed to save LINE settings to Directus:', error);
+      // Still show success for local storage if that worked, but log the error
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTestLine = async () => {
@@ -55,13 +103,55 @@ export const LineSettings: React.FC = () => {
       const messages = [
         {
           type: "text",
-          text: "🔔 มีงานใหม่มอบหมายให้คุณ\n\n🏢 ลูกค้า: เนชั่นไวด์ เอ็กซ์เพรส เซอร์วิส จำกัด\n📍 ต้นทาง: กรุงเทพฯ\n🏁 ปลายทาง: เชียงใหม่\n🚚 รถ: ผบ-4104\n📅 วันที่: 2026-03-14"
-        },
+          text: testMessage
+        }
+      ];
+
+      await axios.post('/api/line/send', {
+        to: testLineId,
+        messages: messages
+      });
+      setTestStatus({ type: 'success', message: 'LINE text message sent successfully!' });
+    } catch (error: any) {
+      console.error('Failed to test LINE:', error);
+      const details = error.response?.data?.details;
+      const errorDetails = typeof details === 'object' ? JSON.stringify(details) : (details || error.message);
+      setTestStatus({ type: 'error', message: `Failed: ${errorDetails}` });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleTestTemplate = async () => {
+    if (!testLineId) return;
+    setIsTestingTemplate(true);
+    setTestStatus(null);
+    try {
+      // Parse template with dummy data
+      let parsedText = notificationTemplate
+        .replace('{{customer_name}}', 'เนชั่นไวด์ เอ็กซ์เพรส เซอร์วิส จำกัด')
+        .replace('{{origin}}', 'กรุงเทพฯ')
+        .replace('{{destination}}', 'เชียงใหม่')
+        .replace('{{car_plate}}', 'ผบ-4104')
+        .replace('{{work_date}}', '2026-03-14');
+
+      const messages = [
         {
           type: "flex",
-          altText: "มีงานใหม่มอบหมายให้คุณ",
+          altText: "มีงานใหม่มอบหมายให้คุณ (ทดสอบเทมเพลต)",
           contents: {
             type: "bubble",
+            hero: {
+              type: "image",
+              url: sampleCarImage || "https://picsum.photos/seed/car/800/400",
+              size: "full",
+              aspectRatio: "20:13",
+              aspectMode: "cover",
+              action: {
+                type: "uri",
+                uri: "https://app.nesxp.com/"
+              }
+            },
             header: {
               type: "box",
               layout: "vertical",
@@ -100,127 +190,12 @@ export const LineSettings: React.FC = () => {
                   spacing: "sm",
                   contents: [
                     {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "ทะเบียนรถ",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "ผบ-4104",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "ลูกค้า",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "เนชั่นไวด์ เอ็กซ์เพรส เซอร์วิส จำกัด",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3,
-                          wrap: true
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "ต้นทาง",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "กรุงเทพฯ",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3,
-                          wrap: true
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "ปลายทาง",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "เชียงใหม่",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3,
-                          wrap: true
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "วันที่",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "2026-03-14",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "คนขับ",
-                          size: "sm",
-                          color: "#8c8c8c",
-                          flex: 1
-                        },
-                        {
-                          type: "text",
-                          text: "ทดสอบ ระบบ",
-                          size: "sm",
-                          color: "#111111",
-                          flex: 3
-                        }
-                      ]
+                      type: "text",
+                      text: parsedText,
+                      size: "sm",
+                      color: "#111111",
+                      wrap: true,
+                      whiteSpace: "pre-wrap"
                     }
                   ]
                 }
@@ -253,25 +228,27 @@ export const LineSettings: React.FC = () => {
         to: testLineId,
         messages: messages
       });
-      setTestStatus({ type: 'success', message: 'LINE messages sent successfully!' });
+      setTestStatus({ type: 'success', message: 'LINE template test sent successfully!' });
     } catch (error: any) {
-      console.error('Failed to test LINE:', error);
+      console.error('Failed to test template:', error);
       const details = error.response?.data?.details;
       const errorDetails = typeof details === 'object' ? JSON.stringify(details) : (details || error.message);
       setTestStatus({ type: 'error', message: `Failed: ${errorDetails}` });
     } finally {
-      setIsTesting(false);
+      setIsTestingTemplate(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('line_settings')}</h1>
-          <p className="text-slate-500">{t('line_config_desc')}</p>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{t('line_settings')}</h1>
+            <p className="text-slate-500">{t('line_config_desc')}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
@@ -315,8 +292,66 @@ export const LineSettings: React.FC = () => {
             <div className="text-sm">
               <p className="font-semibold">Important Note</p>
               <p className="opacity-90">
-                LINE notifications require a valid LINE Messaging API Channel Access Token configured in the system environment. 
-                Disabling this will stop all automated LINE notifications immediately.
+                LINE notifications require a valid LINE Messaging API Channel Access Token and Secret. 
+                You can manage these credentials below or via system environment variables.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Key className="w-4 h-4 text-slate-400" />
+                Channel Access Token
+              </label>
+              <input 
+                type="password" 
+                value={channelAccessToken}
+                onChange={(e) => setChannelAccessToken(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                placeholder="Enter LINE Channel Access Token"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Key className="w-4 h-4 text-slate-400" />
+                Channel Secret
+              </label>
+              <input 
+                type="password" 
+                value={channelSecret}
+                onChange={(e) => setChannelSecret(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                placeholder="Enter LINE Channel Secret"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-slate-700">
+                  Notification Template (Assignment)
+                </label>
+                <button
+                  onClick={handleTestTemplate}
+                  disabled={isTestingTemplate || !testLineId}
+                  className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                >
+                  {isTestingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                  Test Template
+                </button>
+              </div>
+              <textarea
+                value={notificationTemplate}
+                onChange={(e) => setNotificationTemplate(e.target.value)}
+                rows={5}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                placeholder="Enter template using {{variable}} syntax..."
+              />
+              <p className="text-xs text-slate-500">
+                Variables: {"{{customer_name}}"}, {"{{origin}}"}. {"{{destination}}"}. {"{{car_plate}}"}. {"{{work_date}}"}
               </p>
             </div>
           </div>
@@ -328,32 +363,51 @@ export const LineSettings: React.FC = () => {
               <Send className="w-4 h-4" />
               <h3>Test LINE Configuration</h3>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="LINE User ID (e.g. U1234567890abcdef...)"
-                  value={testLineId}
-                  onChange={(e) => setTestLineId(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary pr-32"
-                />
-                <button 
-                  onClick={() => driverLineId && setTestLineId(driverLineId)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  title="Click to use this ID"
+            
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Test Message Content
+              </label>
+              <textarea
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary text-sm"
+                placeholder="Enter message to send for testing..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Recipient LINE User ID
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="LINE User ID (e.g. U1234567890abcdef...)"
+                    value={testLineId}
+                    onChange={(e) => setTestLineId(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary pr-32"
+                  />
+                  <button 
+                    onClick={() => driverLineId && setTestLineId(driverLineId)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                    title="Click to use this ID"
+                  >
+                    <User className="w-3 h-3" />
+                    <span>Driver: {driverLineId ? `${driverLineId.substring(0, 8)}...` : 'N/A'}</span>
+                  </button>
+                </div>
+                <button
+                  onClick={handleTestLine}
+                  disabled={isTesting || !testLineId}
+                  className="px-6 py-2 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-900 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <User className="w-3 h-3" />
-                  <span>Driver: {driverLineId ? `${driverLineId.substring(0, 8)}...` : 'N/A'}</span>
+                  {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Test Send
                 </button>
               </div>
-              <button
-                onClick={handleTestLine}
-                disabled={isTesting || !testLineId}
-                className="px-6 py-2 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-900 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Test
-              </button>
             </div>
             {testStatus && (
               <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${

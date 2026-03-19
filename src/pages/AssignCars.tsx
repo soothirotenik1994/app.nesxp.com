@@ -28,6 +28,14 @@ export const AssignCars: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!memberId) return;
+      
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.warn('No admin token found, redirecting to login...');
+        navigate('/login');
+        return;
+      }
+
       try {
         const [memberData, carsData, permissionsData] = await Promise.all([
           directusApi.getMember(memberId),
@@ -37,14 +45,19 @@ export const AssignCars: React.FC = () => {
         setMember(memberData);
         setAllCars(carsData);
         setPermissions(permissionsData);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching assignment data:', error);
+        if (error.response?.status === 403) {
+          alert('Permission Denied (403): You do not have access to manage car assignments. Please ensure your account has Administrator permissions in Directus.');
+        } else {
+          alert(t('error_loading_data') || 'Error loading data');
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [memberId]);
+  }, [memberId, navigate, t]);
 
   const assignedCarIds = permissions.map(p => {
     if (!p.car_id) return null;
@@ -67,8 +80,37 @@ export const AssignCars: React.FC = () => {
     if (!memberId) return;
     setProcessing(carId);
     try {
+      // 1. Check if the car is already assigned to anyone else
+      const car = allCars.find(c => String(c.id) === String(carId));
+      if (car && car.car_users && car.car_users.length > 0) {
+        // Enforce "One car, one driver" rule: 
+        // Clear all existing assignments for this car before adding the new one
+        await Promise.all(car.car_users.map((cu: any) => 
+          directusApi.deleteCarPermission(cu.id).catch(err => {
+            console.warn(`Failed to delete existing permission ${cu.id}:`, err);
+          })
+        ));
+      }
+
+      // 2. Add the new permission
       const newPermission = await directusApi.addCarPermission(memberId, carId);
-      setPermissions([...permissions, newPermission]);
+      
+      // 3. Update the car's owner_name and driver_phone to match the new driver
+      if (car && member) {
+        const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.display_name || '';
+        await directusApi.updateCar(carId, {
+          owner_name: fullName,
+          driver_phone: member.phone || ''
+        });
+      }
+
+      // 4. Refresh all data to ensure UI is in sync
+      const [carsData, permissionsData] = await Promise.all([
+        directusApi.getCars(),
+        directusApi.getCarPermissions(memberId)
+      ]);
+      setAllCars(carsData);
+      setPermissions(permissionsData);
     } catch (error: any) {
       console.error('Error adding permission:', error);
       const errorData = error.response?.data;
@@ -90,7 +132,26 @@ export const AssignCars: React.FC = () => {
     setProcessing(carId);
     try {
       await directusApi.deleteCarPermission(permission.id);
-      setPermissions(permissions.filter(p => String(p.id) !== String(permission.id)));
+      
+      // Also clear the car's owner info if it matches this member
+      const car = allCars.find(c => String(c.id) === String(carId));
+      if (car && member) {
+        const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.display_name || '';
+        if (car.owner_name === fullName) {
+          await directusApi.updateCar(carId, {
+            owner_name: '',
+            driver_phone: ''
+          });
+        }
+      }
+
+      // Refresh data
+      const [carsData, permissionsData] = await Promise.all([
+        directusApi.getCars(),
+        directusApi.getCarPermissions(memberId)
+      ]);
+      setAllCars(carsData);
+      setPermissions(permissionsData);
     } catch (error: any) {
       console.error('Error removing permission:', error);
       const errorData = error.response?.data;

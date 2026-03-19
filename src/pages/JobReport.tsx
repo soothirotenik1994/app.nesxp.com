@@ -475,6 +475,13 @@ export const JobReport: React.FC = () => {
     setError('');
 
     try {
+      // Extract IDs properly
+      const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+      const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
+      const currentDriverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+
+      console.log('handleSubmit: Extracted IDs:', { currentCustomerId, currentCarId, currentDriverId });
+
       // 1. Upload new photos to Directus if any
       const uploadedPhotoIds: string[] = [];
       const newPhotoMetadata: any[] = [];
@@ -482,8 +489,7 @@ export const JobReport: React.FC = () => {
       if (photos.length > 0) {
         for (const photoObj of photos) {
           try {
-            const uploadedFile = await directusApi.uploadFile(photoObj.file);
-            const fileId = uploadedFile.id;
+            const fileId = await directusApi.uploadFile(photoObj.file);
             uploadedPhotoIds.push(fileId);
             
             if (photoObj.metadata) {
@@ -605,10 +611,7 @@ export const JobReport: React.FC = () => {
         
         // Check if customer or car changed
         if (originalCustomerAndCar) {
-          const newCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
-          const newCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
-
-          if (String(newCustomerId) !== String(originalCustomerAndCar.customerId) || String(newCarId) !== String(originalCustomerAndCar.carId)) {
+          if (String(currentCustomerId) !== String(originalCustomerAndCar.customerId) || String(currentCarId) !== String(originalCustomerAndCar.carId)) {
             console.log('Customer or Car changed, unassigning old car from old customer...');
             await unassignCarFromCustomer(originalCustomerAndCar.customerId, originalCustomerAndCar.carId);
           }
@@ -618,28 +621,8 @@ export const JobReport: React.FC = () => {
         console.log('Update successful');
 
         // Auto-link new car to new customer if changed or if it's a new assignment
-        const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
-        const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
-        
         if (currentCustomerId && currentCarId) {
-          const customerLoc = customers.find(c => String(c.id) === String(currentCustomerId));
-          if (customerLoc) {
-            const memberIds: string[] = [];
-            const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
-            if (primaryId) memberIds.push(String(primaryId));
-            
-            if (customerLoc.members && Array.isArray(customerLoc.members)) {
-              customerLoc.members.forEach((m: any) => {
-                const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-                if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
-              });
-            }
-
-            for (const mid of memberIds) {
-              await directusApi.linkCarToMember(currentCarId, mid);
-            }
-            console.log('Car linked to all members of new/updated customer');
-          }
+          await assignCarToCustomer(currentCustomerId, currentCarId, currentDriverId);
         }
 
         // Send notifications if status changed to completed
@@ -648,7 +631,7 @@ export const JobReport: React.FC = () => {
           try {
             await sendCustomerStatusNotification('completed');
             await sendDriverStatusNotification('completed');
-            await unassignCarFromCustomer();
+            await unassignCarFromCustomer(currentCustomerId, currentCarId);
             console.log('Completion actions triggered successfully');
           } catch (notifyErr) {
             console.error('Error sending completion notifications/unassignment:', notifyErr);
@@ -673,14 +656,27 @@ export const JobReport: React.FC = () => {
         const result = await directusApi.createWorkReport(reportData);
         console.log('Creation successful:', result);
         
-        // Send LINE notification to driver
+        // 1. Assign car to customer's members AND the driver
+        if (currentCustomerId && currentCarId) {
+          console.log('Assigning car to customer and driver:', { currentCustomerId, currentCarId, currentDriverId });
+          await assignCarToCustomer(currentCustomerId, currentCarId, currentDriverId);
+        }
+        
+        // 2. Send LINE notification to driver for NEW job
         try {
-          const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false'; // Reusing the same setting for now
-          const driver = members.find(m => String(m.id) === String(formData.driver_id));
-          const lineId = driver?.line_user_id;
+          const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
+          const driver = members.find(m => String(m.id) === String(currentDriverId));
+          const lineIdRaw = driver?.line_user_id;
+          let lineId = null;
+          if (typeof lineIdRaw === 'object' && lineIdRaw !== null) {
+            lineId = (lineIdRaw as any).line_user_id || (lineIdRaw as any).id;
+          } else {
+            lineId = lineIdRaw;
+          }
+          console.log(`Driver LINE ID extraction:`, { raw: lineIdRaw, extracted: lineId });
 
           if (notificationsEnabled && lineId) {
-            const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+            const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
             const accountSource = driver?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
             const driverName = driver ? `${driver.first_name} ${driver.last_name} ${accountSource}` : 'N/A';
             
@@ -970,360 +966,388 @@ export const JobReport: React.FC = () => {
         }
 
         // Send LINE notification to customer and auto-link car
-        try {
-          const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
-          const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
-          if (customerLoc) {
-            // 1. Auto-link car to ALL customer member accounts
-            const memberIds: string[] = [];
-            const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
-            if (primaryId) memberIds.push(String(primaryId));
+        const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
+        const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
+        
+        if (customerLoc) {
+          console.log('Customer location found for notification:', customerLoc.company_name);
+          
+          // 1. Auto-link car to ALL customer member accounts - MOVED TO TOP OF BLOCK
+          const memberIds: string[] = [];
+          const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+          if (primaryId) memberIds.push(String(primaryId));
+          
+          if (customerLoc.members && Array.isArray(customerLoc.members)) {
+            customerLoc.members.forEach((m: any) => {
+              const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+              if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
+            });
+          }
+          
+          // 2. Send notification to ALL members if they have LINE
+          if (notificationsEnabled) {
+            const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+            const driver = members.find(m => String(m.id) === String(formData.driver_id));
             
-            if (customerLoc.members && Array.isArray(customerLoc.members)) {
-              customerLoc.members.forEach((m: any) => {
-                const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-                if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
-              });
-            }
+            console.log(`Sending notifications to ${memberIds.length} members...`);
+            
+            for (const memberId of memberIds) {
+              try {
+                const memberInMembers = customerLoc.members?.find((m: any) => {
+                  const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+                  return String(mid) === String(memberId);
+                });
 
-            if (formData.car_id) {
-              for (const mid of memberIds) {
-                await directusApi.linkCarToMember(formData.car_id, mid);
-              }
-              console.log('Car auto-linked to all customer member accounts');
-            }
-            
-            // 2. Send notification to primary member if they have LINE
-            const primaryMember = typeof customerLoc.member_id === 'object' 
-              ? customerLoc.member_id 
-              : members.find(m => String(m.id) === String(customerLoc.member_id));
-            
-            const customerLineId = primaryMember?.line_user_id;
+                const member = members.find(m => String(m.id) === String(memberId)) || 
+                              (typeof customerLoc.member_id === 'object' && String(customerLoc.member_id.id) === String(memberId) ? customerLoc.member_id : null) ||
+                              (memberInMembers && typeof memberInMembers.line_user_id === 'object' ? memberInMembers.line_user_id : null);
+                
+                if (!member) {
+                  console.log(`Member not found for ID: ${memberId}`);
+                  continue;
+                }
 
-            if (notificationsEnabled && customerLineId) {
-              const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-              const driver = members.find(m => String(m.id) === String(formData.driver_id));
-              
-              const customerMessages = [
-                {
-                  type: "flex",
-                  altText: "🔔 Nationwide Express Tracker: แจ้งเตือนการจัดส่ง",
-                  contents: {
-                    type: "bubble",
-                    header: {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "Nationwide Express Tracker",
-                          color: "#ffffff",
-                          weight: "bold",
-                          size: "sm"
-                        }
-                      ],
-                      backgroundColor: "#2c5494",
-                      paddingAll: "md"
-                    },
-                    body: {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "แจ้งเตือนการส่งสินค้า",
-                          weight: "bold",
-                          size: "xl",
-                          color: "#e54d42",
-                          margin: "md",
-                          align: "center"
-                        },
-                        {
+                const customerLineIdRaw = member.line_user_id;
+                let customerLineId = null;
+                
+                if (typeof customerLineIdRaw === 'object' && customerLineIdRaw !== null) {
+                  customerLineId = (customerLineIdRaw as any).line_user_id || (customerLineIdRaw as any).id;
+                } else {
+                  customerLineId = customerLineIdRaw;
+                }
+
+                console.log(`Member ${memberId} LINE ID extraction:`, { raw: customerLineIdRaw, extracted: customerLineId });
+
+                if (customerLineId && typeof customerLineId === 'string' && customerLineId.length > 5) {
+                  console.log(`Sending notification to member ${memberId} (LINE: ${customerLineId})`);
+                  
+                  const customerMessages = [
+                    {
+                      type: "flex",
+                      altText: "🔔 Nationwide Express Tracker: แจ้งเตือนการจัดส่ง",
+                      contents: {
+                        type: "bubble",
+                        header: {
                           type: "box",
                           layout: "vertical",
-                          margin: "lg",
                           contents: [
                             {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "ต้นทาง",
-                                  size: "xxs",
-                                  color: "#2c5494",
-                                  weight: "bold"
-                                },
-                                {
-                                  type: "text",
-                                  text: "กำลังส่งสินค้า",
-                                  size: "xxs",
-                                  color: "#aaaaaa",
-                                  align: "center"
-                                },
-                                {
-                                  type: "text",
-                                  text: "ปลายทาง",
-                                  size: "xxs",
-                                  color: "#aaaaaa",
-                                  align: "end"
-                                }
-                              ]
+                              type: "text",
+                              text: "Nationwide Express Tracker",
+                              color: "#ffffff",
+                              weight: "bold",
+                              size: "sm"
+                            }
+                          ],
+                          backgroundColor: "#2c5494",
+                          paddingAll: "md"
+                        },
+                        body: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [
+                            {
+                              type: "text",
+                              text: "แจ้งเตือนการส่งสินค้า",
+                              weight: "bold",
+                              size: "xl",
+                              color: "#e54d42",
+                              margin: "md",
+                              align: "center"
                             },
                             {
                               type: "box",
                               layout: "vertical",
+                              margin: "lg",
                               contents: [
                                 {
                                   type: "box",
                                   layout: "horizontal",
                                   contents: [
                                     {
+                                      type: "text",
+                                      text: "ต้นทาง",
+                                      size: "xxs",
+                                      color: "#2c5494",
+                                      weight: "bold"
+                                    },
+                                    {
+                                      type: "text",
+                                      text: "กำลังส่งสินค้า",
+                                      size: "xxs",
+                                      color: "#aaaaaa",
+                                      align: "center"
+                                    },
+                                    {
+                                      type: "text",
+                                      text: "ปลายทาง",
+                                      size: "xxs",
+                                      color: "#aaaaaa",
+                                      align: "end"
+                                    }
+                                  ]
+                                },
+                                {
+                                  type: "box",
+                                  layout: "vertical",
+                                  contents: [
+                                    {
                                       type: "box",
-                                      layout: "vertical",
-                                      contents: [],
-                                      height: "6px",
-                                      backgroundColor: "#eeeeee",
-                                      flex: 1
+                                      layout: "horizontal",
+                                      contents: [
+                                        {
+                                          type: "box",
+                                          layout: "vertical",
+                                          contents: [],
+                                          height: "6px",
+                                          backgroundColor: "#eeeeee",
+                                          flex: 1
+                                        },
+                                        {
+                                          type: "box",
+                                          layout: "vertical",
+                                          contents: [],
+                                          height: "6px",
+                                          backgroundColor: "#eeeeee",
+                                          flex: 1
+                                        }
+                                      ],
+                                      cornerRadius: "lg"
                                     },
                                     {
                                       type: "box",
                                       layout: "vertical",
                                       contents: [],
-                                      height: "6px",
-                                      backgroundColor: "#eeeeee",
-                                      flex: 1
+                                      width: "14px",
+                                      height: "14px",
+                                      cornerRadius: "7px",
+                                      borderWidth: "2px",
+                                      borderColor: "#2c5494",
+                                      backgroundColor: "#ffffff",
+                                      position: "absolute",
+                                      offsetTop: "-4px",
+                                      offsetStart: "0%"
                                     }
                                   ],
-                                  cornerRadius: "lg"
+                                  margin: "sm"
+                                }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "vertical",
+                              margin: "xl",
+                              spacing: "sm",
+                              contents: [
+                                {
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "🆔 เลขที่เคส",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: String(result.id || 'N/A'),
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5
+                                    }
+                                  ]
                                 },
                                 {
                                   type: "box",
-                                  layout: "vertical",
-                                  contents: [],
-                                  width: "14px",
-                                  height: "14px",
-                                  cornerRadius: "7px",
-                                  borderWidth: "2px",
-                                  borderColor: "#2c5494",
-                                  backgroundColor: "#ffffff",
-                                  position: "absolute",
-                                  offsetTop: "-4px",
-                                  offsetStart: "0%"
-                                }
-                              ],
-                              margin: "sm"
-                            }
-                          ]
-                        },
-                        {
-                          type: "box",
-                          layout: "vertical",
-                          margin: "xl",
-                          spacing: "sm",
-                          contents: [
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "🆔 เลขที่เคส",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "🏢 บริษัท",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: formData.customer_name,
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5,
+                                      wrap: true
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: String(result.id || 'N/A'),
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "🏢 บริษัท",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "📦 สถานะ",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: "กำลังเตรียมการจัดส่ง",
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5,
+                                      weight: "bold"
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: formData.customer_name,
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5,
-                                  wrap: true
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "📦 สถานะ",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "📍 ต้นทาง",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: formData.origin,
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5,
+                                      wrap: true
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: "กำลังเตรียมการจัดส่ง",
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5,
-                                  weight: "bold"
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "📍 ต้นทาง",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "🏁 ปลายทาง",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: formData.destination,
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5,
+                                      wrap: true
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: formData.origin,
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5,
-                                  wrap: true
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "🏁 ปลายทาง",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "🚚 รถ",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: selectedCar?.car_number || 'N/A',
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: formData.destination,
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5,
-                                  wrap: true
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "🚚 รถ",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "👤 คนขับ",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: driver ? `${driver.first_name} ${driver.last_name}` : '-',
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: selectedCar?.car_number || 'N/A',
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "👤 คนขับ",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "📞 เบอร์คนขับ",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: driver?.phone || '-',
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5
+                                    }
+                                  ]
                                 },
                                 {
-                                  type: "text",
-                                  text: driver ? `${driver.first_name} ${driver.last_name}` : '-',
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "📞 เบอร์คนขับ",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
-                                },
-                                {
-                                  type: "text",
-                                  text: driver?.phone || '-',
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "horizontal",
-                              contents: [
-                                {
-                                  type: "text",
-                                  text: "📅 วันที่",
-                                  size: "sm",
-                                  color: "#2c5494",
-                                  flex: 2
-                                },
-                                {
-                                  type: "text",
-                                  text: formData.work_date,
-                                  size: "sm",
-                                  color: "#111111",
-                                  flex: 5
+                                  type: "box",
+                                  layout: "horizontal",
+                                  contents: [
+                                    {
+                                      type: "text",
+                                      text: "📅 วันที่",
+                                      size: "sm",
+                                      color: "#2c5494",
+                                      flex: 2
+                                    },
+                                    {
+                                      type: "text",
+                                      text: formData.work_date,
+                                      size: "sm",
+                                      color: "#111111",
+                                      flex: 5
+                                    }
+                                  ]
                                 }
                               ]
                             }
-                          ]
+                          ],
+                          paddingAll: "lg"
                         }
-                      ],
-                      paddingAll: "lg"
+                      }
                     }
-                  }
+                  ];
+                  
+                  await axios.post('/api/line/send', {
+                    to: customerLineId,
+                    messages: customerMessages
+                  });
+                  console.log(`Successfully sent LINE notification to member ${memberId}`);
+                } else {
+                  console.log(`No valid LINE ID for member ${memberId}. Value: ${customerLineId}`);
                 }
-              ];
-              
-              await axios.post('/api/line/send', {
-                to: customerLineId,
-                messages: customerMessages
-              });
-              console.log('Customer LINE notification sent');
+              } catch (memberErr) {
+                console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
+              }
             }
+            console.log('Customer LINE notifications process completed');
           }
-        } catch (err) {
-          console.error('Error in customer notification/linking:', err);
+        } else {
+          console.log('Customer location not found for ID:', formData.customer_id);
         }
 
         // If the new report is already completed, unassign car
@@ -1440,344 +1464,359 @@ export const JobReport: React.FC = () => {
       console.log(`Found ${memberIds.length} members to notify:`, memberIds);
       
       for (const memberId of memberIds) {
-        const member = members.find(m => String(m.id) === String(memberId));
-        const customerLineIdRaw = member?.line_user_id;
-        const customerLineId = typeof customerLineIdRaw === 'object' ? (customerLineIdRaw as any)?.id : customerLineIdRaw;
+        try {
+          const memberInMembers = customerLoc.members?.find((m: any) => {
+            const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+            return String(mid) === String(memberId);
+          });
+
+          const member = members.find(m => String(m.id) === String(memberId)) || 
+                        (typeof customerLoc.member_id === 'object' && String(customerLoc.member_id.id) === String(memberId) ? customerLoc.member_id : null) ||
+                        (memberInMembers && typeof memberInMembers.line_user_id === 'object' ? memberInMembers.line_user_id : null);
+
+          const customerLineIdRaw = member?.line_user_id;
+          let customerLineId = null;
+          
+          if (typeof customerLineIdRaw === 'object' && customerLineIdRaw !== null) {
+            customerLineId = (customerLineIdRaw as any).line_user_id || (customerLineIdRaw as any).id;
+          } else {
+            customerLineId = customerLineIdRaw;
+          }
+          
+          console.log(`Member ${memberId} LINE ID extraction:`, { raw: customerLineIdRaw, extracted: customerLineId });
+
+          if (!customerLineId) {
+            console.log(`Customer LINE ID not found for member: ${memberId}. Member data:`, member);
+            continue;
+          }
+
+          console.log(`Preparing message for member ${memberId} with LINE ID ${customerLineId}`);
+
+          const flexContents: any = {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "Nationwide Express Tracker",
+                color: "#ffffff",
+                weight: "bold",
+                size: "sm"
+              }
+            ],
+            backgroundColor: headerColor,
+            paddingAll: "md"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "แจ้งเตือนการส่งสินค้า",
+                weight: "bold",
+                size: "xl",
+                color: statusColor,
+                margin: "md",
+                align: "center"
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                margin: "lg",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "ต้นทาง",
+                        size: "xxs",
+                        color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
+                        weight: status === 'accepted' ? "bold" : "regular"
+                      },
+                      {
+                        type: "text",
+                        text: "กำลังส่งสินค้า",
+                        size: "xxs",
+                        color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
+                        align: "center",
+                        weight: status === 'accepted' ? "bold" : "regular"
+                      },
+                      {
+                        type: "text",
+                        text: "ปลายทาง",
+                        size: "xxs",
+                        color: status === 'completed' ? "#2c5494" : "#aaaaaa",
+                        align: "end",
+                        weight: status === 'completed' ? "bold" : "regular"
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "box",
+                            layout: "vertical",
+                            contents: [],
+                            height: "6px",
+                            backgroundColor: status === 'completed' ? "#2c5494" : (status === 'accepted' ? "#2c5494" : "#eeeeee"),
+                            flex: 1
+                          },
+                          {
+                            type: "box",
+                            layout: "vertical",
+                            contents: [],
+                            height: "6px",
+                            backgroundColor: status === 'completed' ? "#2c5494" : "#eeeeee",
+                            flex: 1
+                          }
+                        ],
+                        cornerRadius: "lg"
+                      },
+                      {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [],
+                        width: "14px",
+                        height: "14px",
+                        cornerRadius: "7px",
+                        borderWidth: "2px",
+                        borderColor: "#2c5494",
+                        backgroundColor: "#ffffff",
+                        position: "absolute",
+                        offsetTop: "-4px",
+                        offsetStart: status === 'accepted' ? "48%" : "95%"
+                      }
+                    ],
+                    margin: "sm"
+                  }
+                ]
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                margin: "xl",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "🆔 เลขที่เคส",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(id || 'N/A'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "🏢 บริษัท",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(formData.customer_name || '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5,
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📦 สถานะ",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: statusText,
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5,
+                        weight: "bold"
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📍 ต้นทาง",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(formData.origin || '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5,
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "🏁 ปลายทาง",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(formData.destination || '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5,
+                        wrap: true
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "🚚 รถ",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(selectedCar?.car_number || 'N/A'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "👤 คนขับ",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📞 เบอร์คนขับ",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(driver?.phone || '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "horizontal",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่",
+                        size: "sm",
+                        color: "#2c5494",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: String(formData.work_date || '-'),
+                        size: "sm",
+                        color: "#111111",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            paddingAll: "lg"
+          }
+        };
+
+        const customerMessages = [
+          {
+            type: "flex",
+            altText: `🔔 Nationwide Express Tracker: ${statusText}`,
+            contents: flexContents
+          }
+        ];
         
-        if (!customerLineId) {
-          console.log(`Customer LINE ID not found for member: ${memberId}. Member data:`, member);
-          continue;
-        }
-
-        console.log(`Preparing message for member ${memberId} with LINE ID ${customerLineId}`);
-
-        const flexContents: any = {
-        type: "bubble",
-        header: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "text",
-              text: "Nationwide Express Tracker",
-              color: "#ffffff",
-              weight: "bold",
-              size: "sm"
-            }
-          ],
-          backgroundColor: headerColor,
-          paddingAll: "md"
-        },
-        body: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "text",
-              text: "แจ้งเตือนการส่งสินค้า",
-              weight: "bold",
-              size: "xl",
-              color: statusColor,
-              margin: "md",
-              align: "center"
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              margin: "lg",
-              contents: [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "ต้นทาง",
-                      size: "xxs",
-                      color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
-                      weight: status === 'accepted' ? "bold" : "regular"
-                    },
-                    {
-                      type: "text",
-                      text: "กำลังส่งสินค้า",
-                      size: "xxs",
-                      color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
-                      align: "center",
-                      weight: status === 'accepted' ? "bold" : "regular"
-                    },
-                    {
-                      type: "text",
-                      text: "ปลายทาง",
-                      size: "xxs",
-                      color: status === 'completed' ? "#2c5494" : "#aaaaaa",
-                      align: "end",
-                      weight: status === 'completed' ? "bold" : "regular"
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "vertical",
-                  contents: [
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "box",
-                          layout: "vertical",
-                          contents: [],
-                          height: "6px",
-                          backgroundColor: status === 'completed' ? "#2c5494" : (status === 'accepted' ? "#2c5494" : "#eeeeee"),
-                          flex: 1
-                        },
-                        {
-                          type: "box",
-                          layout: "vertical",
-                          contents: [],
-                          height: "6px",
-                          backgroundColor: status === 'completed' ? "#2c5494" : "#eeeeee",
-                          flex: 1
-                        }
-                      ],
-                      cornerRadius: "lg"
-                    },
-                    {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [],
-                      width: "14px",
-                      height: "14px",
-                      cornerRadius: "7px",
-                      borderWidth: "2px",
-                      borderColor: "#2c5494",
-                      backgroundColor: "#ffffff",
-                      position: "absolute",
-                      offsetTop: "-4px",
-                      offsetStart: status === 'accepted' ? "48%" : "95%"
-                    }
-                  ],
-                  margin: "sm"
-                }
-              ]
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              margin: "xl",
-              spacing: "sm",
-              contents: [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "🆔 เลขที่เคส",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(id || 'N/A'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "🏢 บริษัท",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(formData.customer_name || '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5,
-                      wrap: true
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "📦 สถานะ",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: statusText,
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5,
-                      weight: "bold"
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "📍 ต้นทาง",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(formData.origin || '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5,
-                      wrap: true
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "🏁 ปลายทาง",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(formData.destination || '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5,
-                      wrap: true
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "🚚 รถ",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(selectedCar?.car_number || 'N/A'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "👤 คนขับ",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "📞 เบอร์คนขับ",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(driver?.phone || '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5
-                    }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    {
-                      type: "text",
-                      text: "📅 วันที่",
-                      size: "sm",
-                      color: "#2c5494",
-                      flex: 2
-                    },
-                    {
-                      type: "text",
-                      text: String(formData.work_date || '-'),
-                      size: "sm",
-                      color: "#111111",
-                      flex: 5
-                    }
-                  ]
-                }
-              ]
-            }
-          ],
-          paddingAll: "lg"
-        }
-      };
-
-      // Only add footer for 'accepted' status (กำลังส่งสินค้า)
-      if (status === 'accepted') {
-        // Footer removed as requested
+        await axios.post('/api/line/send', {
+          to: customerLineId,
+          messages: customerMessages
+        });
+        console.log(`Customer LINE notification sent for status: ${status} to member: ${memberId}`);
+      } catch (memberErr) {
+        console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
       }
-
-      const customerMessages = [
-        {
-          type: "flex",
-          altText: `🔔 Nationwide Express Tracker: ${statusText}`,
-          contents: flexContents
-        }
-      ];
-      
-      await axios.post('/api/line/send', {
-        to: customerLineId,
-        messages: customerMessages
-      });
-      console.log(`Customer LINE notification sent for status: ${status} to member: ${memberId}`);
     }
-    console.log('All customer notifications sent');
+    console.log('Customer LINE notifications process completed');
     } catch (err) {
       console.error('Error sending customer status notification:', err);
     }
@@ -1788,7 +1827,14 @@ export const JobReport: React.FC = () => {
       console.log(`Starting driver notification for status: ${status}, driver_id: ${formData.driver_id}`);
       const driver = members.find(m => String(m.id) === String(formData.driver_id));
       const driverLineIdRaw = driver?.line_user_id;
-      const driverLineId = typeof driverLineIdRaw === 'object' ? (driverLineIdRaw as any)?.id : driverLineIdRaw;
+      let driverLineId = null;
+      if (typeof driverLineIdRaw === 'object' && driverLineIdRaw !== null) {
+        driverLineId = (driverLineIdRaw as any).line_user_id || (driverLineIdRaw as any).id;
+      } else {
+        driverLineId = driverLineIdRaw;
+      }
+      
+      console.log(`Driver LINE ID extraction:`, { raw: driverLineIdRaw, extracted: driverLineId });
       
       if (!driverLineId) {
         console.log('Driver LINE ID not found, skipping notification. Driver ID:', formData.driver_id);
@@ -1924,6 +1970,121 @@ export const JobReport: React.FC = () => {
     }
   };
 
+  const resolveMemberId = (idOrUid: any) => {
+    if (!idOrUid || idOrUid === 'null' || idOrUid === 'undefined' || idOrUid === '') return null;
+    const idStr = String(idOrUid);
+    
+    // Try to find by Directus ID first
+    let member = members.find(m => String(m.id) === idStr);
+    if (member) return String(member.id);
+    
+    // If not found, try to find by LINE UID
+    member = members.find(m => String(m.line_user_id) === idStr);
+    if (member) return String(member.id);
+    
+    if (members.length > 0) {
+      console.warn(`resolveMemberId: Could not find member for ${idStr} in ${members.length} loaded members`);
+    }
+    
+    return idStr; // Fallback to original
+  };
+
+  const assignCarToCustomer = async (customerId: string, carId: string, driverId?: string) => {
+    if (!customerId || !carId) {
+      console.log('assignCarToCustomer: Missing customerId or carId', { customerId, carId });
+      return;
+    }
+    try {
+      console.log(`assignCarToCustomer: Assigning car ${carId} to customer ${customerId} and driver ${driverId}...`);
+      
+      // Ensure we have the latest customers data if possible, but use state for now
+      const customerLoc = customers.find(c => String(c.id) === String(customerId));
+      
+      if (!customerLoc) {
+        console.warn('assignCarToCustomer: Customer location not found in state for ID:', customerId);
+        // Try to fetch it directly if not in state
+        try {
+          const freshLoc = await directusApi.getCustomerLocation(customerId);
+          if (freshLoc) {
+            console.log('assignCarToCustomer: Fetched fresh customer location:', freshLoc.company_name);
+            await processAssignment(freshLoc, carId, driverId);
+            return;
+          }
+        } catch (err) {
+          console.error('assignCarToCustomer: Failed to fetch fresh customer location:', err);
+        }
+        return;
+      }
+
+      await processAssignment(customerLoc, carId, driverId);
+    } catch (error) {
+      console.error('Error in assignCarToCustomer:', error);
+    }
+  };
+
+  const processAssignment = async (customerLoc: any, carId: string, driverId?: string) => {
+    console.log('processAssignment: Processing for:', customerLoc.company_name);
+
+    const memberIds: string[] = [];
+    
+    // 1. Resolve primary member
+    const primaryMember = typeof customerLoc.member_id === 'object' ? customerLoc.member_id : null;
+    const primaryIdRaw = primaryMember ? primaryMember.id : customerLoc.member_id;
+    const primaryId = resolveMemberId(primaryIdRaw);
+    
+    if (primaryId) {
+      console.log('processAssignment: Adding primary member ID:', primaryId, primaryIdRaw !== primaryId ? `(resolved from ${primaryIdRaw})` : '');
+      memberIds.push(primaryId);
+    } else {
+      console.warn('processAssignment: Could not resolve primary member ID:', primaryIdRaw);
+    }
+    
+    // 2. Resolve additional members
+    if (customerLoc.members && Array.isArray(customerLoc.members)) {
+      console.log(`processAssignment: Processing ${customerLoc.members.length} additional members`);
+      customerLoc.members.forEach((m: any) => {
+        const mMember = typeof m.line_user_id === 'object' ? m.line_user_id : null;
+        const mIdRaw = mMember ? mMember.id : m.line_user_id;
+        const mid = resolveMemberId(mIdRaw);
+        
+        if (mid && !memberIds.includes(mid)) {
+          console.log('processAssignment: Adding additional member ID:', mid, mIdRaw !== mid ? `(resolved from ${mIdRaw})` : '');
+          memberIds.push(mid);
+        } else if (!mid) {
+          console.warn('processAssignment: Could not resolve additional member ID:', mIdRaw);
+        }
+      });
+    }
+
+    // 3. Resolve driver
+    if (driverId) {
+      const resolvedDriverId = resolveMemberId(driverId);
+      if (resolvedDriverId && !memberIds.includes(resolvedDriverId)) {
+        console.log('processAssignment: Adding driver ID:', resolvedDriverId, driverId !== resolvedDriverId ? `(resolved from ${driverId})` : '');
+        memberIds.push(resolvedDriverId);
+      } else if (!resolvedDriverId) {
+        console.warn('processAssignment: Could not resolve driver member ID:', driverId);
+      }
+    }
+
+    if (memberIds.length === 0) {
+      console.warn('processAssignment: No valid member IDs found to link car to');
+      return;
+    }
+
+    console.log('processAssignment: Final list of member IDs to link:', memberIds);
+
+    for (const mid of memberIds) {
+      try {
+        console.log(`processAssignment: Linking car ${carId} to member ${mid}`);
+        await directusApi.linkCarToMember(carId, mid);
+      } catch (linkErr) {
+        console.error(`processAssignment: Failed to link car ${carId} to member ${mid}:`, linkErr);
+      }
+    }
+    console.log('processAssignment: Car linked successfully');
+  };
+
   const unassignCarFromCustomer = async (targetCustomerId?: string, targetCarId?: string) => {
     try {
       const customerId = targetCustomerId || (typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id);
@@ -1936,22 +2097,29 @@ export const JobReport: React.FC = () => {
       const customerLocation = await directusApi.getCustomerLocation(customerId);
       
       const memberIds: string[] = [];
-      const primaryId = typeof customerLocation.member_id === 'object' ? customerLocation.member_id?.id : customerLocation.member_id;
-      if (primaryId) memberIds.push(String(primaryId));
+      const primaryMember = typeof customerLocation.member_id === 'object' ? customerLocation.member_id : null;
+      const primaryIdRaw = primaryMember ? primaryMember.id : customerLocation.member_id;
+      const primaryId = resolveMemberId(String(primaryIdRaw));
+      
+      if (primaryId) memberIds.push(primaryId);
       
       if (customerLocation.members && Array.isArray(customerLocation.members)) {
         customerLocation.members.forEach((m: any) => {
-          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-          if (id && !memberIds.includes(String(id))) {
-            memberIds.push(String(id));
+          const mMember = typeof m.line_user_id === 'object' ? m.line_user_id : null;
+          const mIdRaw = mMember ? mMember.id : m.line_user_id;
+          const mid = resolveMemberId(String(mIdRaw));
+          
+          if (mid && !memberIds.includes(mid)) {
+            memberIds.push(mid);
           }
         });
       }
 
       // Add driver to unassign list
-      const driverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
-      if (driverId && !memberIds.includes(String(driverId))) {
-        memberIds.push(String(driverId));
+      const driverIdRaw = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+      const driverId = resolveMemberId(String(driverIdRaw));
+      if (driverId && !memberIds.includes(driverId)) {
+        memberIds.push(driverId);
       }
 
       if (memberIds.length === 0) {
@@ -1962,10 +2130,8 @@ export const JobReport: React.FC = () => {
       // Unassign for all members
       for (const memberId of memberIds) {
         console.log(`Checking permissions for member: ${memberId}`);
-        // 3. Get all permissions for this member
         const permissions = await directusApi.getCarPermissions(memberId);
         
-        // 4. Find the permission for this specific car
         const permissionToDelete = permissions.find(p => {
           if (!p.car_id) return false;
           const pCarId = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
@@ -2671,7 +2837,7 @@ export const JobReport: React.FC = () => {
                 type="datetime-local" 
                 required
                 disabled={!!id && !isAdmin}
-                value={formData.work_date}
+                value={formData.work_date || ''}
                 onChange={async (e) => {
                   const newDate = e.target.value;
                   setFormData(prev => ({ ...prev, work_date: newDate }));
@@ -2809,7 +2975,7 @@ export const JobReport: React.FC = () => {
                 type="text" 
                 disabled={!!id && !isAdmin}
                 placeholder={t('contact_name')}
-                value={formData.customer_contact_name}
+                value={formData.customer_contact_name || ''}
                 onChange={e => setFormData({...formData, customer_contact_name: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -2825,7 +2991,7 @@ export const JobReport: React.FC = () => {
                 type="text" 
                 disabled={!!id && !isAdmin}
                 placeholder={t('contact_phone')}
-                value={formData.customer_contact_phone}
+                value={formData.customer_contact_phone || ''}
                 onChange={e => setFormData({...formData, customer_contact_phone: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -2845,7 +3011,7 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('origin')}
-                value={formData.origin}
+                value={formData.origin || ''}
                 onChange={e => {
                   setFormData({...formData, origin: e.target.value});
                 }}
@@ -2864,7 +3030,7 @@ export const JobReport: React.FC = () => {
                 required
                 disabled={!!id && !isAdmin}
                 placeholder={t('destination')}
-                value={formData.destination}
+                value={formData.destination || ''}
                 onChange={e => {
                   setFormData({...formData, destination: e.target.value});
                 }}
@@ -2982,7 +3148,7 @@ export const JobReport: React.FC = () => {
                 type="text" 
                 disabled={!!id && !isAdmin}
                 placeholder={t('vehicle_type') || 'e.g. 4-wheel, 6-wheel'}
-                value={formData.vehicle_type}
+                value={formData.vehicle_type || ''}
                 onChange={e => setFormData({...formData, vehicle_type: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3036,7 +3202,7 @@ export const JobReport: React.FC = () => {
               required
               disabled={!!id && !isAdmin}
               placeholder="08X-XXX-XXXX"
-              value={formData.phone}
+              value={formData.phone || ''}
               onChange={e => setFormData({...formData, phone: e.target.value})}
               className={clsx(
                 "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3081,7 +3247,7 @@ export const JobReport: React.FC = () => {
                 <input 
                   type="datetime-local" 
                   disabled={!isEditable || isFieldLocked('standby_time')}
-                  value={formData.standby_time}
+                  value={formData.standby_time || ''}
                   onChange={e => setFormData({...formData, standby_time: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3096,7 +3262,7 @@ export const JobReport: React.FC = () => {
                 <input 
                   type="datetime-local" 
                   disabled={!isEditable || isFieldLocked('departure_time')}
-                  value={formData.departure_time}
+                  value={formData.departure_time || ''}
                   onChange={e => setFormData({...formData, departure_time: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3111,7 +3277,7 @@ export const JobReport: React.FC = () => {
                 <input 
                   type="datetime-local" 
                   disabled={!isEditable || isFieldLocked('arrival_time')}
-                  value={formData.arrival_time}
+                  value={formData.arrival_time || ''}
                   onChange={e => {
                     const arrivalTime = e.target.value;
                     if (formData.departure_time && arrivalTime && new Date(arrivalTime) < new Date(formData.departure_time)) {
@@ -3138,7 +3304,7 @@ export const JobReport: React.FC = () => {
                   type="number" 
                   disabled={!isEditable || isFieldLocked('mileage_start')}
                   placeholder="0"
-                  value={formData.mileage_start}
+                  value={formData.mileage_start || ''}
                   onChange={e => setFormData({...formData, mileage_start: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3154,7 +3320,7 @@ export const JobReport: React.FC = () => {
                   type="number" 
                   disabled={!isEditable || isFieldLocked('mileage_end')}
                   placeholder="0"
-                  value={formData.mileage_end}
+                  value={formData.mileage_end || ''}
                   onChange={e => setFormData({...formData, mileage_end: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
@@ -3266,7 +3432,7 @@ export const JobReport: React.FC = () => {
               rows={3}
               disabled={!isEditable}
               placeholder={t('notes')}
-              value={formData.notes}
+              value={formData.notes || ''}
               onChange={e => setFormData({...formData, notes: e.target.value})}
               className={clsx(
                 "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
