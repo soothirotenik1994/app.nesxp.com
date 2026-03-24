@@ -195,6 +195,53 @@ async function startServer() {
     }
   });
 
+  // LINE Broadcast Endpoint
+  app.post("/api/line/broadcast", async (req, res) => {
+    try {
+      const { to, messages } = req.body;
+      const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+
+      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken });
+
+      if (!accessToken) {
+        return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured" });
+      }
+
+      if (!to || !messages) {
+        return res.status(400).json({ error: "Recipients 'to' and 'messages' are required" });
+      }
+
+      const recipients = Array.isArray(to) ? to : [to];
+      
+      // LINE Multicast API supports up to 500 recipients
+      const results = [];
+      for (let i = 0; i < recipients.length; i += 500) {
+        const batch = recipients.slice(i, i + 500);
+        const response = await axios.post("https://api.line.me/v2/bot/message/multicast", {
+          to: batch,
+          messages: messages
+        }, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        });
+        results.push(response.data);
+      }
+
+      console.log("LINE Broadcast success");
+      res.json({ success: true, results });
+    } catch (error: any) {
+      const errorData = error.response?.data || error.message;
+      console.error("LINE broadcast error details:", errorData);
+      res.status(500).json({ 
+        error: "Failed to broadcast LINE message", 
+        details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
+      });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

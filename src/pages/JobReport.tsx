@@ -131,7 +131,10 @@ export const JobReport: React.FC = () => {
     status: 'pending' as 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending',
     cancel_reason: '',
     status_logs: [] as any[],
-    photo_metadata: [] as any[]
+    photo_metadata: [] as any[],
+    current_mileage: undefined as number | undefined,
+    next_maintenance_date: undefined as string | undefined,
+    next_maintenance_mileage: undefined as number | undefined
   });
 
   const [allReports, setAllReports] = useState<any[]>([]);
@@ -349,7 +352,10 @@ export const JobReport: React.FC = () => {
             status: report.status || 'pending',
             cancel_reason: report.cancel_reason || '',
             status_logs: report.status_logs || [],
-            photo_metadata: report.photo_metadata || []
+            photo_metadata: report.photo_metadata || [],
+            current_mileage: report.car_id?.current_mileage,
+            next_maintenance_date: report.car_id?.next_maintenance_date,
+            next_maintenance_mileage: report.car_id?.next_maintenance_mileage
           };
           
           setFormData(initialData);
@@ -1518,10 +1524,10 @@ export const JobReport: React.FC = () => {
       
       // Send to Admin Group (via lineService if configured, or just log for now)
       // In a real app, you'd have an admin group chat ID
-      await lineService.sendPushMessage(adminGroupId, {
+      await lineService.sendPushMessage(adminGroupId, [{
         type: "text",
         text: message
-      });
+      }]);
 
       setStatusConfig({
         type: 'success',
@@ -2772,6 +2778,7 @@ export const JobReport: React.FC = () => {
                   }).filter(Boolean).join(', ');
                   const driverName = assignedNames || car.owner_name || '';
                   const vehicleType = car.vehicle_type ? ` [${car.vehicle_type}]` : '';
+                  
                   return {
                     value: car.id,
                     label: `${car.car_number}${vehicleType} ${driverName ? `(${driverName})` : ''}`,
@@ -2785,7 +2792,20 @@ export const JobReport: React.FC = () => {
                 onChange={(option: any) => {
                   const carId = option?.value || '';
                   const selectedCar = option?.data;
-                  setFormData(prev => ({...prev, car_id: carId, vehicle_type: selectedCar?.vehicle_type || ''}));
+                  if (selectedCar?.maintenance_status === 'maintenance') {
+                    setError(t('car_under_maintenance'));
+                    setFormData(prev => ({...prev, car_id: '', vehicle_type: '', current_mileage: undefined, next_maintenance_date: undefined, next_maintenance_mileage: undefined}));
+                    return;
+                  }
+                  setError('');
+                  setFormData(prev => ({
+                    ...prev, 
+                    car_id: carId, 
+                    vehicle_type: selectedCar?.vehicle_type || '',
+                    current_mileage: selectedCar?.current_mileage,
+                    next_maintenance_date: selectedCar?.next_maintenance_date,
+                    next_maintenance_mileage: selectedCar?.next_maintenance_mileage
+                  }));
                   
                   // Auto-fill customer if car is assigned to a customer
                   if (isAdmin && carId && selectedCar && selectedCar.car_users) {
@@ -2840,6 +2860,13 @@ export const JobReport: React.FC = () => {
                   })
                 }}
               />
+              {formData.car_id && (
+                <div className="mt-2 p-3 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-1 border border-slate-100">
+                  <p><strong>{t('current_mileage')}:</strong> {formData.current_mileage || '-'}</p>
+                  <p><strong>{t('next_maintenance_date')}:</strong> {formData.next_maintenance_date ? new Date(formData.next_maintenance_date).toLocaleDateString() : '-'}</p>
+                  <p><strong>{t('next_maintenance_mileage')}:</strong> {formData.next_maintenance_mileage || '-'}</p>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -3143,27 +3170,6 @@ export const JobReport: React.FC = () => {
           </div>
         </div>
 
-
-        {isAdmin && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
-                if (!currentCustomerId) {
-                  alert('กรุณาเลือกลูกค้าก่อนทดสอบ');
-                  return;
-                }
-                sendCustomerStatusNotification('pending', id || 'TEST-001', currentCustomerId);
-                alert('กำลังส่งข้อความทดสอบ... กรุณาตรวจสอบ Console');
-              }}
-              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all text-sm font-bold flex items-center gap-2 border border-slate-200"
-            >
-              <MessageSquare className="w-4 h-4" />
-              ทดสอบแจ้งเตือน LINE (ลูกค้า)
-            </button>
-          </div>
-        )}
 
         <button 
           type="submit"

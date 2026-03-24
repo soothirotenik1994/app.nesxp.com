@@ -20,37 +20,49 @@ export const Dashboard: React.FC = () => {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
 
   const fetchGpsData = async (carsData: Car[]) => {
-    const statuses = await Promise.all(
-      carsData.map(async (car) => {
-        try {
-          const status = await gpsApi.getCarStatus(car.car_number);
-          const assignedNames = (car.car_users || (car as any).line_users)?.map((cu: any) => {
-            const user = cu.line_user_id || cu;
-            if (!user) return null;
-            const source = user.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
-            const name = user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null);
-            return name ? `${name} ${source}` : null;
-          }).filter(Boolean).join(', ');
-          return { 
-            ...status, 
-            driverName: assignedNames || car.owner_name,
-            driverPhone: car.driver_phone
-          };
-        } catch (err) {
-          console.warn(`Could not fetch status for ${car.car_number}`);
-          return {
-            carNumber: car.car_number,
-            lat: 0,
-            lng: 0,
-            speed: 0,
-            address: "Data unavailable",
-            lastUpdate: new Date().toISOString(),
-            status: 'offline' as const,
-            driverName: car.owner_name
-          };
-        }
-      })
-    );
+    const BATCH_SIZE = 3;
+    const statuses: CarStatus[] = [];
+
+    for (let i = 0; i < carsData.length; i += BATCH_SIZE) {
+      const batch = carsData.slice(i, i + BATCH_SIZE);
+      const batchStatuses = await Promise.all(
+        batch.map(async (car) => {
+          try {
+            const status = await gpsApi.getCarStatus(car.car_number);
+            const assignedNames = (car.car_users || (car as any).line_users)?.map((cu: any) => {
+              const user = cu.line_user_id || cu;
+              if (!user) return null;
+              const source = user.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
+              const name = user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null);
+              return name ? `${name} ${source}` : null;
+            }).filter(Boolean).join(', ');
+            return { 
+              ...status, 
+              driverName: assignedNames || car.owner_name,
+              driverPhone: car.driver_phone
+            };
+          } catch (err) {
+            console.warn(`Could not fetch status for ${car.car_number}`);
+            return {
+              carNumber: car.car_number,
+              lat: 0,
+              lng: 0,
+              speed: 0,
+              address: "Data unavailable",
+              lastUpdate: new Date().toISOString(),
+              status: 'offline' as const,
+              driverName: car.owner_name
+            };
+          }
+        })
+      );
+      statuses.push(...(batchStatuses as CarStatus[]));
+      
+      // Add a delay between batches to respect rate limits
+      if (i + BATCH_SIZE < carsData.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
     setCarStatuses(statuses);
   };
 

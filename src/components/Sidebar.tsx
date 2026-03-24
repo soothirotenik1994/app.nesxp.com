@@ -56,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('vehicles'), path: '/cars', icon: Car, key: 'vehicles' },
     { name: t('customer_locations'), path: '/locations', icon: MapPin, key: 'locations' },
     { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText, key: 'new_job' },
+    { name: t('maintenance'), path: '/maintenance', icon: RefreshCw, key: 'maintenance' },
   ].filter(item => isVisible(item.key));
 
   const logisticsItems = [
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
+    { name: 'LINE Broadcast', path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
     { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
   ].filter(item => isVisible(item.key));
 

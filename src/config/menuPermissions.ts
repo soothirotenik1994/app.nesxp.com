@@ -11,7 +11,9 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     history: true,
     admins: true,
     line_settings: true,
+    line_broadcast: true,
     system_settings: true,
+    maintenance: true,
   },
   'Admin': {
     reports: true,
@@ -25,7 +27,9 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     history: true,
     admins: true,
     line_settings: true,
+    line_broadcast: true,
     system_settings: true,
+    maintenance: true,
   },
   'Driver': {
     reports: false,
@@ -39,6 +43,8 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     history: true,
     admins: false,
     line_settings: false,
+    line_broadcast: false,
     system_settings: false,
+    maintenance: false,
   }
 };

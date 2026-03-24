@@ -8,7 +8,7 @@ export interface Member {
   phone: string;
   email: string;
   password?: string;
-  role?: 'driver' | 'customer';
+  role?: 'driver' | 'customer' | 'general';
   status?: 'active' | 'inactive' | 'pending';
   created_at: string;
   date_created?: string;
@@ -31,6 +31,11 @@ export interface Car {
     line_user_id: Member;
   }[];
   line_users?: any[];
+  status?: 'active' | 'inactive';
+  maintenance_status?: 'normal' | 'maintenance';
+  next_maintenance_date?: string;
+  next_maintenance_mileage?: number;
+  current_mileage?: number;
 }
 
 export interface CarPermission {

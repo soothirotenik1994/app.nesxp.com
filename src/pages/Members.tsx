@@ -56,7 +56,7 @@ export const Members: React.FC = () => {
     line_user_id: '',
     password: '',
     role: 'general' as 'driver' | 'customer' | 'general' | 'inactive',
-    status: 'active' as 'active' | 'inactive',
+    status: 'active' as 'active' | 'inactive' | 'pending',
     picture_url: ''
   });
   const navigate = useNavigate();
@@ -157,20 +157,19 @@ export const Members: React.FC = () => {
       }
 
       if (editingMember) {
-        // If role is set to 'inactive', set status to 'inactive', otherwise 'active'
-        if (payload.role === 'inactive') {
+        // If status is set to 'inactive', set status to 'inactive', otherwise 'active'
+        if (payload.status === 'inactive') {
           payload.status = 'inactive';
-          payload.role = editingMember.role === 'inactive' ? 'customer' : editingMember.role; // Restore previous role or default
         } else {
           payload.status = 'active';
         }
 
         if (editingMember.status === 'pending' && payload.status === 'active' && editingMember.line_user_id) {
           try {
-            await lineService.sendPushMessage(editingMember.line_user_id, {
+            await lineService.sendPushMessage(editingMember.line_user_id, [{
               type: 'text',
               text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
-            });
+            }]);
           } catch (e) {
             console.error('Failed to send approval notification:', e);
           }
@@ -216,10 +215,10 @@ export const Members: React.FC = () => {
       // If approving a pending member, send notification
       if (member.status === 'pending' && newStatus === 'active' && member.line_user_id) {
         try {
-          await lineService.sendPushMessage(member.line_user_id, {
+          await lineService.sendPushMessage(member.line_user_id, [{
             type: 'text',
             text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
-          });
+          }]);
         } catch (e) {
           console.error('Failed to send approval notification:', e);
         }
@@ -455,7 +454,7 @@ export const Members: React.FC = () => {
                           member.role === 'general' ? "bg-slate-100 text-slate-700" :
                           "bg-emerald-100 text-emerald-700"
                         )}>
-                          {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : t(`${member.role || 'customer'}_role`)}
+                          {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : member.role === 'general' ? 'ทั่วไป' : t(`${member.role || 'customer'}_role`)}
                         </span>
                       </td>
                     )}

@@ -13,8 +13,10 @@ import { JobHistory } from './pages/JobHistory';
 import { JobCalendar } from './pages/JobCalendar';
 import { MyJobs } from './pages/MyJobs';
 import { Reports } from './pages/Reports';
+import { LineBroadcast } from './pages/LineBroadcast';
 import { LineSettings } from './pages/LineSettings';
 import { SystemSettings } from './pages/SystemSettings';
+import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
 import { useEffect } from 'react';
 import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -68,6 +70,9 @@ export default function App() {
             <Route path="/jobs/my" element={<MyJobs />} />
             <Route path="/jobs/calendar" element={<JobCalendar />} />
             <Route path="/jobs/history" element={<JobHistory />} />
+            <Route path="/line/settings" element={<LineSettings />} />
+            <Route path="/line/broadcast" element={<LineBroadcast />} />
+            <Route path="/maintenance" element={<MaintenanceDashboard />} />
             <Route path="/settings/system" element={<SystemSettings />} />
             <Route path="/permissions" element={<Members />} />
             <Route path="/permissions/:memberId" element={<AssignCars />} />

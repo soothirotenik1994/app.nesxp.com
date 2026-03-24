@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, User, LogOut } from 'lucide-react';
+import { Menu, User, LogOut, PlusCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { setAuthToken } from '../api/directus';
 import { ProfileModal } from './ProfileModal';
 
@@ -53,6 +53,13 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
+        <Link 
+          to="/jobs/new"
+          className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span className="hidden sm:inline">{t('new_job_assignment')}</span>
+        </Link>
         <LanguageSwitcher />
         
         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>

@@ -25,7 +25,8 @@ export const Cars: React.FC = () => {
     description: '',
     owner_name: '',
     driver_phone: '',
-    car_image: ''
+    car_image: '',
+    status: 'active'
   });
 
   const userRole = localStorage.getItem('user_role');
@@ -82,7 +83,8 @@ export const Cars: React.FC = () => {
         description: car.description || '',
         owner_name: car.owner_name || '',
         driver_phone: car.driver_phone || '',
-        car_image: carImageId || ''
+        car_image: carImageId || '',
+        status: (car as any).status || 'active'
       });
     } else {
       setEditingCar(null);
@@ -92,7 +94,8 @@ export const Cars: React.FC = () => {
         description: '',
         owner_name: '',
         driver_phone: '',
-        car_image: ''
+        car_image: '',
+        status: 'active'
       });
     }
     setIsModalOpen(true);
@@ -134,7 +137,8 @@ export const Cars: React.FC = () => {
       // Prepare data for submission, ensuring empty strings are null for file fields if needed
       const submissionData = {
         ...formData,
-        car_image: formData.car_image || null
+        car_image: formData.car_image || null,
+        status: formData.status as 'active' | 'inactive'
       };
       
       console.log('Submission data (processed):', submissionData);
@@ -494,7 +498,18 @@ export const Cars: React.FC = () => {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
+                <label className="text-sm font-semibold text-slate-700">{t('status') || 'สถานะรถ'}</label>
+                <select 
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({...prev, status: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="active">ใช้งานได้</option>
+                  <option value="inactive">ระงับการใช้งาน</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">เลขทะเบียนรถ</label>
                   <input 
                   type="text" 
                   required
@@ -505,7 +520,7 @@ export const Cars: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('vehicle_type') || 'ประเภทรถ'}</label>
+                <label className="text-sm font-semibold text-slate-700">ประเภทรถ</label>
                 <input 
                   type="text" 
                   value={formData.vehicle_type}
@@ -515,7 +530,7 @@ export const Cars: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('driver_name')}</label>
+                <label className="text-sm font-semibold text-slate-700">ชื่อคนขับ</label>
                 <select 
                   value={allMembers.find(m => (m.first_name + ' ' + m.last_name).trim() === formData.owner_name)?.id || ''}
                   onChange={(e) => {
@@ -536,7 +551,7 @@ export const Cars: React.FC = () => {
                   }}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                 >
-                  <option value="">{t('select_driver')}</option>
+                  <option value="">เลือกคนขับ</option>
                   {allMembers
                     .filter(m => (m.role || 'driver') === 'driver')
                     .map(member => (
@@ -547,7 +562,7 @@ export const Cars: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('phone')}</label>
+                <label className="text-sm font-semibold text-slate-700">เบอร์โทรศัพท์</label>
                 <input 
                   type="tel" 
                   value={formData.driver_phone}
@@ -557,7 +572,7 @@ export const Cars: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('description')}</label>
+                <label className="text-sm font-semibold text-slate-700">รายละเอียด</label>
                 <textarea 
                   rows={3}
                   value={formData.description}
