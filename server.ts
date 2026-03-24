@@ -8,6 +8,13 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Log LINE configuration status
+  if (process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+    console.log('LINE_CHANNEL_ACCESS_TOKEN is configured (starts with:', process.env.LINE_CHANNEL_ACCESS_TOKEN.substring(0, 10) + '...)');
+  } else {
+    console.warn('LINE_CHANNEL_ACCESS_TOKEN is NOT configured. LINE notifications will fail.');
+  }
+
   app.use(cors());
   app.use(express.json());
 
@@ -117,15 +124,33 @@ async function startServer() {
     }
   });
 
+  // LINE Config Check
+  app.get("/api/line/config-check", (req, res) => {
+    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    res.json({
+      configured: !!accessToken,
+      tokenPrefix: accessToken ? `${accessToken.substring(0, 5)}...` : null
+    });
+  });
+
   // LINE Messaging Endpoint
   app.post("/api/line/send", async (req, res) => {
     try {
       const { to, message, messages } = req.body;
       const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
+      console.log('Backend: Received request to send LINE message', { to, hasToken: !!accessToken });
+
       if (!accessToken) {
         console.error("LINE Error: LINE_CHANNEL_ACCESS_TOKEN is not configured");
-        return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured" });
+        return res.status(500).json({ 
+          error: "LINE_CHANNEL_ACCESS_TOKEN is not configured",
+          details: "Please add LINE_CHANNEL_ACCESS_TOKEN to AI Studio Secrets (Settings -> Secrets)."
+        });
+      }
+
+      if (!to) {
+        return res.status(400).json({ error: "Recipient 'to' is required" });
       }
 
       console.log(`Sending LINE message to: ${to}`);
@@ -149,13 +174,22 @@ async function startServer() {
         timeout: 10000
       });
 
-      console.log("LINE Response:", response.data);
+      console.log("LINE Response success:", response.data);
       res.json(response.data);
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
       console.error("LINE error details:", errorData);
+      
+      // Provide more helpful error messages for common LINE errors
+      let helpfulMessage = "Failed to send LINE message";
+      if (error.response?.status === 401) {
+        helpfulMessage = "Invalid LINE Channel Access Token. Please check your token in AI Studio Secrets.";
+      } else if (error.response?.status === 400) {
+        helpfulMessage = `LINE API Error: ${errorData.message || 'Bad Request'}`;
+      }
+
       res.status(500).json({ 
-        error: "Failed to send LINE message", 
+        error: helpfulMessage, 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
       });
     }

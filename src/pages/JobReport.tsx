@@ -152,6 +152,25 @@ export const JobReport: React.FC = () => {
     return carReports.length > 0 ? carReports[0].mileage_end : 0;
   };
 
+  const resolveMemberId = (idOrUid: any) => {
+    if (!idOrUid || idOrUid === 'null' || idOrUid === 'undefined' || idOrUid === '') return null;
+    const idStr = String(idOrUid);
+    
+    // Try to find by Directus ID first
+    let member = members.find(m => String(m.id) === idStr);
+    if (member) return String(member.id);
+    
+    // If not found, try to find by LINE UID
+    member = members.find(m => String(m.line_user_id) === idStr);
+    if (member) return String(member.id);
+    
+    if (members.length > 0) {
+      console.warn(`resolveMemberId: Could not find member for ${idStr} in ${members.length} loaded members`);
+    }
+    
+    return idStr; // Fallback to original
+  };
+
   const totalDistance = useMemo(() => {
     const start = parseFloat(formData.mileage_start);
     const end = parseFloat(formData.mileage_end);
@@ -274,6 +293,18 @@ export const JobReport: React.FC = () => {
         setCars(carsData);
         setMembers(membersData);
         setCustomers(customersData);
+        console.log(`JobReport: Loaded ${membersData.length} members, ${customersData.length} customers, ${carsData.length} cars`);
+
+        // Check LINE configuration
+        try {
+          const configRes = await axios.get('/api/line/config-check');
+          console.log('LINE Configuration Check:', configRes.data);
+          if (!configRes.data.configured) {
+            console.warn('LINE_CHANNEL_ACCESS_TOKEN is not configured in the backend.');
+          }
+        } catch (configErr) {
+          console.error('Failed to check LINE configuration:', configErr);
+        }
 
         if (id) {
           const report = await directusApi.getWorkReport(id);
@@ -454,6 +485,463 @@ export const JobReport: React.FC = () => {
     setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
+  const sendLineNotification = async (to: string, messages: any[], altText: string) => {
+    try {
+      await lineService.sendPushMessage(to, messages);
+      console.log(`LINE notification sent to ${to}`);
+    } catch (err: any) {
+      console.error(`Error sending LINE notification to ${to}:`, err.response?.data || err.message);
+      throw err;
+    }
+  };
+
+  const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'completed', jobId?: string, targetCustomerId?: string) => {
+    try {
+      const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id);
+      const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
+      const currentDriverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+      const currentReportId = jobId || id;
+
+      console.log(`Starting customer notification for status: ${status}, customer_id: ${currentCustomerId}, report_id: ${currentReportId}`);
+      
+      const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
+      console.log('LINE Notifications enabled in settings:', notificationsEnabled);
+      
+      if (!notificationsEnabled) {
+        console.log('Customer notifications are disabled in localStorage');
+        return;
+      }
+
+      if (!currentCustomerId) {
+        console.log('No customer ID provided for notification');
+        return;
+      }
+
+      const customerLoc = customers.find(c => String(c.id) === String(currentCustomerId));
+      console.log('Found customer location:', customerLoc ? {
+        id: customerLoc.id,
+        company_name: customerLoc.company_name,
+        member_id: customerLoc.member_id,
+        members_count: customerLoc.members?.length || 0,
+        members_raw: customerLoc.members
+      } : 'NOT FOUND');
+      
+      if (!customerLoc) {
+        console.log(`Customer location ${currentCustomerId} not found in customers list`);
+        console.log('Available customer IDs:', customers.map(c => c.id));
+        return;
+      }
+      
+      const memberIds: string[] = [];
+      const primaryIdRaw = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+      const primaryId = resolveMemberId(primaryIdRaw);
+      if (primaryId) {
+        memberIds.push(String(primaryId));
+        console.log('Added primary member ID:', primaryId);
+      }
+      
+      if (customerLoc.members && Array.isArray(customerLoc.members)) {
+        customerLoc.members.forEach((m: any, idx: number) => {
+          console.log(`Processing customer member ${idx}:`, m);
+          const mMember = typeof m.line_user_id === 'object' ? m.line_user_id : null;
+          const mIdRaw = mMember ? mMember.id : m.line_user_id;
+          const mid = resolveMemberId(mIdRaw);
+          if (mid && !memberIds.includes(String(mid))) {
+            memberIds.push(String(mid));
+            console.log(`Added additional member ID from members list: ${mid}`);
+          }
+        });
+      }
+
+      console.log('Member IDs to notify for customer status update:', memberIds);
+
+      if (memberIds.length === 0) {
+        console.log('Customer location has no members linked');
+        return;
+      }
+
+      const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
+      const driver = members.find(m => String(m.id) === String(currentDriverId));
+      
+      const statusText = status === 'pending' ? 'ได้รับงานใหม่แล้ว' : (status === 'accepted' ? 'กำลังส่งสินค้า' : 'จัดส่งสินค้าสำเร็จ');
+      const headerColor = '#2c5494'; // NES Blue
+      const statusColor = status === 'completed' ? '#27ae60' : '#e54d42'; // Green for success, Red for others
+      const displayId = currentReportId;
+
+      // Send notification to each member
+      console.log(`Found ${memberIds.length} members to notify:`, memberIds);
+      
+      for (const memberId of memberIds) {
+        try {
+          const member = members.find(m => String(m.id) === String(memberId));
+          
+          if (!member) {
+            console.log(`Member not found in state for ID: ${memberId}`);
+            continue;
+          }
+
+          const lineIdRaw = member.line_user_id;
+          let customerLineId = null;
+          
+          if (typeof lineIdRaw === 'object' && lineIdRaw !== null) {
+            customerLineId = (lineIdRaw as any).line_user_id || (lineIdRaw as any).id;
+          } else {
+            customerLineId = lineIdRaw;
+          }
+          
+          // Final fallback: if it's still an object, it might be the member object itself from a relation
+          if (typeof customerLineId === 'object' && customerLineId !== null) {
+            customerLineId = (customerLineId as any).line_user_id || (customerLineId as any).id;
+          }
+
+          if (!customerLineId || typeof customerLineId !== 'string' || customerLineId.length < 5) {
+            console.log(`Customer LINE ID not found or invalid for member: ${memberId}. LINE ID: ${customerLineId}. Member data:`, member);
+            continue;
+          }
+
+          console.log(`Preparing message for member ${memberId} with LINE ID ${customerLineId}`);
+          
+          if (!customerLineId) {
+            console.log(`Member ${memberId} has no LINE ID, skipping notification`);
+            continue;
+          }
+
+          const flexContents: any = {
+            type: "bubble",
+            header: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: "Nationwide Express Tracker",
+                  color: "#ffffff",
+                  weight: "bold",
+                  size: "sm"
+                }
+              ],
+              backgroundColor: headerColor,
+              paddingAll: "md"
+            },
+            body: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: "แจ้งเตือนการส่งสินค้า",
+                  weight: "bold",
+                  size: "xl",
+                  color: statusColor,
+                  margin: "md",
+                  align: "center"
+                },
+                {
+                  type: "box",
+                  layout: "vertical",
+                  margin: "lg",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "ต้นทาง",
+                          size: "xxs",
+                          color: status === 'pending' || status === 'accepted' || status === 'completed' ? "#2c5494" : "#aaaaaa",
+                          weight: status === 'pending' || status === 'accepted' || status === 'completed' ? "bold" : "regular"
+                        },
+                        {
+                          type: "text",
+                          text: "กำลังส่งสินค้า",
+                          size: "xxs",
+                          color: status === 'accepted' || status === 'completed' ? "#2c5494" : "#aaaaaa",
+                          align: "center",
+                          weight: status === 'accepted' || status === 'completed' ? "bold" : "regular"
+                        },
+                        {
+                          type: "text",
+                          text: "ปลายทาง",
+                          size: "xxs",
+                          color: status === 'completed' ? "#2c5494" : "#aaaaaa",
+                          align: "end",
+                          weight: status === 'completed' ? "bold" : "regular"
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "vertical",
+                      contents: [
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            {
+                              type: "box",
+                              layout: "vertical",
+                              contents: [],
+                              height: "6px",
+                              backgroundColor: status === 'completed' ? "#2c5494" : (status === 'accepted' ? "#2c5494" : "#eeeeee"),
+                              flex: 1
+                            },
+                            {
+                              type: "box",
+                              layout: "vertical",
+                              contents: [],
+                              height: "6px",
+                              backgroundColor: status === 'completed' ? "#2c5494" : "#eeeeee",
+                              flex: 1
+                            }
+                          ],
+                          cornerRadius: "lg"
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [],
+                          width: "14px",
+                          height: "14px",
+                          cornerRadius: "7px",
+                          borderWidth: "2px",
+                          borderColor: "#2c5494",
+                          backgroundColor: "#ffffff",
+                          position: "absolute",
+                          offsetTop: "-4px",
+                          offsetStart: status === 'pending' ? "0%" : (status === 'accepted' ? "48%" : "95%")
+                        }
+                      ],
+                      margin: "sm"
+                    }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "vertical",
+                  margin: "xl",
+                  spacing: "sm",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🆔 เลขที่เคส",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(displayId || 'N/A'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🏢 บริษัท",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(formData.customer_name || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5,
+                          wrap: true
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "📦 สถานะ",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: statusText,
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5,
+                          weight: "bold"
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "📍 ต้นทาง",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(formData.origin || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5,
+                          wrap: true
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🏁 ปลายทาง",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(formData.destination || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5,
+                          wrap: true
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "🚚 รถ",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(selectedCar?.car_number || 'N/A'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "👤 คนขับ",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "📞 เบอร์คนขับ",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(driver?.phone || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "text",
+                          text: "📅 วันที่",
+                          size: "sm",
+                          color: "#2c5494",
+                          flex: 2
+                        },
+                        {
+                          type: "text",
+                          text: String(formData.work_date || '-'),
+                          size: "sm",
+                          color: "#111111",
+                          flex: 5
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              paddingAll: "lg"
+            },
+            footer: {
+              type: "box",
+              layout: "vertical",
+              spacing: "sm",
+              contents: [
+                {
+                  type: "button",
+                  style: "primary",
+                  height: "sm",
+                  color: "#e54d42",
+                  action: {
+                    type: "uri",
+                    label: "เข้าสู่ระบบ",
+                    uri: "https://app.nesxp.com/"
+                  }
+                }
+              ],
+              flex: 0
+            }
+          };
+
+          await sendLineNotification(customerLineId, [{ type: "flex", altText: `แจ้งเตือนการส่งสินค้า: ${statusText}`, contents: flexContents }], `แจ้งเตือนการส่งสินค้า: ${statusText}`);
+        } catch (memberErr) {
+          console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
+        }
+      }
+    } catch (error) {
+      console.error('Error in sendCustomerStatusNotification:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('handleSubmit triggered', formData);
@@ -480,7 +968,17 @@ export const JobReport: React.FC = () => {
       const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
       const currentDriverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
 
+      const getSafeId = (val: any) => {
+        if (!val) return '';
+        if (typeof val === 'object') return String(val.id || '');
+        return String(val);
+      };
+
       console.log('handleSubmit: Extracted IDs:', { currentCustomerId, currentCarId, currentDriverId });
+      
+      if (!currentCustomerId) {
+        console.warn('handleSubmit: currentCustomerId is empty! Customer notifications might fail.');
+      }
 
       // 1. Upload new photos to Directus if any
       const uploadedPhotoIds: string[] = [];
@@ -954,7 +1452,7 @@ export const JobReport: React.FC = () => {
           const details = lineErr.response?.data?.details;
           const errorDetails = typeof details === 'object' ? JSON.stringify(details) : (details || lineErr.message);
           
-          // Add a notification if LINE fails
+          // Show error but don't return early, so customer notification can still be attempted
           setStatusConfig({
             type: 'error',
             title: 'การแจ้งเตือน LINE ล้มเหลว',
@@ -962,392 +1460,13 @@ export const JobReport: React.FC = () => {
             action: () => setShowStatusModal(false)
           });
           setShowStatusModal(true);
-          return; // Stop here to let the user see the error
         }
 
         // Send LINE notification to customer and auto-link car
-        const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
-        const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
-        
-        if (customerLoc) {
-          console.log('Customer location found for notification:', customerLoc.company_name);
-          
-          // 1. Auto-link car to ALL customer member accounts - MOVED TO TOP OF BLOCK
-          const memberIds: string[] = [];
-          const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
-          if (primaryId) memberIds.push(String(primaryId));
-          
-          if (customerLoc.members && Array.isArray(customerLoc.members)) {
-            customerLoc.members.forEach((m: any) => {
-              const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-              if (mid && !memberIds.includes(String(mid))) memberIds.push(String(mid));
-            });
-          }
-          
-          // 2. Send notification to ALL members if they have LINE
-          if (notificationsEnabled) {
-            const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-            const driver = members.find(m => String(m.id) === String(formData.driver_id));
-            
-            console.log(`Sending notifications to ${memberIds.length} members...`);
-            
-            for (const memberId of memberIds) {
-              try {
-                const memberInMembers = customerLoc.members?.find((m: any) => {
-                  const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-                  return String(mid) === String(memberId);
-                });
-
-                const member = members.find(m => String(m.id) === String(memberId)) || 
-                              (typeof customerLoc.member_id === 'object' && String(customerLoc.member_id.id) === String(memberId) ? customerLoc.member_id : null) ||
-                              (memberInMembers && typeof memberInMembers.line_user_id === 'object' ? memberInMembers.line_user_id : null);
-                
-                if (!member) {
-                  console.log(`Member not found for ID: ${memberId}`);
-                  continue;
-                }
-
-                const customerLineIdRaw = member.line_user_id;
-                let customerLineId = null;
-                
-                if (typeof customerLineIdRaw === 'object' && customerLineIdRaw !== null) {
-                  customerLineId = (customerLineIdRaw as any).line_user_id || (customerLineIdRaw as any).id;
-                } else {
-                  customerLineId = customerLineIdRaw;
-                }
-
-                console.log(`Member ${memberId} LINE ID extraction:`, { raw: customerLineIdRaw, extracted: customerLineId });
-
-                if (customerLineId && typeof customerLineId === 'string' && customerLineId.length > 5) {
-                  console.log(`Sending notification to member ${memberId} (LINE: ${customerLineId})`);
-                  
-                  const customerMessages = [
-                    {
-                      type: "flex",
-                      altText: "🔔 Nationwide Express Tracker: แจ้งเตือนการจัดส่ง",
-                      contents: {
-                        type: "bubble",
-                        header: {
-                          type: "box",
-                          layout: "vertical",
-                          contents: [
-                            {
-                              type: "text",
-                              text: "Nationwide Express Tracker",
-                              color: "#ffffff",
-                              weight: "bold",
-                              size: "sm"
-                            }
-                          ],
-                          backgroundColor: "#2c5494",
-                          paddingAll: "md"
-                        },
-                        body: {
-                          type: "box",
-                          layout: "vertical",
-                          contents: [
-                            {
-                              type: "text",
-                              text: "แจ้งเตือนการส่งสินค้า",
-                              weight: "bold",
-                              size: "xl",
-                              color: "#e54d42",
-                              margin: "md",
-                              align: "center"
-                            },
-                            {
-                              type: "box",
-                              layout: "vertical",
-                              margin: "lg",
-                              contents: [
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "ต้นทาง",
-                                      size: "xxs",
-                                      color: "#2c5494",
-                                      weight: "bold"
-                                    },
-                                    {
-                                      type: "text",
-                                      text: "กำลังส่งสินค้า",
-                                      size: "xxs",
-                                      color: "#aaaaaa",
-                                      align: "center"
-                                    },
-                                    {
-                                      type: "text",
-                                      text: "ปลายทาง",
-                                      size: "xxs",
-                                      color: "#aaaaaa",
-                                      align: "end"
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "vertical",
-                                  contents: [
-                                    {
-                                      type: "box",
-                                      layout: "horizontal",
-                                      contents: [
-                                        {
-                                          type: "box",
-                                          layout: "vertical",
-                                          contents: [],
-                                          height: "6px",
-                                          backgroundColor: "#eeeeee",
-                                          flex: 1
-                                        },
-                                        {
-                                          type: "box",
-                                          layout: "vertical",
-                                          contents: [],
-                                          height: "6px",
-                                          backgroundColor: "#eeeeee",
-                                          flex: 1
-                                        }
-                                      ],
-                                      cornerRadius: "lg"
-                                    },
-                                    {
-                                      type: "box",
-                                      layout: "vertical",
-                                      contents: [],
-                                      width: "14px",
-                                      height: "14px",
-                                      cornerRadius: "7px",
-                                      borderWidth: "2px",
-                                      borderColor: "#2c5494",
-                                      backgroundColor: "#ffffff",
-                                      position: "absolute",
-                                      offsetTop: "-4px",
-                                      offsetStart: "0%"
-                                    }
-                                  ],
-                                  margin: "sm"
-                                }
-                              ]
-                            },
-                            {
-                              type: "box",
-                              layout: "vertical",
-                              margin: "xl",
-                              spacing: "sm",
-                              contents: [
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "🆔 เลขที่เคส",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: String(result.id || 'N/A'),
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "🏢 บริษัท",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: formData.customer_name,
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5,
-                                      wrap: true
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "📦 สถานะ",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: "กำลังเตรียมการจัดส่ง",
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5,
-                                      weight: "bold"
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "📍 ต้นทาง",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: formData.origin,
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5,
-                                      wrap: true
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "🏁 ปลายทาง",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: formData.destination,
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5,
-                                      wrap: true
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "🚚 รถ",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: selectedCar?.car_number || 'N/A',
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "👤 คนขับ",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: driver ? `${driver.first_name} ${driver.last_name}` : '-',
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "📞 เบอร์คนขับ",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: driver?.phone || '-',
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5
-                                    }
-                                  ]
-                                },
-                                {
-                                  type: "box",
-                                  layout: "horizontal",
-                                  contents: [
-                                    {
-                                      type: "text",
-                                      text: "📅 วันที่",
-                                      size: "sm",
-                                      color: "#2c5494",
-                                      flex: 2
-                                    },
-                                    {
-                                      type: "text",
-                                      text: formData.work_date,
-                                      size: "sm",
-                                      color: "#111111",
-                                      flex: 5
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ],
-                          paddingAll: "lg"
-                        }
-                      }
-                    }
-                  ];
-                  
-                  await axios.post('/api/line/send', {
-                    to: customerLineId,
-                    messages: customerMessages
-                  });
-                  console.log(`Successfully sent LINE notification to member ${memberId}`);
-                } else {
-                  console.log(`No valid LINE ID for member ${memberId}. Value: ${customerLineId}`);
-                }
-              } catch (memberErr) {
-                console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
-              }
-            }
-            console.log('Customer LINE notifications process completed');
-          }
-        } else {
-          console.log('Customer location not found for ID:', formData.customer_id);
+        try {
+          await sendCustomerStatusNotification('pending', result.id, currentCustomerId);
+        } catch (custErr) {
+          console.error('Failed to send initial customer notification:', custErr);
         }
 
         // If the new report is already completed, unassign car
@@ -1416,409 +1535,6 @@ export const JobReport: React.FC = () => {
       setError('Failed to send report');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const sendCustomerStatusNotification = async (status: 'accepted' | 'completed') => {
-    try {
-      console.log(`Starting customer notification for status: ${status}, customer_id: ${formData.customer_id}`);
-      const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
-      if (!notificationsEnabled) {
-        console.log('Notifications disabled in localStorage');
-        return;
-      }
-
-      const customerLoc = customers.find(c => String(c.id) === String(formData.customer_id));
-      if (!customerLoc) {
-        console.log('Customer location not found for ID:', formData.customer_id);
-        console.log('Available customer IDs:', customers.map(c => c.id));
-        return;
-      }
-      
-      const memberIds: string[] = [];
-      const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
-      if (primaryId) memberIds.push(String(primaryId));
-      
-      if (customerLoc.members && Array.isArray(customerLoc.members)) {
-        customerLoc.members.forEach((m: any) => {
-          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-          if (id && !memberIds.includes(String(id))) {
-            memberIds.push(String(id));
-          }
-        });
-      }
-
-      if (memberIds.length === 0) {
-        console.log('Customer location has no members linked');
-        return;
-      }
-
-      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-      const driver = members.find(m => String(m.id) === String(formData.driver_id));
-      
-      const statusText = status === 'accepted' ? 'กำลังส่งสินค้า' : 'จัดส่งสินค้าสำเร็จ';
-      const headerColor = '#2c5494'; // NES Blue
-      const statusColor = '#e54d42'; // NES Red
-
-      // Send notification to each member
-      console.log(`Found ${memberIds.length} members to notify:`, memberIds);
-      
-      for (const memberId of memberIds) {
-        try {
-          const memberInMembers = customerLoc.members?.find((m: any) => {
-            const mid = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-            return String(mid) === String(memberId);
-          });
-
-          const member = members.find(m => String(m.id) === String(memberId)) || 
-                        (typeof customerLoc.member_id === 'object' && String(customerLoc.member_id.id) === String(memberId) ? customerLoc.member_id : null) ||
-                        (memberInMembers && typeof memberInMembers.line_user_id === 'object' ? memberInMembers.line_user_id : null);
-
-          const customerLineIdRaw = member?.line_user_id;
-          let customerLineId = null;
-          
-          if (typeof customerLineIdRaw === 'object' && customerLineIdRaw !== null) {
-            customerLineId = (customerLineIdRaw as any).line_user_id || (customerLineIdRaw as any).id;
-          } else {
-            customerLineId = customerLineIdRaw;
-          }
-          
-          console.log(`Member ${memberId} LINE ID extraction:`, { raw: customerLineIdRaw, extracted: customerLineId });
-
-          if (!customerLineId) {
-            console.log(`Customer LINE ID not found for member: ${memberId}. Member data:`, member);
-            continue;
-          }
-
-          console.log(`Preparing message for member ${memberId} with LINE ID ${customerLineId}`);
-
-          const flexContents: any = {
-          type: "bubble",
-          header: {
-            type: "box",
-            layout: "vertical",
-            contents: [
-              {
-                type: "text",
-                text: "Nationwide Express Tracker",
-                color: "#ffffff",
-                weight: "bold",
-                size: "sm"
-              }
-            ],
-            backgroundColor: headerColor,
-            paddingAll: "md"
-          },
-          body: {
-            type: "box",
-            layout: "vertical",
-            contents: [
-              {
-                type: "text",
-                text: "แจ้งเตือนการส่งสินค้า",
-                weight: "bold",
-                size: "xl",
-                color: statusColor,
-                margin: "md",
-                align: "center"
-              },
-              {
-                type: "box",
-                layout: "vertical",
-                margin: "lg",
-                contents: [
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "ต้นทาง",
-                        size: "xxs",
-                        color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
-                        weight: status === 'accepted' ? "bold" : "regular"
-                      },
-                      {
-                        type: "text",
-                        text: "กำลังส่งสินค้า",
-                        size: "xxs",
-                        color: status === 'accepted' ? "#2c5494" : "#aaaaaa",
-                        align: "center",
-                        weight: status === 'accepted' ? "bold" : "regular"
-                      },
-                      {
-                        type: "text",
-                        text: "ปลายทาง",
-                        size: "xxs",
-                        color: status === 'completed' ? "#2c5494" : "#aaaaaa",
-                        align: "end",
-                        weight: status === 'completed' ? "bold" : "regular"
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "vertical",
-                    contents: [
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "box",
-                            layout: "vertical",
-                            contents: [],
-                            height: "6px",
-                            backgroundColor: status === 'completed' ? "#2c5494" : (status === 'accepted' ? "#2c5494" : "#eeeeee"),
-                            flex: 1
-                          },
-                          {
-                            type: "box",
-                            layout: "vertical",
-                            contents: [],
-                            height: "6px",
-                            backgroundColor: status === 'completed' ? "#2c5494" : "#eeeeee",
-                            flex: 1
-                          }
-                        ],
-                        cornerRadius: "lg"
-                      },
-                      {
-                        type: "box",
-                        layout: "vertical",
-                        contents: [],
-                        width: "14px",
-                        height: "14px",
-                        cornerRadius: "7px",
-                        borderWidth: "2px",
-                        borderColor: "#2c5494",
-                        backgroundColor: "#ffffff",
-                        position: "absolute",
-                        offsetTop: "-4px",
-                        offsetStart: status === 'accepted' ? "48%" : "95%"
-                      }
-                    ],
-                    margin: "sm"
-                  }
-                ]
-              },
-              {
-                type: "box",
-                layout: "vertical",
-                margin: "xl",
-                spacing: "sm",
-                contents: [
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "🆔 เลขที่เคส",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(id || 'N/A'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "🏢 บริษัท",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(formData.customer_name || '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5,
-                        wrap: true
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "📦 สถานะ",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: statusText,
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5,
-                        weight: "bold"
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "📍 ต้นทาง",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(formData.origin || '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5,
-                        wrap: true
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "🏁 ปลายทาง",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(formData.destination || '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5,
-                        wrap: true
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "🚚 รถ",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(selectedCar?.car_number || 'N/A'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "👤 คนขับ",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "📞 เบอร์คนขับ",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(driver?.phone || '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5
-                      }
-                    ]
-                  },
-                  {
-                    type: "box",
-                    layout: "horizontal",
-                    contents: [
-                      {
-                        type: "text",
-                        text: "📅 วันที่",
-                        size: "sm",
-                        color: "#2c5494",
-                        flex: 2
-                      },
-                      {
-                        type: "text",
-                        text: String(formData.work_date || '-'),
-                        size: "sm",
-                        color: "#111111",
-                        flex: 5
-                      }
-                    ]
-                  }
-                ]
-              }
-            ],
-            paddingAll: "lg"
-          }
-        };
-
-        const customerMessages = [
-          {
-            type: "flex",
-            altText: `🔔 Nationwide Express Tracker: ${statusText}`,
-            contents: flexContents
-          }
-        ];
-        
-        await axios.post('/api/line/send', {
-          to: customerLineId,
-          messages: customerMessages
-        });
-        console.log(`Customer LINE notification sent for status: ${status} to member: ${memberId}`);
-      } catch (memberErr) {
-        console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
-      }
-    }
-    console.log('Customer LINE notifications process completed');
-    } catch (err) {
-      console.error('Error sending customer status notification:', err);
     }
   };
 
@@ -1960,33 +1676,11 @@ export const JobReport: React.FC = () => {
         }
       ];
 
-      await axios.post('/api/line/send', {
-        to: driverLineId,
-        messages: driverMessages
-      });
+      await sendLineNotification(driverLineId, driverMessages, `🔔 Nationwide Express Tracker: ${statusText}`);
       console.log(`Driver completion notification sent to ${driverLineId}`);
     } catch (err: any) {
       console.error('Error sending driver status notification:', err.response?.data || err.message);
     }
-  };
-
-  const resolveMemberId = (idOrUid: any) => {
-    if (!idOrUid || idOrUid === 'null' || idOrUid === 'undefined' || idOrUid === '') return null;
-    const idStr = String(idOrUid);
-    
-    // Try to find by Directus ID first
-    let member = members.find(m => String(m.id) === idStr);
-    if (member) return String(member.id);
-    
-    // If not found, try to find by LINE UID
-    member = members.find(m => String(m.line_user_id) === idStr);
-    if (member) return String(member.id);
-    
-    if (members.length > 0) {
-      console.warn(`resolveMemberId: Could not find member for ${idStr} in ${members.length} loaded members`);
-    }
-    
-    return idStr; // Fallback to original
   };
 
   const assignCarToCustomer = async (customerId: string, carId: string, driverId?: string) => {
@@ -2042,7 +1736,8 @@ export const JobReport: React.FC = () => {
     // 2. Resolve additional members
     if (customerLoc.members && Array.isArray(customerLoc.members)) {
       console.log(`processAssignment: Processing ${customerLoc.members.length} additional members`);
-      customerLoc.members.forEach((m: any) => {
+      customerLoc.members.forEach((m: any, idx: number) => {
+        console.log(`processAssignment: Member ${idx} raw data:`, m);
         const mMember = typeof m.line_user_id === 'object' ? m.line_user_id : null;
         const mIdRaw = mMember ? mMember.id : m.line_user_id;
         const mid = resolveMemberId(mIdRaw);
@@ -2073,6 +1768,11 @@ export const JobReport: React.FC = () => {
     }
 
     console.log('processAssignment: Final list of member IDs to link:', memberIds);
+
+    if (!directusApi.linkCarToMember) {
+      console.error('processAssignment: directusApi.linkCarToMember is NOT defined!');
+      return;
+    }
 
     for (const mid of memberIds) {
       try {
@@ -2933,7 +2633,8 @@ export const JobReport: React.FC = () => {
                 }}
               />
               {(() => {
-                const cust = customers.find(c => c.id === formData.customer_id);
+                const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+                const cust = customers.find(c => String(c.id) === String(currentCustomerId));
                 if (!cust) return null;
 
                 const memberIds: string[] = [];
@@ -3442,6 +3143,27 @@ export const JobReport: React.FC = () => {
           </div>
         </div>
 
+
+        {isAdmin && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
+                if (!currentCustomerId) {
+                  alert('กรุณาเลือกลูกค้าก่อนทดสอบ');
+                  return;
+                }
+                sendCustomerStatusNotification('pending', id || 'TEST-001', currentCustomerId);
+                alert('กำลังส่งข้อความทดสอบ... กรุณาตรวจสอบ Console');
+              }}
+              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all text-sm font-bold flex items-center gap-2 border border-slate-200"
+            >
+              <MessageSquare className="w-4 h-4" />
+              ทดสอบแจ้งเตือน LINE (ลูกค้า)
+            </button>
+          </div>
+        )}
 
         <button 
           type="submit"

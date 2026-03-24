@@ -57,6 +57,11 @@ export const Login: React.FC = () => {
       const member = await directusApi.loginStaff(email, password);
       
       if (member) {
+        if (member.status === 'inactive') {
+          setError(t('account_disabled') || 'บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+          setLoading(false);
+          return;
+        }
         console.log('Staff login successful:', member.email);
         localStorage.setItem('user_role', member.role || 'customer');
         localStorage.setItem('user_name', `${member.first_name} ${member.last_name}`);

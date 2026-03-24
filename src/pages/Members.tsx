@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
+import { lineService } from '../services/lineService';
 import { Member } from '../types';
 import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -24,7 +25,7 @@ export const Members: React.FC = () => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('members_columns');
-    return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'source', 'line_uid', 'vehicles', 'actions'];
+    return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'status', 'source', 'line_uid', 'vehicles', 'actions'];
   });
 
   useEffect(() => {
@@ -43,7 +44,6 @@ export const Members: React.FC = () => {
     { id: 'name', label: t('name') },
     { id: 'contact', label: t('contact_info') },
     { id: 'role', label: t('role') },
-    { id: 'source', label: t('registration_source') },
     { id: 'line_uid', label: t('line_uid') },
     { id: 'vehicles', label: t('assigned_vehicles') },
     { id: 'actions', label: t('actions') },
@@ -55,7 +55,8 @@ export const Members: React.FC = () => {
     phone: '',
     line_user_id: '',
     password: '',
-    role: 'customer' as 'driver' | 'customer',
+    role: 'general' as 'driver' | 'customer' | 'general' | 'inactive',
+    status: 'active' as 'active' | 'inactive',
     picture_url: ''
   });
   const navigate = useNavigate();
@@ -103,6 +104,7 @@ export const Members: React.FC = () => {
         line_user_id: member.line_user_id || '',
         password: '', // Don't show password
         role: member.role || 'customer',
+        status: member.status || 'active',
         picture_url: member.picture_url || ''
       });
     } else {
@@ -114,7 +116,8 @@ export const Members: React.FC = () => {
         phone: '',
         line_user_id: '',
         password: '',
-        role: 'customer',
+        role: 'general',
+        status: 'active',
         picture_url: ''
       });
     }
@@ -154,8 +157,28 @@ export const Members: React.FC = () => {
       }
 
       if (editingMember) {
+        // If role is set to 'inactive', set status to 'inactive', otherwise 'active'
+        if (payload.role === 'inactive') {
+          payload.status = 'inactive';
+          payload.role = editingMember.role === 'inactive' ? 'customer' : editingMember.role; // Restore previous role or default
+        } else {
+          payload.status = 'active';
+        }
+
+        if (editingMember.status === 'pending' && payload.status === 'active' && editingMember.line_user_id) {
+          try {
+            await lineService.sendPushMessage(editingMember.line_user_id, {
+              type: 'text',
+              text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
+            });
+          } catch (e) {
+            console.error('Failed to send approval notification:', e);
+          }
+        }
         await directusApi.updateMember(editingMember.id, payload);
       } else {
+        payload.status = 'pending';
+        payload.role = 'general';
         await directusApi.createMember(payload);
       }
       setIsModalOpen(false);
@@ -181,6 +204,31 @@ export const Members: React.FC = () => {
       console.error('Error deleting member:', err);
       setActionError(err.message || t('error_deleting'));
       setDeleteId(null);
+    }
+  };
+
+  const handleToggleStatus = async (member: Member) => {
+    try {
+      // If pending or inactive, make it active. If active, make it inactive.
+      const newStatus = (member.status === 'inactive' || member.status === 'pending') ? 'active' : 'inactive';
+      await directusApi.updateMember(member.id, { status: newStatus });
+      
+      // If approving a pending member, send notification
+      if (member.status === 'pending' && newStatus === 'active' && member.line_user_id) {
+        try {
+          await lineService.sendPushMessage(member.line_user_id, {
+            type: 'text',
+            text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
+          });
+        } catch (e) {
+          console.error('Failed to send approval notification:', e);
+        }
+      }
+      
+      fetchMembers();
+    } catch (err: any) {
+      console.error('Error toggling member status:', err);
+      setActionError('Failed to update status');
     }
   };
 
@@ -314,7 +362,6 @@ export const Members: React.FC = () => {
                 {visibleColumns.includes('name') && <th className="px-6 py-4">{t('name')}</th>}
                 {visibleColumns.includes('contact') && <th className="px-6 py-4">{t('contact_info')}</th>}
                 {visibleColumns.includes('role') && <th className="px-6 py-4">{t('role')}</th>}
-                {visibleColumns.includes('source') && <th className="px-6 py-4">{t('registration_source')}</th>}
                 {visibleColumns.includes('line_uid') && <th className="px-6 py-4">{t('line_uid')}</th>}
                 {visibleColumns.includes('vehicles') && <th className="px-6 py-4">{t('assigned_vehicles')}</th>}
                 {visibleColumns.includes('actions') && <th className="px-6 py-4 text-right">{t('actions')}</th>}
@@ -403,20 +450,12 @@ export const Members: React.FC = () => {
                       <td className="px-6 py-4">
                         <span className={clsx(
                           "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                          member.role === 'customer' ? "bg-emerald-100 text-emerald-700" :
-                          "bg-blue-100 text-blue-700"
+                          member.status === 'inactive' ? "bg-red-100 text-red-700" :
+                          member.role === 'driver' ? "bg-blue-100 text-blue-700" :
+                          member.role === 'general' ? "bg-slate-100 text-slate-700" :
+                          "bg-emerald-100 text-emerald-700"
                         )}>
-                          {t(`${member.role || 'customer'}_role`)}
-                        </span>
-                      </td>
-                    )}
-                    {visibleColumns.includes('source') && (
-                      <td className="px-6 py-4">
-                        <span className={clsx(
-                          "text-[10px] font-bold px-2 py-1 rounded-md",
-                          member.line_user_id ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
-                        )}>
-                          {member.line_user_id ? 'LINE' : 'Admin'}
+                          {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : t(`${member.role || 'customer'}_role`)}
                         </span>
                       </td>
                     )}
@@ -663,8 +702,10 @@ export const Members: React.FC = () => {
                     onChange={(e) => setFormData({...formData, role: e.target.value as any})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
-                    <option value="driver">{t('driver_role')}</option>
-                    <option value="customer">{t('customer_role')}</option>
+                    <option value="driver">{t('driver_role') || 'คนขับ'}</option>
+                    <option value="customer">{t('customer_role') || 'ลูกค้า'}</option>
+                    <option value="general">{'ทั่วไป'}</option>
+                    <option value="inactive">{t('disabled') || 'ระงับการใช้งาน'}</option>
                   </select>
                 </div>
               </div>

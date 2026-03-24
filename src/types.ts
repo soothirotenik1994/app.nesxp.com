@@ -9,6 +9,7 @@ export interface Member {
   email: string;
   password?: string;
   role?: 'driver' | 'customer';
+  status?: 'active' | 'inactive' | 'pending';
   created_at: string;
   date_created?: string;
   registration_source?: 'line' | 'admin';

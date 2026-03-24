@@ -29,13 +29,6 @@ export const AssignCars: React.FC = () => {
     const fetchData = async () => {
       if (!memberId) return;
       
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        console.warn('No admin token found, redirecting to login...');
-        navigate('/login');
-        return;
-      }
-
       try {
         const [memberData, carsData, permissionsData] = await Promise.all([
           directusApi.getMember(memberId),
@@ -48,7 +41,7 @@ export const AssignCars: React.FC = () => {
       } catch (error: any) {
         console.error('Error fetching assignment data:', error);
         if (error.response?.status === 403) {
-          alert('Permission Denied (403): You do not have access to manage car assignments. Please ensure your account has Administrator permissions in Directus.');
+          alert('Permission Denied (403): You do not have access to manage car assignments.');
         } else {
           alert(t('error_loading_data') || 'Error loading data');
         }

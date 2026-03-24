@@ -111,6 +111,7 @@ export const LineCallback: React.FC = () => {
               first_name: lineProfile.displayName,
               last_name: '(LINE)',
               role: 'customer',
+              status: 'pending',
               picture_url: directusPictureId,
               display_name: lineProfile.displayName
             });
@@ -121,6 +122,19 @@ export const LineCallback: React.FC = () => {
         if (!member) {
           console.error('LineCallback: Member not found in system');
           setError('ขออภัย ไม่พบข้อมูลผู้ใช้งานในระบบ กรุณาติดต่อผู้ดูแลระบบเพื่อลงทะเบียน');
+          return;
+        }
+
+        // Check if member is active
+        if (member.status === 'inactive') {
+          console.error('LineCallback: Member account is disabled');
+          setError('ขออภัย บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+          return;
+        }
+
+        if (member.status === 'pending') {
+          console.error('LineCallback: Member account is pending approval');
+          setError('บัญชีของคุณอยู่ระหว่างการตรวจสอบโดยแอดมิน กรุณารอสักครู่');
           return;
         }
 

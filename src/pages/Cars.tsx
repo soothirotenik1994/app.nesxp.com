@@ -28,6 +28,10 @@ export const Cars: React.FC = () => {
     car_image: ''
   });
 
+  const userRole = localStorage.getItem('user_role');
+  const memberId = localStorage.getItem('member_id');
+  const isAdmin = userRole === 'Administrator' || userRole === 'Admin';
+
   const fetchCars = async () => {
     setLoading(true);
     setError(null);
@@ -190,6 +194,16 @@ export const Cars: React.FC = () => {
   };
 
   const filteredCars = cars.filter(c => {
+    // If not admin, only show cars that this driver has permission for
+    if (!isAdmin && memberId) {
+      const hasPermission = allPermissions.some(p => {
+        const pCarId = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+        const pMemberId = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+        return String(pCarId) === String(c.id) && String(pMemberId) === String(memberId);
+      });
+      if (!hasPermission) return false;
+    }
+
     const carNum = String(c.car_number || '').toLowerCase();
     const desc = String(c.description || '').toLowerCase();
     const owner = String(c.owner_name || '').toLowerCase();
@@ -205,13 +219,15 @@ export const Cars: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">{t('vehicle_inventory')}</h2>
           <p className="text-slate-500">{t('manage_vehicles')}</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
-        >
-          <Plus className="w-5 h-5" />
-          {t('add_vehicle')}
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={() => handleOpenModal()}
+            className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
+          >
+            <Plus className="w-5 h-5" />
+            {t('add_vehicle')}
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -274,20 +290,22 @@ export const Cars: React.FC = () => {
                       </div>
                     );
                   })()}
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => handleOpenModal(car)}
-                      className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-primary transition-colors shadow-sm"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => setDeleteId(car.id)}
-                      className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-red-500 transition-colors shadow-sm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleOpenModal(car)}
+                        className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-primary transition-colors shadow-sm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setDeleteId(car.id)}
+                        className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-red-500 transition-colors shadow-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   {car.vehicle_type && (
                     <div className="absolute bottom-3 left-3">
                       <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">

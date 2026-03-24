@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 export const lineService = {
-  sendPushMessage: async (to: string, message: any) => {
+  sendPushMessage: async (to: string, messages: any[]) => {
     try {
       const response = await axios.post('/api/line/send', {
         to,
-        message
+        messages
       });
       return response.data;
     } catch (error) {

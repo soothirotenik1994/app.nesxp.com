@@ -30,7 +30,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
   'Driver': {
     reports: false,
     drivers: false,
-    vehicles: false,
+    vehicles: true,
     locations: false,
     new_job: false,
     dashboard: true,

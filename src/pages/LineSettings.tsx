@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { MessageSquare, Save, AlertCircle, Send, Loader2, CheckCircle2, XCircle, User, Key } from 'lucide-react';
+import { MessageSquare, Save, AlertCircle, Send, Loader2, CheckCircle2, XCircle, User } from 'lucide-react';
 import { lineService } from '../services/lineService';
 import { directusApi } from '../api/directus';
 
@@ -15,8 +15,6 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [testLineId, setTestLineId] = useState('');
-  const [channelAccessToken, setChannelAccessToken] = useState('');
-  const [channelSecret, setChannelSecret] = useState('');
   const [testMessage, setTestMessage] = useState('🔔 ทดสอบระบบการแจ้งเตือน\n\nนี่คือข้อความทดสอบจากระบบ Nationwide Express Tracker');
   const [notificationTemplate, setNotificationTemplate] = useState('🔔 มีงานใหม่มอบหมายให้คุณ\n\n🏢 ลูกค้า: {{customer_name}}\n📍 ต้นทาง: {{origin}}\n🏁 ปลายทาง: {{destination}}\n🚚 รถ: {{car_plate}}\n📅 วันที่: {{work_date}}');
   const [driverLineId, setDriverLineId] = useState<string | null>(null);
@@ -24,6 +22,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingTemplate, setIsTestingTemplate] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
     const savedSetting = localStorage.getItem('line_notifications_enabled');
@@ -31,13 +30,21 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       setIsEnabled(savedSetting === 'true');
     }
 
+    // Check configuration status
+    const checkConfig = async () => {
+      try {
+        const response = await axios.get('/api/line/config-check');
+        setIsConfigured(response.data.configured);
+      } catch (error) {
+        console.error('Failed to check LINE config:', error);
+      }
+    };
+
     // Fetch system settings for LINE templates
     const fetchSettings = async () => {
       try {
         const settings = await directusApi.getSystemSettings();
         if (settings) {
-          if (settings.line_channel_access_token) setChannelAccessToken(settings.line_channel_access_token);
-          if (settings.line_channel_secret) setChannelSecret(settings.line_channel_secret);
           if (settings.line_test_message) setTestMessage(settings.line_test_message);
           if (settings.line_notification_template) setNotificationTemplate(settings.line_notification_template);
         }
@@ -70,6 +77,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
 
     fetchSettings();
     fetchSamples();
+    checkConfig();
   }, []);
 
   const handleSave = async () => {
@@ -78,8 +86,6 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
     
     try {
       await directusApi.updateSystemSettings({
-        line_channel_access_token: channelAccessToken,
-        line_channel_secret: channelSecret,
         line_test_message: testMessage,
         line_notification_template: notificationTemplate
       });
@@ -292,39 +298,16 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
             <div className="text-sm">
               <p className="font-semibold">Important Note</p>
               <p className="opacity-90">
-                LINE notifications require a valid LINE Messaging API Channel Access Token and Secret. 
-                You can manage these credentials below or via system environment variables.
+                LINE notifications are configured via system environment variables.
               </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Key className="w-4 h-4 text-slate-400" />
-                Channel Access Token
-              </label>
-              <input 
-                type="password" 
-                value={channelAccessToken}
-                onChange={(e) => setChannelAccessToken(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="Enter LINE Channel Access Token"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Key className="w-4 h-4 text-slate-400" />
-                Channel Secret
-              </label>
-              <input 
-                type="password" 
-                value={channelSecret}
-                onChange={(e) => setChannelSecret(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="Enter LINE Channel Secret"
-              />
+              {isConfigured !== null && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  <span className="font-medium">
+                    Status: {isConfigured ? 'Configured' : 'Not Configured (Missing Secret)'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

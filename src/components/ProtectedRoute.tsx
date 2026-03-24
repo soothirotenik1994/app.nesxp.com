@@ -14,11 +14,20 @@ export const ProtectedRoute: React.FC = () => {
   }
 
   // If driver tries to access admin pages, redirect to logistics
-  const adminPaths = ['/members', '/cars', '/admins', '/permissions'];
+  const adminPaths = ['/members', '/admins'];
+  const permissionPath = '/permissions';
   
   if (!isAdmin) {
     if (adminPaths.some(path => location.pathname.startsWith(path))) {
       return <Navigate to="/jobs/new" replace />;
+    }
+    // Allow access to /permissions/:memberId only if it's their own
+    if (location.pathname.startsWith(permissionPath)) {
+      const memberIdFromUrl = location.pathname.split('/')[2];
+      const loggedInMemberId = localStorage.getItem('member_id');
+      if (memberIdFromUrl !== loggedInMemberId) {
+        return <Navigate to="/jobs/new" replace />;
+      }
     }
   }
 

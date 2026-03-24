@@ -422,8 +422,9 @@ export const directusApi = {
 
   linkCarToMember: async (carId: string, memberId: string): Promise<any> => {
     try {
-      console.log(`linkCarToMember: carId=${carId}, memberId=${memberId}`);
+      console.log(`linkCarToMember: START carId=${carId}, memberId=${memberId}`);
       // Check if already linked
+      console.log(`linkCarToMember: Checking existing link for car ${carId} and member ${memberId}`);
       const existing = await api.get('/items/car_users', {
         params: {
           filter: {
@@ -433,20 +434,21 @@ export const directusApi = {
           limit: -1
         }
       });
+      console.log(`linkCarToMember: Existing links found: ${existing.data.data.length}`);
       
       if (existing.data.data.length === 0) {
-        console.log(`Creating new link in car_users for car ${carId} and member ${memberId}`);
+        console.log(`linkCarToMember: Creating new link in car_users for car ${carId} and member ${memberId}`);
         const response = await api.post('/items/car_users', {
           car_id: carId,
           line_user_id: memberId
         });
-        console.log('Link creation response:', response.data.data);
+        console.log('linkCarToMember: Link creation response:', response.data.data);
         return response.data.data;
       }
-      console.log(`Link already exists for car ${carId} and member ${memberId}`);
+      console.log(`linkCarToMember: Link already exists for car ${carId} and member ${memberId}`);
       return existing.data.data[0];
     } catch (error) {
-      console.error('Error linking car to member:', error);
+      console.error('linkCarToMember: ERROR linking car to member:', error);
       throw error;
     }
   },
