@@ -30,16 +30,7 @@ async function startServer() {
 
     try {
       console.log("Logging in to GPS provider...");
-      
-      // Fetch system settings from Directus to get the latest GPS API Token
-      const settingsResponse = await axios.get(`${process.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com'}/items/system_settings/1`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0'}`
-        }
-      });
-      
-      const gpsToken = settingsResponse.data?.data?.gps_api_token || process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
-      
+      const gpsToken = process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
       const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`);
       if (response.data?.result?.sessionId) {
         sessionId = response.data.result.sessionId;

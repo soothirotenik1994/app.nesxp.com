@@ -63,7 +63,7 @@ api.interceptors.response.use(
       
       if (!isLoginPage && !isAuthRequest) {
         console.log('Redirecting to login due to 401...');
-        window.parent.location.href = '/login';
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -308,11 +308,6 @@ export const directusApi = {
 
   createWorkReport: async (data: any): Promise<any> => {
     const response = await api.post('/items/work_reports', data);
-    return response.data.data;
-  },
-
-  createItem: async (collection: string, data: any): Promise<any> => {
-    const response = await api.post(`/items/${collection}`, data);
     return response.data.data;
   },
 

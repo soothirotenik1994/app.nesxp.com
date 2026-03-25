@@ -18,7 +18,6 @@ export const SystemSettings: React.FC = () => {
     websiteName: localStorage.getItem('website_name') || 'NES Tracking',
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
     appUrl: localStorage.getItem('app_url') || window.location.origin,
-    gpsApiToken: localStorage.getItem('gps_api_token') || '',
   });
 
   useEffect(() => {
@@ -71,13 +70,11 @@ export const SystemSettings: React.FC = () => {
         website_name: formData.websiteName,
         website_logo: formData.websiteLogo,
         app_url: formData.appUrl,
-        gps_api_token: formData.gpsApiToken,
       });
 
       // Save to localStorage
       localStorage.setItem('directus_url', formData.directusUrl);
       localStorage.setItem('static_api_key', formData.staticApiKey);
-      localStorage.setItem('gps_api_token', formData.gpsApiToken);
       localStorage.setItem('website_name', formData.websiteName);
       localStorage.setItem('website_logo', formData.websiteLogo);
       localStorage.setItem('app_url', formData.appUrl);
@@ -272,20 +269,6 @@ export const SystemSettings: React.FC = () => {
                 onChange={(e) => setFormData({...formData, staticApiKey: e.target.value})}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="Enter your Directus static token"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Key className="w-4 h-4 text-slate-400" />
-                GPS API Token
-              </label>
-              <input 
-                type="password" 
-                value={formData.gpsApiToken}
-                onChange={(e) => setFormData({...formData, gpsApiToken: e.target.value})}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="Enter your GPS API token"
               />
             </div>
           </div>

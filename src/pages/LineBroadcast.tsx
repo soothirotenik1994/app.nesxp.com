@@ -14,8 +14,6 @@ export const LineBroadcast: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState('');
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -40,7 +38,7 @@ export const LineBroadcast: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSend = async () => {
     if (!messageText && !imageUrl) return;
     setIsSending(true);
     setStatus(null);
@@ -54,48 +52,23 @@ export const LineBroadcast: React.FC = () => {
         throw new Error('No recipients selected');
       }
 
-      const broadcastData = {
-        message: messageText,
-        image: imageUrl,
-        recipients: JSON.stringify(targets),
-        scheduled_at: isScheduled ? scheduledAt : new Date().toISOString(),
-        status: isScheduled ? 'scheduled' : 'sent'
-      };
-
-      console.log('Sending broadcastData to Directus:', broadcastData);
-
-      // If not scheduled, send immediately (or let the backend handle it)
-      if (!isScheduled) {
-        const messages = [];
-        if (imageUrl) {
-          messages.push({ type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl });
-        }
-        if (messageText) {
-          messages.push({ type: 'text', text: messageText });
-        }
-
-        if (messages.length === 0) {
-          console.error('No messages to send');
-          return;
-        }
-
-        console.log('Sending broadcast request:', { to: targets, messages });
-
-        await axios.post('/api/line/broadcast', {
-          to: targets,
-          messages: messages
-        });
+      const messages = [];
+      if (imageUrl) {
+        messages.push({ type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl });
+      }
+      if (messageText) {
+        messages.push({ type: 'text', text: messageText });
       }
 
-      // Save to Directus
-      await directusApi.createItem('line_broadcasts', broadcastData);
+      await axios.post('/api/line/broadcast', {
+        to: targets,
+        messages: messages
+      });
 
-      setStatus({ type: 'success', message: `Broadcast ${isScheduled ? 'scheduled' : 'sent'} successfully!` });
+      setStatus({ type: 'success', message: `Broadcast sent to ${targets.length} members successfully!` });
       setMessageText('');
       setImageUrl('');
       setSelectedMembers([]);
-      setScheduledAt('');
-      setIsScheduled(false);
     } catch (error: any) {
       console.error('Broadcast failed:', error);
       setStatus({ type: 'error', message: `Failed: ${error.message}` });
@@ -108,7 +81,7 @@ export const LineBroadcast: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">LINE Broadcast</h1>
-        <p className="text-slate-500">Send or schedule messages to members</p>
+        <p className="text-slate-500">Send messages to members</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
@@ -146,19 +119,9 @@ export const LineBroadcast: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} />
-            <span className="text-sm font-semibold text-slate-700">Schedule Message</span>
-          </label>
-          {isScheduled && (
-            <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl" />
-          )}
-        </div>
-
-        <button onClick={handleSave} disabled={isSending} className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+        <button onClick={handleSend} disabled={isSending} className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
           {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          {isScheduled ? 'Schedule Broadcast' : 'Send Broadcast'}
+          Send Broadcast
         </button>
 
         {status && (
