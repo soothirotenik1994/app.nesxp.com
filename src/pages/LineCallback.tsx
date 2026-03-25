@@ -34,10 +34,15 @@ export const LineCallback: React.FC = () => {
       try {
         setStatus('Exchanging code for token...');
         console.log('LineCallback: Exchanging code for token...');
+        
+        // Get config from backend
+        const configResponse = await axios.get('/api/line/config');
+        const { redirectUri } = configResponse.data;
+
         // Exchange code for token via our server proxy
         const tokenResponse = await axios.post('/api/auth/line/token', {
           code,
-          redirect_uri: 'https://ais-dev-gxjnrsyiqcxwz7c4mvte75-260301993622.asia-east1.run.app/line/callback'
+          redirect_uri: redirectUri
         });
 
         const { id_token, access_token } = tokenResponse.data;

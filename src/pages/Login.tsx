@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle } from 'lucide-react';
+import axios from 'axios';
 import { directusApi, setAuthToken } from '../api/directus';
 import clsx from 'clsx';
 
@@ -183,22 +184,26 @@ export const Login: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => {
-                  // Use the specific LINE Login Channel ID from the screenshot
-                  const channelId = '2009240188';
-                  const redirectUri = 'https://ais-dev-gxjnrsyiqcxwz7c4mvte75-260301993622.asia-east1.run.app/line/callback';
-                  
-                  console.log('Starting LINE Login with:', { channelId, redirectUri });
-                  
-                  if (!channelId || !redirectUri) {
-                    setError('LINE Configuration Error: VITE_LINE_CHANNEL_ID or VITE_LINE_REDIRECT_URI is missing in environment variables.');
-                    console.error('LINE Config missing:', { channelId, redirectUri });
-                    return;
-                  }
+                onClick={async () => {
+                  try {
+                    const response = await axios.get('/api/line/config');
+                    const { channelId, redirectUri } = response.data;
+                    
+                    console.log('Starting LINE Login with:', { channelId, redirectUri });
+                    
+                    if (!channelId || !redirectUri) {
+                      setError('LINE Configuration Error: LINE_CHANNEL_ID or REDIRECT_URI is missing in Directus settings.');
+                      console.error('LINE Config missing:', { channelId, redirectUri });
+                      return;
+                    }
 
-                  const state = Math.random().toString(36).substring(7);
-                  const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=profile%20openid%20email`;
-                  window.location.href = url;
+                    const state = Math.random().toString(36).substring(7);
+                    const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=profile%20openid%20email`;
+                    window.location.href = url;
+                  } catch (err) {
+                    console.error('Failed to fetch LINE config:', err);
+                    setError('Failed to initialize LINE login. Please try again.');
+                  }
                 }}
                 className="w-full bg-[#06C755] text-white py-3 rounded-xl font-semibold hover:bg-[#05b34c] transition-colors flex items-center justify-center gap-2"
               >

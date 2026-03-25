@@ -13,7 +13,7 @@ async function startServer() {
     try {
       const response = await axios.get(`${process.env.DIRECTUS_URL || 'https://data.nesxp.com'}/items/line_settings/1`, {
         headers: {
-          'Authorization': `Bearer ${process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0'}`
+          'Authorization': `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
         }
       });
       return response.data.data;
@@ -133,6 +133,18 @@ async function startServer() {
   });
 
   // LINE Config Check
+  app.get("/api/line/config", async (req, res) => {
+    const settings = await getLineSettingsFromDirectus();
+    const redirectUri = settings?.redirect_uri || `${req.protocol}://${req.get('host')}/line/callback`;
+    const accessToken = settings?.channel_access_token;
+    res.json({
+      configured: !!accessToken,
+      redirectUri,
+      channelId: settings?.channel_id || "2009240188" // Fallback to existing hardcoded ID if not in settings
+    });
+  });
+
+  // LINE Config Check (legacy)
   app.get("/api/line/config-check", async (req, res) => {
     const settings = await getLineSettingsFromDirectus();
     const accessToken = settings?.channel_access_token;
