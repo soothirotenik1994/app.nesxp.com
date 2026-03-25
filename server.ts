@@ -3,17 +3,25 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
 import cors from "cors";
+import 'dotenv/config';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Log LINE configuration status
-  if (process.env.LINE_CHANNEL_ACCESS_TOKEN) {
-    console.log('LINE_CHANNEL_ACCESS_TOKEN is configured (starts with:', process.env.LINE_CHANNEL_ACCESS_TOKEN.substring(0, 10) + '...)');
-  } else {
-    console.warn('LINE_CHANNEL_ACCESS_TOKEN is NOT configured. LINE notifications will fail.');
-  }
+  const getLineSettingsFromDirectus = async () => {
+    try {
+      const response = await axios.get(`${process.env.DIRECTUS_URL || 'https://data.nesxp.com'}/items/line_settings/1`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0'}`
+        }
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to fetch LINE settings from Directus:', error);
+      return null;
+    }
+  };
 
   app.use(cors());
   app.use(express.json());
@@ -125,8 +133,9 @@ async function startServer() {
   });
 
   // LINE Config Check
-  app.get("/api/line/config-check", (req, res) => {
-    const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  app.get("/api/line/config-check", async (req, res) => {
+    const settings = await getLineSettingsFromDirectus();
+    const accessToken = settings?.channel_access_token;
     res.json({
       configured: !!accessToken,
       tokenPrefix: accessToken ? `${accessToken.substring(0, 5)}...` : null
@@ -137,15 +146,16 @@ async function startServer() {
   app.post("/api/line/send", async (req, res) => {
     try {
       const { to, message, messages } = req.body;
-      const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      const settings = await getLineSettingsFromDirectus();
+      const accessToken = settings?.channel_access_token;
 
       console.log('Backend: Received request to send LINE message', { to, hasToken: !!accessToken });
 
       if (!accessToken) {
-        console.error("LINE Error: LINE_CHANNEL_ACCESS_TOKEN is not configured");
+        console.error("LINE Error: LINE_CHANNEL_ACCESS_TOKEN is not configured in Directus");
         return res.status(500).json({ 
           error: "LINE_CHANNEL_ACCESS_TOKEN is not configured",
-          details: "Please add LINE_CHANNEL_ACCESS_TOKEN to AI Studio Secrets (Settings -> Secrets)."
+          details: "Please add LINE_CHANNEL_ACCESS_TOKEN to LINE Settings in System Settings."
         });
       }
 
@@ -199,12 +209,13 @@ async function startServer() {
   app.post("/api/line/broadcast", async (req, res) => {
     try {
       const { to, messages } = req.body;
-      const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      const settings = await getLineSettingsFromDirectus();
+      const accessToken = settings?.channel_access_token;
 
       console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken });
 
       if (!accessToken) {
-        return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured" });
+        return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured in Directus" });
       }
 
       if (!to || !messages) {

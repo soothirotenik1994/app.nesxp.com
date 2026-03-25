@@ -30,6 +30,7 @@ export const Dashboard: React.FC = () => {
           try {
             const status = await gpsApi.getCarStatus(car.car_number);
             const assignedNames = (car.car_users || (car as any).line_users)?.map((cu: any) => {
+              if (!cu) return null;
               const user = cu.line_user_id || cu;
               if (!user) return null;
               const source = user.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';

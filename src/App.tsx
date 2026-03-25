@@ -15,6 +15,7 @@ import { MyJobs } from './pages/MyJobs';
 import { Reports } from './pages/Reports';
 import { LineBroadcast } from './pages/LineBroadcast';
 import { LineSettings } from './pages/LineSettings';
+import { LineApiSettings } from './pages/LineApiSettings';
 import { SystemSettings } from './pages/SystemSettings';
 import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
 import { useEffect } from 'react';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/jobs/calendar" element={<JobCalendar />} />
             <Route path="/jobs/history" element={<JobHistory />} />
             <Route path="/line/settings" element={<LineSettings />} />
+            <Route path="/line/api-settings" element={<LineApiSettings />} />
             <Route path="/line/broadcast" element={<LineBroadcast />} />
             <Route path="/maintenance" element={<MaintenanceDashboard />} />
             <Route path="/settings/system" element={<SystemSettings />} />

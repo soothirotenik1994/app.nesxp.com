@@ -23,6 +23,8 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
   const [isTestingTemplate, setIsTestingTemplate] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+  const [channelAccessToken, setChannelAccessToken] = useState('');
+  const [channelSecret, setChannelSecret] = useState('');
 
   useEffect(() => {
     const savedSetting = localStorage.getItem('line_notifications_enabled');
@@ -40,7 +42,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       }
     };
 
-    // Fetch system settings for LINE templates
+    // Fetch system settings for LINE templates and API settings
     const fetchSettings = async () => {
       try {
         const settings = await directusApi.getSystemSettings();
@@ -48,8 +50,14 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           if (settings.line_test_message) setTestMessage(settings.line_test_message);
           if (settings.line_notification_template) setNotificationTemplate(settings.line_notification_template);
         }
+        
+        const lineSettings = await directusApi.getLineSettings();
+        if (lineSettings) {
+          if (lineSettings.channel_access_token) setChannelAccessToken(lineSettings.channel_access_token);
+          if (lineSettings.channel_secret) setChannelSecret(lineSettings.channel_secret);
+        }
       } catch (error) {
-        console.error('Failed to fetch system settings:', error);
+        console.error('Failed to fetch settings from Directus:', error);
       }
     };
 
@@ -88,6 +96,10 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       await directusApi.updateSystemSettings({
         line_test_message: testMessage,
         line_notification_template: notificationTemplate
+      });
+      await directusApi.updateLineSettings({
+        channel_access_token: channelAccessToken,
+        channel_secret: channelSecret
       });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
@@ -312,6 +324,30 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           </div>
 
           <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">
+                LINE Channel Access Token
+              </label>
+              <input
+                type="password"
+                value={channelAccessToken}
+                onChange={(e) => setChannelAccessToken(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                placeholder="Enter your LINE Channel Access Token..."
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">
+                LINE Channel Secret
+              </label>
+              <input
+                type="password"
+                value={channelSecret}
+                onChange={(e) => setChannelSecret(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                placeholder="Enter your LINE Channel Secret..."
+              />
+            </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700">

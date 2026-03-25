@@ -420,6 +420,32 @@ export const directusApi = {
     }
   },
 
+  getLineSettings: async (): Promise<any> => {
+    try {
+      const response = await api.get('/items/line_settings/1');
+      return response.data.data;
+    } catch (error) {
+      console.warn('LINE settings not found in Directus');
+      return null;
+    }
+  },
+
+  updateLineSettings: async (data: any): Promise<any> => {
+    try {
+      // Try to update ID 1, if fails, create it
+      try {
+        const response = await api.patch('/items/line_settings/1', data);
+        return response.data.data;
+      } catch (e) {
+        const response = await api.post('/items/line_settings', { id: 1, ...data });
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Error updating LINE settings:', error);
+      throw error;
+    }
+  },
+
   linkCarToMember: async (carId: string, memberId: string): Promise<any> => {
     try {
       console.log(`linkCarToMember: START carId=${carId}, memberId=${memberId}`);

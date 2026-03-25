@@ -503,9 +503,9 @@ export const JobReport: React.FC = () => {
 
   const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'completed', jobId?: string, targetCustomerId?: string) => {
     try {
-      const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id);
-      const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
-      const currentDriverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+      const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id);
+      const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
+      const currentDriverId = typeof formData.driver_id === 'object' && formData.driver_id ? (formData.driver_id as any).id : formData.driver_id;
       const currentReportId = jobId || id;
 
       console.log(`Starting customer notification for status: ${status}, customer_id: ${currentCustomerId}, report_id: ${currentReportId}`);
@@ -970,9 +970,9 @@ export const JobReport: React.FC = () => {
 
     try {
       // Extract IDs properly
-      const currentCustomerId = typeof formData.customer_id === 'object' ? (formData.customer_id as any).id : formData.customer_id;
-      const currentCarId = typeof formData.car_id === 'object' ? (formData.car_id as any).id : formData.car_id;
-      const currentDriverId = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
+      const currentCustomerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
+      const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
+      const currentDriverId = typeof formData.driver_id === 'object' && formData.driver_id ? (formData.driver_id as any).id : formData.driver_id;
 
       const getSafeId = (val: any) => {
         if (!val) return '';

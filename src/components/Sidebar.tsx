@@ -69,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
     { name: 'LINE Broadcast', path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
+    { name: 'LINE API Settings', path: '/line/api-settings', icon: Settings, key: 'line_api_settings' },
     { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
   ].filter(item => isVisible(item.key));
 

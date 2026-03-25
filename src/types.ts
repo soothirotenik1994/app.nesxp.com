@@ -23,6 +23,7 @@ export interface Car {
   id: string;
   car_number: string;
   vehicle_type?: string;
+  brand_id?: string | CarBrand;
   description: string;
   owner_name?: string;
   driver_phone?: string;
@@ -36,6 +37,11 @@ export interface Car {
   next_maintenance_date?: string;
   next_maintenance_mileage?: number;
   current_mileage?: number;
+}
+
+export interface CarBrand {
+  id: string;
+  name: string;
 }
 
 export interface CarPermission {

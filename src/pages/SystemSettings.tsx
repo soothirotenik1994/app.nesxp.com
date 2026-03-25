@@ -125,7 +125,7 @@ export const SystemSettings: React.FC = () => {
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          {t('line_settings')}
+          ตั้งค่า API LINE
         </button>
       </div>
 

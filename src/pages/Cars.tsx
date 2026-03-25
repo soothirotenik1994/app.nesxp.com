@@ -8,12 +8,14 @@ import { ConfirmModal } from '../components/ConfirmModal';
 export const Cars: React.FC = () => {
   const { t } = useTranslation();
   const [cars, setCars] = useState<CarType[]>([]);
+  const [carBrands, setCarBrands] = useState<any[]>([]);
   const [allMembers, setAllMembers] = useState<any[]>([]);
   const [allPermissions, setAllPermissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<CarType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -26,7 +28,8 @@ export const Cars: React.FC = () => {
     owner_name: '',
     driver_phone: '',
     car_image: '',
-    status: 'active'
+    status: 'active',
+    brand_id: ''
   });
 
   const userRole = localStorage.getItem('user_role');
@@ -41,12 +44,17 @@ export const Cars: React.FC = () => {
       console.log('Fetched cars:', carsDataResult);
       setCars(carsDataResult);
       
-      const [membersDataResult, permissionsDataResult] = await Promise.all([
+      const [membersDataResult, permissionsDataResult, brandsDataResult] = await Promise.all([
         directusApi.getMembers(),
-        directusApi.getCarPermissions()
+        directusApi.getCarPermissions(),
+        directusApi.getCarBrands().catch(err => {
+          console.error('Error fetching car brands:', err);
+          return [];
+        })
       ]);
       setAllMembers(membersDataResult);
       setAllPermissions(permissionsDataResult);
+      setCarBrands(brandsDataResult);
     } catch (err: any) {
       console.error('Error fetching cars:', err);
       // Only set error if it's not a 401 (which is handled by the interceptor)
@@ -84,7 +92,8 @@ export const Cars: React.FC = () => {
         owner_name: car.owner_name || '',
         driver_phone: car.driver_phone || '',
         car_image: carImageId || '',
-        status: (car as any).status || 'active'
+        status: (car as any).status || 'active',
+        brand_id: (typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || ''
       });
     } else {
       setEditingCar(null);
@@ -95,7 +104,8 @@ export const Cars: React.FC = () => {
         owner_name: '',
         driver_phone: '',
         car_image: '',
-        status: 'active'
+        status: 'active',
+        brand_id: ''
       });
     }
     setIsModalOpen(true);
@@ -138,7 +148,8 @@ export const Cars: React.FC = () => {
       const submissionData = {
         ...formData,
         car_image: formData.car_image || null,
-        status: formData.status as 'active' | 'inactive'
+        status: formData.status as 'active' | 'inactive',
+        brand_id: formData.brand_id || null
       };
       
       console.log('Submission data (processed):', submissionData);
@@ -224,13 +235,22 @@ export const Cars: React.FC = () => {
           <p className="text-slate-500">{t('manage_vehicles')}</p>
         </div>
         {isAdmin && (
-          <button 
-            onClick={() => handleOpenModal()}
-            className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
-          >
-            <Plus className="w-5 h-5" />
-            {t('add_vehicle')}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsBrandModalOpen(true)}
+              className="bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-slate-200 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              {t('add_brand') || 'เพิ่มยี่ห้อรถ'}
+            </button>
+            <button 
+              onClick={() => handleOpenModal()}
+              className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
+            >
+              <Plus className="w-5 h-5" />
+              {t('add_vehicle')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -327,6 +347,12 @@ export const Cars: React.FC = () => {
                       {t('online')}
                     </div>
                   </div>
+                  <div className="mb-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('brand') || 'ยี่ห้อรถ'}</p>
+                    <p className="text-sm text-slate-700 font-bold">
+                      {typeof car.brand_id === 'object' && car.brand_id ? (car.brand_id as any)?.name : (carBrands.find(b => b.id === car.brand_id)?.name || 'N/A')}
+                    </p>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
@@ -352,12 +378,12 @@ export const Cars: React.FC = () => {
                         // Find permissions for this car
                         const carPermissions = allPermissions.filter(p => {
                           if (!p.car_id) return false;
-                          const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+                          const id = typeof p.car_id === 'object' ? (p.car_id as any)?.id : p.car_id;
                           return String(id) === String(car.id);
                         });
                         const carMembers = allMembers.filter(member => carPermissions.some(p => {
                           if (!p.line_user_id) return false;
-                          const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+                          const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any)?.id : p.line_user_id;
                           return String(id) === String(member.id);
                         }));
                         
@@ -427,6 +453,53 @@ export const Cars: React.FC = () => {
         onCancel={() => setDeleteId(null)}
         confirmText={t('delete')}
       />
+
+      {isBrandModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-900">{t('add_brand') || 'เพิ่มยี่ห้อรถ'}</h3>
+              <button onClick={() => setIsBrandModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const name = (e.target as any).brandName.value;
+              if (!name) return;
+              await directusApi.createCarBrand({ name });
+              setIsBrandModalOpen(false);
+              fetchCars(); // Refresh brands
+            }} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">ชื่อยี่ห้อรถ</label>
+                <input 
+                  type="text" 
+                  name="brandName"
+                  required
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Toyota"
+                />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsBrandModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {t('cancel') || 'ยกเลิก'}
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100"
+                >
+                  {t('save') || 'บันทึก'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -506,6 +579,21 @@ export const Cars: React.FC = () => {
                 >
                   <option value="active">ใช้งานได้</option>
                   <option value="inactive">ระงับการใช้งาน</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">ยี่ห้อรถ</label>
+                <select 
+                  value={formData.brand_id}
+                  onChange={(e) => setFormData(prev => ({...prev, brand_id: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">เลือกยี่ห้อรถ</option>
+                  {carBrands.map(brand => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1.5">

@@ -12,6 +12,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     admins: true,
     line_settings: true,
     line_broadcast: true,
+    line_api_settings: true,
     system_settings: true,
     maintenance: true,
   },
@@ -28,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     admins: true,
     line_settings: true,
     line_broadcast: true,
+    line_api_settings: true,
     system_settings: true,
     maintenance: true,
   },
@@ -44,6 +46,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     admins: false,
     line_settings: false,
     line_broadcast: false,
+    line_api_settings: false,
     system_settings: false,
     maintenance: false,
   }
