@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
@@ -8,6 +8,192 @@ import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Tr
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
+
+// Memoized MemberRow component
+const MemberRow = React.memo(({ 
+  member, 
+  visibleColumns, 
+  allCars, 
+  allPermissions, 
+  onEdit, 
+  onDelete,
+  onNavigatePermissions
+}: { 
+  member: Member, 
+  visibleColumns: string[], 
+  allCars: any[], 
+  allPermissions: any[], 
+  onEdit: (member: Member) => void, 
+  onDelete: (id: string) => void,
+  onNavigatePermissions: (id: string) => void
+}) => {
+  const { t } = useTranslation();
+
+  const memberVehicles = useMemo(() => {
+    // 1. Try manual join first
+    const memberPermissions = allPermissions.filter(p => {
+      const id = p.line_user_id && typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+      return String(id) === String(member.id);
+    });
+    
+    const cars = allCars.filter(car => memberPermissions.some(p => {
+      const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+      return String(id) === String(car.id);
+    }));
+
+    if (cars.length > 0) return cars;
+
+    // 2. Fallback to nested data
+    if (member.car_users && member.car_users.length > 0) {
+      return member.car_users.map((cu: any) => cu.car_id).filter(Boolean);
+    }
+
+    return [];
+  }, [member.id, member.car_users, allCars, allPermissions]);
+
+  return (
+    <tr className="hover:bg-slate-50/50 transition-colors group">
+      {visibleColumns.includes('name') && (
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-3">
+            {member.picture_url ? (
+              <img 
+                src={directusApi.getFileUrl(member.picture_url)} 
+                alt={member.display_name} 
+                className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
+                {String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase()}
+                {String(member.last_name || '').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-slate-900">
+                  {member.first_name || member.last_name 
+                    ? `${member.first_name} ${member.last_name}`.trim()
+                    : member.display_name || t('not_specified')}
+                </p>
+                {member.car_users && member.car_users.length > 0 && (
+                  <span className="bg-blue-100 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                    {member.car_users.length} {t('vehicles')}
+                  </span>
+                )}
+              </div>
+              {member.display_name && (member.first_name || member.last_name) && (
+                <p className="text-xs text-primary font-medium">LINE: {member.display_name}</p>
+              )}
+            </div>
+          </div>
+        </td>
+      )}
+      {visibleColumns.includes('contact') && (
+        <td className="px-6 py-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Mail className="w-3.5 h-3.5 text-slate-400" />
+              {member.email ? (
+                <a href={`mailto:${member.email}`} className="hover:text-primary hover:underline transition-colors">
+                  {member.email}
+                </a>
+              ) : (
+                <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Phone className="w-3.5 h-3.5 text-slate-400" />
+              {member.phone ? (
+                <a href={`tel:${member.phone}`} className="hover:text-primary hover:underline transition-colors">
+                  {member.phone}
+                </a>
+              ) : (
+                <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
+              )}
+            </div>
+          </div>
+        </td>
+      )}
+      {visibleColumns.includes('role') && (
+        <td className="px-6 py-4">
+          <span className={clsx(
+            "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+            member.status === 'inactive' ? "bg-red-100 text-red-700" :
+            member.role === 'driver' ? "bg-blue-100 text-blue-700" :
+            member.role === 'general' ? "bg-slate-100 text-slate-700" :
+            "bg-emerald-100 text-emerald-700"
+          )}>
+            {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : member.role === 'general' ? 'ทั่วไป' : t(`${member.role || 'customer'}_role`)}
+          </span>
+        </td>
+      )}
+      {visibleColumns.includes('line_uid') && (
+        <td className="px-6 py-4">
+          <p className="text-xs font-mono text-slate-500 break-all max-w-[150px]">
+            {member.line_user_id || '-'}
+          </p>
+        </td>
+      )}
+      {visibleColumns.includes('vehicles') && (
+        <td className="px-6 py-4">
+          <div className="flex flex-wrap gap-1.5 max-w-[250px]">
+            {memberVehicles.length > 0 ? (
+              memberVehicles.map((car: any) => (
+                <span 
+                  key={car.id}
+                  className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
+                  title={`${t('driver_name')}: ${car.owner_name || 'N/A'}`}
+                >
+                  <div className="flex items-center gap-1">
+                    <CarIcon className="w-3 h-3" />
+                    {car.car_number}
+                  </div>
+                  {car.owner_name && (
+                    <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
+                      {car.owner_name}
+                    </span>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="text-slate-400 text-xs italic">{t('no_data')}</span>
+            )}
+          </div>
+        </td>
+      )}
+      {visibleColumns.includes('actions') && (
+        <td className="px-6 py-4 text-right">
+          <div className="flex items-center justify-end gap-2">
+            {member.role === 'customer' && (
+              <button 
+                onClick={() => onNavigatePermissions(member.id)}
+                className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-colors"
+                title={t('assign_cars')}
+              >
+                <ExternalLink className="w-5 h-5" />
+              </button>
+            )}
+            <button 
+              onClick={() => onEdit(member)}
+              className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
+              title={t('edit')}
+            >
+              <Edit2 className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => onDelete(member.id)}
+              className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+              title={t('delete')}
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+});
 
 export const Members: React.FC = () => {
   const { t } = useTranslation();
@@ -231,15 +417,21 @@ export const Members: React.FC = () => {
     }
   };
 
-  const filteredMembers = members.filter(m => {
-    const fullName = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
-    const email = (m.email || '').toLowerCase();
-    const phone = (m.phone || '');
-    const role = (m.role || '').toLowerCase();
-    const search = searchTerm.toLowerCase();
-    
-    return fullName.includes(search) || email.includes(search) || phone.includes(searchTerm) || role.includes(search);
-  });
+  const filteredMembers = useMemo(() => {
+    return members.filter(m => {
+      const fullName = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
+      const email = (m.email || '').toLowerCase();
+      const phone = (m.phone || '');
+      const role = (m.role || '').toLowerCase();
+      const search = searchTerm.toLowerCase();
+      
+      return fullName.includes(search) || email.includes(search) || phone.includes(searchTerm) || role.includes(search);
+    });
+  }, [members, searchTerm]);
+
+  const handleEdit = useCallback((member: Member) => handleOpenModal(member), []);
+  const handleDeleteClick = useCallback((id: string) => setDeleteId(id), []);
+  const handleNavigatePermissions = useCallback((id: string) => navigate(`/permissions/${id}`), [navigate]);
 
   return (
     <div className="space-y-6">
@@ -347,7 +539,7 @@ export const Members: React.FC = () => {
         {error && (
           <div className="p-6 bg-red-50 border-b border-red-100 text-red-600 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <AlertCircle className="w-4 h-4" />
               {error}
             </div>
             <button onClick={fetchMembers} className="text-xs font-bold underline">{t('try_again')}</button>
@@ -382,184 +574,16 @@ export const Members: React.FC = () => {
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
-                    {visibleColumns.includes('name') && (
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {member.picture_url ? (
-                            <img 
-                              src={directusApi.getFileUrl(member.picture_url)} 
-                              alt={member.display_name} 
-                              className="w-10 h-10 rounded-full border border-slate-200 object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
-                              {String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase()}
-                              {String(member.last_name || '').charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-slate-900">
-                                {member.first_name || member.last_name 
-                                  ? `${member.first_name} ${member.last_name}`.trim()
-                                  : member.display_name || t('not_specified')}
-                              </p>
-                              {member.car_users && member.car_users.length > 0 && (
-                                <span className="bg-blue-100 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                                  {member.car_users.length} {t('vehicles')}
-                                </span>
-                              )}
-                            </div>
-                            {member.display_name && (member.first_name || member.last_name) && (
-                              <p className="text-xs text-primary font-medium">LINE: {member.display_name}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.includes('contact') && (
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
-                            {member.email ? (
-                              <a href={`mailto:${member.email}`} className="hover:text-primary hover:underline transition-colors">
-                                {member.email}
-                              </a>
-                            ) : (
-                              <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            {member.phone ? (
-                              <a href={`tel:${member.phone}`} className="hover:text-primary hover:underline transition-colors">
-                                {member.phone}
-                              </a>
-                            ) : (
-                              <span className="text-slate-400 italic text-xs">{t('not_specified')}</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.includes('role') && (
-                      <td className="px-6 py-4">
-                        <span className={clsx(
-                          "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                          member.status === 'inactive' ? "bg-red-100 text-red-700" :
-                          member.role === 'driver' ? "bg-blue-100 text-blue-700" :
-                          member.role === 'general' ? "bg-slate-100 text-slate-700" :
-                          "bg-emerald-100 text-emerald-700"
-                        )}>
-                          {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : member.role === 'general' ? 'ทั่วไป' : t(`${member.role || 'customer'}_role`)}
-                        </span>
-                      </td>
-                    )}
-                    {visibleColumns.includes('line_uid') && (
-                      <td className="px-6 py-4">
-                        <p className="text-xs font-mono text-slate-500 break-all max-w-[150px]">
-                          {member.line_user_id || '-'}
-                        </p>
-                      </td>
-                    )}
-                    {visibleColumns.includes('vehicles') && (
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1.5 max-w-[250px]">
-                          {(() => {
-                              // Find permissions for this member
-                              const memberPermissions = allPermissions.filter(p => {
-                                if (!p.line_user_id) return false;
-                                const id = p.line_user_id && typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
-                                return String(id) === String(member.id);
-                              });
-                              const memberCars = allCars.filter(car => memberPermissions.some(p => {
-                                if (!p.car_id) return false;
-                                const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
-                                return String(id) === String(car.id);
-                              }));
-                              
-                              if (memberCars.length > 0) {
-                                return memberCars.map((car) => (
-                                  <span 
-                                    key={car.id}
-                                    className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
-                                    title={`${t('driver_name')}: ${car.owner_name || 'N/A'}`}
-                                  >
-                                    <div className="flex items-center gap-1">
-                                      <CarIcon className="w-3 h-3" />
-                                      {car.car_number}
-                                    </div>
-                                    {car.owner_name && (
-                                      <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
-                                        {car.owner_name}
-                                      </span>
-                                    )}
-                                  </span>
-                                ));
-                              }
-                              
-                              // Fallback to nested data if manual join fails
-                              if (member.car_users && member.car_users.length > 0) {
-                                return member.car_users.map((cu: any) => {
-                                  const car = cu.car_id;
-                                  return (
-                                    <span 
-                                      key={car?.id || Math.random()}
-                                      className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
-                                      title={`${t('driver_name')}: ${car?.owner_name || 'N/A'}`}
-                                    >
-                                      <div className="flex items-center gap-1">
-                                        <CarIcon className="w-3 h-3" />
-                                        {car?.car_number || cu.car_number || t('unknown_car')}
-                                      </div>
-                                      {car?.owner_name && (
-                                        <span className="text-[8px] opacity-70 font-medium truncate max-w-[80px]">
-                                          {car.owner_name}
-                                        </span>
-                                      )}
-                                    </span>
-                                  );
-                                });
-                              }
-
-                              return <span className="text-slate-400 text-xs italic">{t('no_data')}</span>;
-                          })()}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.includes('actions') && (
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {member.role === 'customer' && (
-                            <button 
-                              onClick={() => navigate(`/permissions/${member.id}`)}
-                              className="p-2 hover:bg-blue-50 text-primary rounded-lg transition-colors"
-                              title={t('assign_cars')}
-                            >
-                              <ExternalLink className="w-5 h-5" />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleOpenModal(member)}
-                            className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
-                            title={t('edit')}
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => setDeleteId(member.id)}
-                            className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                            title={t('delete')}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
+                  <MemberRow 
+                    key={member.id}
+                    member={member}
+                    visibleColumns={visibleColumns}
+                    allCars={allCars}
+                    allPermissions={allPermissions}
+                    onEdit={handleEdit}
+                    onDelete={handleDeleteClick}
+                    onNavigatePermissions={handleNavigatePermissions}
+                  />
                 ))
               )}
             </tbody>

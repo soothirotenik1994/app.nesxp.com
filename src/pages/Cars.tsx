@@ -1,9 +1,156 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
-import { Car as CarType } from '../types';
-import { Search, Plus, Car as CarIcon, MoreVertical, Edit2, Trash2, X, Loader2, AlertCircle, Save } from 'lucide-react';
+import { Car as CarType, Member } from '../types';
+import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+
+// Memoized CarCard component to prevent unnecessary re-renders
+const CarCard = React.memo(({ 
+  car, 
+  isAdmin, 
+  carBrands, 
+  allMembers, 
+  allPermissions,
+  onEdit, 
+  onDelete 
+}: { 
+  car: CarType, 
+  isAdmin: boolean, 
+  carBrands: any[], 
+  allMembers: Member[], 
+  allPermissions: any[],
+  onEdit: (car: CarType) => void, 
+  onDelete: (id: string) => void 
+}) => {
+  const { t } = useTranslation();
+  
+  const imageId = typeof car.car_image === 'object' ? (car.car_image as any)?.id : car.car_image;
+  const brandName = useMemo(() => {
+    if (typeof car.brand_id === 'object' && car.brand_id) return (car.brand_id as any)?.name;
+    return carBrands.find(b => b.id === car.brand_id)?.name || 'N/A';
+  }, [car.brand_id, carBrands]);
+
+  const carMembers = useMemo(() => {
+    // 1. Try to use expanded data first (most efficient)
+    if (car.car_users && car.car_users.length > 0) {
+      return car.car_users.map(cu => {
+        const member = cu.line_user_id;
+        if (!member) return null;
+        return member.display_name || (member.first_name ? `${member.first_name} ${member.last_name}` : null);
+      }).filter(Boolean);
+    }
+
+    // 2. Fallback to manual join if needed
+    const carPermissions = allPermissions.filter(p => {
+      const id = typeof p.car_id === 'object' ? (p.car_id as any)?.id : p.car_id;
+      return String(id) === String(car.id);
+    });
+    
+    return allMembers
+      .filter(member => carPermissions.some(p => {
+        const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any)?.id : p.line_user_id;
+        return String(id) === String(member.id);
+      }))
+      .map(m => m.display_name || `${m.first_name} ${m.last_name}`);
+  }, [car.car_users, car.id, allPermissions, allMembers]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 hover:border-primary/30 transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md">
+      <div className="relative h-48 bg-slate-100 overflow-hidden">
+        {imageId ? (
+          <img 
+            src={directusApi.getFileUrl(car.car_image)} 
+            alt={car.car_number} 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+            <CarIcon className="w-16 h-16 text-slate-200" />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={() => onEdit(car)}
+              className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-primary transition-colors shadow-sm"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => onDelete(car.id)}
+              className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-red-500 transition-colors shadow-sm"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        {car.vehicle_type && (
+          <div className="absolute bottom-3 left-3">
+            <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
+              {car.vehicle_type}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-slate-900">{car.car_number}</h3>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            {t('online')}
+          </div>
+        </div>
+        
+        <div className="mb-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('brand') || 'ยี่ห้อรถ'}</p>
+          <p className="text-sm text-slate-700 font-bold">{brandName}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('driver_name')}</p>
+            <p className="text-sm text-slate-700 font-bold truncate">{car.owner_name || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>
+            {car.driver_phone ? (
+              <a href={`tel:${car.driver_phone}`} className="text-sm text-primary font-bold hover:underline">
+                {car.driver_phone}
+              </a>
+            ) : (
+              <p className="text-sm text-slate-300 italic">{t('no_data')}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('members')}</p>
+          <div className="flex flex-wrap gap-1">
+            {carMembers.length > 0 ? (
+              carMembers.map((name, idx) => (
+                <span 
+                  key={idx}
+                  className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
+                >
+                  {name}
+                </span>
+              ))
+            ) : (
+              <span className="text-slate-400 text-[10px] italic">{t('no_data')}</span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-sm text-slate-500 line-clamp-2 italic mb-4">
+          {car.description || t('no_description')}
+        </p>
+      </div>
+    </div>
+  );
+});
 
 export const Cars: React.FC = () => {
   const { t } = useTranslation();
@@ -209,24 +356,29 @@ export const Cars: React.FC = () => {
     }
   };
 
-  const filteredCars = cars.filter(c => {
-    // If not admin, only show cars that this driver has permission for
-    if (!isAdmin && memberId) {
-      const hasPermission = allPermissions.some(p => {
-        const pCarId = (p.car_id && typeof p.car_id === 'object') ? (p.car_id as any).id : p.car_id;
-        const pMemberId = (p.line_user_id && typeof p.line_user_id === 'object') ? (p.line_user_id as any).id : p.line_user_id;
-        return String(pCarId) === String(c.id) && String(pMemberId) === String(memberId);
-      });
-      if (!hasPermission) return false;
-    }
+  const filteredCars = useMemo(() => {
+    return cars.filter(c => {
+      // If not admin, only show cars that this driver has permission for
+      if (!isAdmin && memberId) {
+        const hasPermission = allPermissions.some(p => {
+          const pCarId = (p.car_id && typeof p.car_id === 'object') ? (p.car_id as any).id : p.car_id;
+          const pMemberId = (p.line_user_id && typeof p.line_user_id === 'object') ? (p.line_user_id as any).id : p.line_user_id;
+          return String(pCarId) === String(c.id) && String(pMemberId) === String(memberId);
+        });
+        if (!hasPermission) return false;
+      }
 
-    const carNum = String(c.car_number || '').toLowerCase();
-    const desc = String(c.description || '').toLowerCase();
-    const owner = String(c.owner_name || '').toLowerCase();
-    const search = searchTerm.toLowerCase();
-    
-    return carNum.includes(search) || desc.includes(search) || owner.includes(search);
-  });
+      const carNum = String(c.car_number || '').toLowerCase();
+      const desc = String(c.description || '').toLowerCase();
+      const owner = String(c.owner_name || '').toLowerCase();
+      const search = searchTerm.toLowerCase();
+      
+      return carNum.includes(search) || desc.includes(search) || owner.includes(search);
+    });
+  }, [cars, searchTerm, isAdmin, memberId, allPermissions]);
+
+  const handleEdit = useCallback((car: CarType) => handleOpenModal(car), []);
+  const handleDeleteClick = useCallback((id: string) => setDeleteId(id), []);
 
   return (
     <div className="space-y-6">
@@ -275,7 +427,7 @@ export const Cars: React.FC = () => {
         {error && (
           <div className="p-6 bg-red-50 border-b border-red-100 text-red-600 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <AlertCircle className="w-4 h-4" />
               {error}
             </div>
             <button onClick={fetchCars} className="text-xs font-bold underline">{t('try_again')}</button>
@@ -294,140 +446,16 @@ export const Cars: React.FC = () => {
             </div>
           ) : (
             filteredCars.map((car) => (
-              <div key={car.id} className="bg-white rounded-2xl border border-slate-200 hover:border-primary/30 transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md">
-                {/* Car Image Display */}
-                <div className="relative h-48 bg-slate-100 overflow-hidden">
-                  {(() => {
-                    const imageId = typeof car.car_image === 'object' ? (car.car_image as any)?.id : car.car_image;
-                    if (imageId) {
-                      return (
-                        <img 
-                          src={directusApi.getFileUrl(car.car_image)} 
-                          alt={car.car_number} 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                          referrerPolicy="no-referrer"
-                        />
-                      );
-                    }
-                    return (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                        <CarIcon className="w-16 h-16 text-slate-200" />
-                      </div>
-                    );
-                  })()}
-                  {isAdmin && (
-                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleOpenModal(car)}
-                        className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-primary transition-colors shadow-sm"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setDeleteId(car.id)}
-                        className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-slate-600 hover:text-red-500 transition-colors shadow-sm"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                  {car.vehicle_type && (
-                    <div className="absolute bottom-3 left-3">
-                      <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                        {car.vehicle_type}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-5 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-slate-900">{car.car_number}</h3>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                      {t('online')}
-                    </div>
-                  </div>
-                  <div className="mb-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('brand') || 'ยี่ห้อรถ'}</p>
-                    <p className="text-sm text-slate-700 font-bold">
-                      {typeof car.brand_id === 'object' && car.brand_id ? (car.brand_id as any)?.name : (carBrands.find(b => b.id === car.brand_id)?.name || 'N/A')}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('driver_name')}</p>
-                      <p className="text-sm text-slate-700 font-bold truncate">{car.owner_name || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>
-                      {car.driver_phone ? (
-                        <a href={`tel:${car.driver_phone}`} className="text-sm text-primary font-bold hover:underline">
-                          {car.driver_phone}
-                        </a>
-                      ) : (
-                        <p className="text-sm text-slate-300 italic">{t('no_data')}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('members')}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {(() => {
-                        // Find permissions for this car
-                        const carPermissions = allPermissions.filter(p => {
-                          if (!p.car_id) return false;
-                          const id = typeof p.car_id === 'object' ? (p.car_id as any)?.id : p.car_id;
-                          return String(id) === String(car.id);
-                        });
-                        const carMembers = allMembers.filter(member => carPermissions.some(p => {
-                          if (!p.line_user_id) return false;
-                          const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any)?.id : p.line_user_id;
-                          return String(id) === String(member.id);
-                        }));
-                        
-                        if (carMembers.length > 0) {
-                          return carMembers.map((member) => {
-                            const name = member.display_name || `${member.first_name} ${member.last_name}`;
-                            return (
-                              <span 
-                                key={member.id}
-                                className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
-                              >
-                                {name}
-                              </span>
-                            );
-                          });
-                        }
-
-                        // Fallback to nested data
-                        if (car.car_users && car.car_users.length > 0) {
-                          return car.car_users.map((cu) => {
-                            const member = cu.line_user_id;
-                            const name = member?.display_name || (member?.first_name ? `${member.first_name} ${member.last_name}` : t('unknown_car'));
-                            return (
-                              <span 
-                                key={(cu as any).id || Math.random()}
-                                className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold"
-                              >
-                                {name}
-                              </span>
-                            );
-                          });
-                        }
-
-                        return <span className="text-slate-400 text-[10px] italic">{t('no_data')}</span>;
-                      })()}
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-slate-500 line-clamp-2 italic mb-4">
-                    {car.description || t('no_description')}
-                  </p>
-                </div>
-              </div>
+              <CarCard 
+                key={car.id} 
+                car={car} 
+                isAdmin={isAdmin} 
+                carBrands={carBrands}
+                allMembers={allMembers}
+                allPermissions={allPermissions}
+                onEdit={handleEdit}
+                onDelete={handleDeleteClick}
+              />
             ))
           )}
         </div>

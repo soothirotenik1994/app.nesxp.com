@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { directusApi, DIRECTUS_URL, STATIC_API_KEY } from '../api/directus';
@@ -140,7 +140,57 @@ export const JobHistory: React.FC = () => {
 📌 ${t('notes')} : ${report.notes || '-'}`;
   };
 
-  const handleExportExcel = () => {
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => {
+      // Only show finished jobs (completed or cancelled)
+      if (r.status !== 'completed' && r.status !== 'cancelled') return false;
+
+      // Date filtering
+      if (startDate || endDate) {
+        const reportDateStr = r.work_date || r.date_created || '';
+        if (!reportDateStr) return false;
+        
+        const reportDate = parseISO(reportDateStr);
+        if (startDate && reportDate < startOfDay(parseISO(startDate))) return false;
+        if (endDate && reportDate > endOfDay(parseISO(endDate))) return false;
+      }
+
+      const search = searchTerm.toLowerCase();
+      const customer = String(r.customer_name || '').toLowerCase();
+      const origin = String(r.origin || '').toLowerCase();
+      const dest = String(r.destination || '').toLowerCase();
+      const car = (r.car_id && typeof r.car_id === 'object') ? String((r.car_id as any).car_number || '').toLowerCase() : '';
+      const caseNum = String(r.id || '').toLowerCase();
+      
+      return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
+    }).sort((a, b) => {
+      const getStatusWeight = (status: string) => {
+        switch (status) {
+          case 'pending': return 0;
+          case 'accepted': return 1;
+          case 'cancel_pending': return 2;
+          case 'completed': return 3;
+          case 'cancelled': return 4;
+          default: return 5;
+        }
+      };
+
+      const weightA = getStatusWeight(a.status);
+      const weightB = getStatusWeight(b.status);
+
+      return (weightA - weightB) || (new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime());
+    });
+  }, [reports, searchTerm, startDate, endDate]);
+
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+  const paginatedReports = useMemo(() => {
+    return filteredReports.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [filteredReports, currentPage, itemsPerPage]);
+
+  const handleExportExcel = useCallback(() => {
     const dataToExport = filteredReports.map(r => {
       const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
       const car = typeof r.car_id === 'object' ? r.car_id : null;
@@ -175,53 +225,7 @@ export const JobHistory: React.FC = () => {
     
     const fileName = `Job_History_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-  };
-
-  const filteredReports = reports.filter(r => {
-    // Only show finished jobs (completed or cancelled)
-    if (r.status !== 'completed' && r.status !== 'cancelled') return false;
-
-    // Date filtering
-    if (startDate || endDate) {
-      const reportDateStr = r.work_date || r.date_created || '';
-      if (!reportDateStr) return false;
-      
-      const reportDate = parseISO(reportDateStr);
-      if (startDate && reportDate < startOfDay(parseISO(startDate))) return false;
-      if (endDate && reportDate > endOfDay(parseISO(endDate))) return false;
-    }
-
-    const search = searchTerm.toLowerCase();
-    const customer = String(r.customer_name || '').toLowerCase();
-    const origin = String(r.origin || '').toLowerCase();
-    const dest = String(r.destination || '').toLowerCase();
-    const car = (r.car_id && typeof r.car_id === 'object') ? String((r.car_id as any).car_number || '').toLowerCase() : '';
-    const caseNum = String(r.id || '').toLowerCase();
-    
-    return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
-  }).sort((a, b) => {
-    const getStatusWeight = (status: string) => {
-      switch (status) {
-        case 'pending': return 0;
-        case 'accepted': return 1;
-        case 'cancel_pending': return 2;
-        case 'completed': return 3;
-        case 'cancelled': return 4;
-        default: return 5;
-      }
-    };
-
-    const weightA = getStatusWeight(a.status);
-    const weightB = getStatusWeight(b.status);
-
-    return (weightA - weightB) || (new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime());
-  });
-
-  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
-  const paginatedReports = filteredReports.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  }, [filteredReports, t]);
 
   return (
     <div className="space-y-6">

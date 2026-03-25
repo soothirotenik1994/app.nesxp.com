@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { 
@@ -72,62 +72,63 @@ export const Reports: React.FC = () => {
     fetchData();
   }, []);
 
-  const filteredData = reports.filter(r => {
-    const dateStr = r.work_date || r.date_created;
-    if (!dateStr) return false;
-    const reportDate = parseISO(dateStr);
-    return isWithinInterval(reportDate, {
-      start: parseISO(dateRange.start),
-      end: parseISO(dateRange.end)
+  const filteredData = useMemo(() => {
+    return reports.filter(r => {
+      const dateStr = r.work_date || r.date_created;
+      if (!dateStr) return false;
+      const reportDate = parseISO(dateStr);
+      return isWithinInterval(reportDate, {
+        start: parseISO(dateRange.start),
+        end: parseISO(dateRange.end)
+      });
     });
-  });
+  }, [reports, dateRange]);
 
   // --- MoM Calculation ---
-  const now = new Date();
-  const currentMonthStart = startOfMonth(now);
-  const lastMonthStart = startOfMonth(subMonths(now, 1));
-  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const momStats = useMemo(() => {
+    const now = new Date();
+    const currentMonthJobs = reports.filter(r => {
+      const dateStr = r.work_date || r.date_created;
+      return dateStr && isSameMonth(parseISO(dateStr), now);
+    }).length;
 
-  const currentMonthJobs = reports.filter(r => {
-    const dateStr = r.work_date || r.date_created;
-    return dateStr && isSameMonth(parseISO(dateStr), now);
-  }).length;
-
-  const lastMonthJobs = reports.filter(r => {
-    const dateStr = r.work_date || r.date_created;
-    return dateStr && isSameMonth(parseISO(dateStr), subMonths(now, 1));
-  }).length;
-  
-  const momGrowth = lastMonthJobs === 0 ? 100 : ((currentMonthJobs - lastMonthJobs) / lastMonthJobs) * 100;
+    const lastMonthJobs = reports.filter(r => {
+      const dateStr = r.work_date || r.date_created;
+      return dateStr && isSameMonth(parseISO(dateStr), subMonths(now, 1));
+    }).length;
+    
+    const momGrowth = lastMonthJobs === 0 ? 100 : ((currentMonthJobs - lastMonthJobs) / lastMonthJobs) * 100;
+    return { currentMonthJobs, lastMonthJobs, momGrowth };
+  }, [reports]);
 
   // --- Activity Log (Diligence) ---
-  // Grouping by user to see who is most active in submitting/updating reports
-  const userDiligence = members
-    .filter(m => m.role === 'driver')
-    .map(member => {
-      const userReports = reports.filter(r => {
-        const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-        return (String(driverId) === String(member.id)) || (String(r.user_created) === String(member.id));
-      });
-    
-    // Sort by most recent activity
-    const lastReport = [...userReports].sort((a, b) => {
-      const dateA = a.date_updated || a.date_created || 0;
-      const dateB = b.date_updated || b.date_created || 0;
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
-    })[0];
+  const userDiligence = useMemo(() => {
+    return members
+      .filter(m => m.role === 'driver')
+      .map(member => {
+        const userReports = reports.filter(r => {
+          const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+          return (String(driverId) === String(member.id)) || (String(r.user_created) === String(member.id));
+        });
+      
+      const lastReport = [...userReports].sort((a, b) => {
+        const dateA = a.date_updated || a.date_created || 0;
+        const dateB = b.date_updated || b.date_created || 0;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      })[0];
 
-    const lastActiveDate = lastReport ? (lastReport.date_updated || lastReport.date_created) : null;
+      const lastActiveDate = lastReport ? (lastReport.date_updated || lastReport.date_created) : null;
 
-    return {
-      id: member.id,
-      name: member.display_name || `${member.first_name} ${member.last_name}`,
-      count: userReports.length,
-      lastActive: lastActiveDate ? format(parseISO(lastActiveDate), 'MMM dd, HH:mm') : '-'
-    };
-  }).sort((a, b) => b.count - a.count).slice(0, 10);
+      return {
+        id: member.id,
+        name: member.display_name || `${member.first_name} ${member.last_name}`,
+        count: userReports.length,
+        lastActive: lastActiveDate ? format(parseISO(lastActiveDate), 'MMM dd, HH:mm') : '-'
+      };
+    }).sort((a, b) => b.count - a.count).slice(0, 10);
+  }, [members, reports]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = useCallback(() => {
     const dataToExport = filteredData.map(r => {
       const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
       const car = typeof r.car_id === 'object' ? r.car_id : null;
@@ -162,71 +163,77 @@ export const Reports: React.FC = () => {
     
     const fileName = `Reports_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-  };
+  }, [filteredData, t]);
 
   // 1. Job Status Distribution
-  const statusData = [
+  const statusData = useMemo(() => [
     { name: t('status_completed'), value: filteredData.filter(r => r.status === 'completed').length },
     { name: t('status_pending'), value: filteredData.filter(r => r.status === 'pending').length },
     { name: t('status_accepted'), value: filteredData.filter(r => r.status === 'accepted').length },
     { name: t('status_cancelled'), value: filteredData.filter(r => r.status === 'cancelled').length },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0), [filteredData, t]);
 
   // 2. Jobs Over Time (MoM Line Chart)
-  // We'll show current month vs last month trend
-  const getMonthTrend = (monthDate: Date) => {
-    const daysInMonth = endOfMonth(monthDate).getDate();
-    const data = [];
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dayStr = i.toString().padStart(2, '0');
-      const count = reports.filter(r => {
-        const dateStr = r.work_date || r.date_created;
-        if (!dateStr) return false;
-        const d = parseISO(dateStr);
-        return isSameMonth(d, monthDate) && format(d, 'dd') === dayStr;
-      }).length;
-      data.push({ day: i, count });
-    }
-    return data;
-  };
+  const combinedTrend = useMemo(() => {
+    const now = new Date();
+    const getMonthTrend = (monthDate: Date) => {
+      const daysInMonth = endOfMonth(monthDate).getDate();
+      const data = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+        const dayStr = i.toString().padStart(2, '0');
+        const count = reports.filter(r => {
+          const dateStr = r.work_date || r.date_created;
+          if (!dateStr) return false;
+          const d = parseISO(dateStr);
+          return isSameMonth(d, monthDate) && format(d, 'dd') === dayStr;
+        }).length;
+        data.push({ day: i, count });
+      }
+      return data;
+    };
 
-  const currentMonthTrend = getMonthTrend(now);
-  const lastMonthTrend = getMonthTrend(subMonths(now, 1));
-  
-  const combinedTrend = currentMonthTrend.map((d, i) => ({
-    day: d.day,
-    current: d.count,
-    last: lastMonthTrend[i]?.count || 0
-  }));
+    const currentMonthTrend = getMonthTrend(now);
+    const lastMonthTrend = getMonthTrend(subMonths(now, 1));
+    
+    return currentMonthTrend.map((d, i) => ({
+      day: d.day,
+      current: d.count,
+      last: lastMonthTrend[i]?.count || 0
+    }));
+  }, [reports]);
 
   // 3. Top Drivers
-  const driverStats = filteredData.reduce((acc: any, r) => {
-    if (r.driver_id) {
-      const name = typeof r.driver_id === 'object' 
-        ? (r.driver_id.display_name || `${r.driver_id.first_name} ${r.driver_id.last_name}`)
-        : r.driver_id;
-      acc[name] = (acc[name] || 0) + 1;
-    }
-    return acc;
-  }, {});
+  const topDrivers = useMemo(() => {
+    const driverStats = filteredData.reduce((acc: any, r) => {
+      if (r.driver_id) {
+        const name = typeof r.driver_id === 'object' 
+          ? (r.driver_id.display_name || `${r.driver_id.first_name} ${r.driver_id.last_name}`)
+          : r.driver_id;
+        acc[name] = (acc[name] || 0) + 1;
+      }
+      return acc;
+    }, {});
 
-  const topDrivers = Object.entries(driverStats)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a: any, b: any) => b.count - a.count)
-    .slice(0, 5);
+    return Object.entries(driverStats)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a: any, b: any) => b.count - a.count)
+      .slice(0, 5);
+  }, [filteredData]);
 
   // 4. Top Customers
-  const customerStats = filteredData.reduce((acc: any, r) => {
-    if (r.customer_name) {
-      acc[r.customer_name] = (acc[r.customer_name] || 0) + 1;
-    }
-    return acc;
-  }, {});
+  const topCustomers = useMemo(() => {
+    const customerStats = filteredData.reduce((acc: any, r) => {
+      if (r.customer_name) {
+        acc[r.customer_name] = (acc[r.customer_name] || 0) + 1;
+      }
+      return acc;
+    }, {});
 
-  const topCustomers = Object.entries(customerStats)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a: any, b: any) => b.count - a.count)
-    .slice(0, 5);
+    return Object.entries(customerStats)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a: any, b: any) => b.count - a.count)
+      .slice(0, 5);
+  }, [filteredData]);
 
   if (loading) {
     return (
@@ -287,15 +294,15 @@ export const Reports: React.FC = () => {
             </div>
             <div className={clsx(
               "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold",
-              momGrowth >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+              momStats.momGrowth >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
             )}>
-              {momGrowth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-              {Math.abs(momGrowth).toFixed(1)}%
+              {momStats.momGrowth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              {Math.abs(momStats.momGrowth).toFixed(1)}%
             </div>
           </div>
           <p className="text-sm font-medium text-slate-500">{t('total_jobs')}</p>
           <p className="text-2xl font-bold text-slate-900">{filteredData.length}</p>
-          <p className="text-[10px] text-slate-400 mt-1">{t('vs_last_month')}: {lastMonthJobs}</p>
+          <p className="text-[10px] text-slate-400 mt-1">{t('vs_last_month')}: {momStats.lastMonthJobs}</p>
         </div>
         
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">

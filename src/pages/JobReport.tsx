@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -139,21 +139,52 @@ export const JobReport: React.FC = () => {
 
   const [allReports, setAllReports] = useState<any[]>([]);
 
-  const isDriverBusy = (driverId: string) => {
-    return allReports.some(r => 
-      String(r.driver_id?.id || r.driver_id) === String(driverId) && 
-      !['completed', 'cancelled'].includes(r.status) &&
-      String(r.id) !== String(id)
-    );
-  };
+  const busyDriversMap = useMemo(() => {
+    const map = new Set<string>();
+    allReports.forEach(r => {
+      const status = r.status;
+      if (!['completed', 'cancelled'].includes(status)) {
+        const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+        if (driverId && String(r.id) !== String(id)) {
+          map.add(String(driverId));
+        }
+      }
+    });
+    return map;
+  }, [allReports, id]);
 
-  const getLastMileage = (carId: string) => {
-    const carReports = allReports
-      .filter(r => String(r.car_id?.id || r.car_id) === String(carId) && r.status === 'completed')
-      .sort((a, b) => new Date(b.arrival_time || b.date_created).getTime() - new Date(a.arrival_time || a.date_created).getTime());
-    
-    return carReports.length > 0 ? carReports[0].mileage_end : 0;
-  };
+  const lastMileageMap = useMemo(() => {
+    const map = new Map<string, number>();
+    // Group reports by car
+    const carReportsMap = new Map<string, any[]>();
+    allReports.forEach(r => {
+      if (r.status === 'completed') {
+        const carId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
+        if (carId) {
+          const reports = carReportsMap.get(String(carId)) || [];
+          reports.push(r);
+          carReportsMap.set(String(carId), reports);
+        }
+      }
+    });
+
+    // For each car, find the latest report
+    carReportsMap.forEach((reports, carId) => {
+      const sorted = reports.sort((a, b) => 
+        new Date(b.arrival_time || b.date_created).getTime() - new Date(a.arrival_time || a.date_created).getTime()
+      );
+      map.set(carId, sorted[0].mileage_end || 0);
+    });
+    return map;
+  }, [allReports]);
+
+  const isDriverBusy = useCallback((driverId: string) => {
+    return busyDriversMap.has(String(driverId));
+  }, [busyDriversMap]);
+
+  const getLastMileage = useCallback((carId: string) => {
+    return lastMileageMap.get(String(carId)) || 0;
+  }, [lastMileageMap]);
 
   const resolveMemberId = (idOrUid: any) => {
     if (!idOrUid || idOrUid === 'null' || idOrUid === 'undefined' || idOrUid === '') return null;
