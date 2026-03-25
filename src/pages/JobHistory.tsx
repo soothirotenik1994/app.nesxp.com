@@ -110,8 +110,8 @@ export const JobHistory: React.FC = () => {
   };
 
   const generateReportText = (report: WorkReport) => {
-    const carNum = typeof report.car_id === 'object' ? report.car_id.car_number : report.car_id;
-    const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
+    const carNum = (report.car_id && typeof report.car_id === 'object') ? (report.car_id as any).car_number : report.car_id;
+    const driver = (report.driver_id && typeof report.driver_id === 'object') ? report.driver_id : null;
     const accountSource = driver?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
     const driverName = driver ? `${driver.first_name} ${driver.last_name} ${accountSource}` : report.driver_id;
     
@@ -195,7 +195,7 @@ export const JobHistory: React.FC = () => {
     const customer = String(r.customer_name || '').toLowerCase();
     const origin = String(r.origin || '').toLowerCase();
     const dest = String(r.destination || '').toLowerCase();
-    const car = typeof r.car_id === 'object' ? String(r.car_id.car_number || '').toLowerCase() : '';
+    const car = (r.car_id && typeof r.car_id === 'object') ? String((r.car_id as any).car_number || '').toLowerCase() : '';
     const caseNum = String(r.id || '').toLowerCase();
     
     return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);

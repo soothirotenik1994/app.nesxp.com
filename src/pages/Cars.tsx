@@ -20,6 +20,7 @@ export const Cars: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteBrandId, setDeleteBrandId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     car_number: '',
@@ -93,7 +94,7 @@ export const Cars: React.FC = () => {
         driver_phone: car.driver_phone || '',
         car_image: carImageId || '',
         status: (car as any).status || 'active',
-        brand_id: (typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || ''
+        brand_id: (car.brand_id && typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || ''
       });
     } else {
       setEditingCar(null);
@@ -212,8 +213,8 @@ export const Cars: React.FC = () => {
     // If not admin, only show cars that this driver has permission for
     if (!isAdmin && memberId) {
       const hasPermission = allPermissions.some(p => {
-        const pCarId = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
-        const pMemberId = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+        const pCarId = (p.car_id && typeof p.car_id === 'object') ? (p.car_id as any).id : p.car_id;
+        const pMemberId = (p.line_user_id && typeof p.line_user_id === 'object') ? (p.line_user_id as any).id : p.line_user_id;
         return String(pCarId) === String(c.id) && String(pMemberId) === String(memberId);
       });
       if (!hasPermission) return false;
@@ -241,7 +242,7 @@ export const Cars: React.FC = () => {
               className="bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-slate-200 transition-colors flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
-              {t('add_brand') || 'เพิ่มยี่ห้อรถ'}
+              ยี่ห้อรถ
             </button>
             <button 
               onClick={() => handleOpenModal()}
@@ -458,48 +459,95 @@ export const Cars: React.FC = () => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">{t('add_brand') || 'เพิ่มยี่ห้อรถ'}</h3>
+              <h3 className="text-xl font-bold text-slate-900">ยี่ห้อรถ</h3>
               <button onClick={() => setIsBrandModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-6 h-6 text-slate-400" />
               </button>
             </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const name = (e.target as any).brandName.value;
-              if (!name) return;
-              await directusApi.createCarBrand({ name });
-              setIsBrandModalOpen(false);
-              fetchCars(); // Refresh brands
-            }} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">ชื่อยี่ห้อรถ</label>
-                <input 
-                  type="text" 
-                  name="brandName"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Toyota"
-                />
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Add Brand Form */}
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const name = (e.target as any).brandName.value;
+                if (!name) return;
+                try {
+                  setSubmitting(true);
+                  await directusApi.createCarBrand({ name });
+                  (e.target as any).reset();
+                  fetchCars(); // Refresh brands
+                } catch (err) {
+                  console.error('Error creating brand:', err);
+                } finally {
+                  setSubmitting(false);
+                }
+              }} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">เพิ่มยี่ห้อรถใหม่</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      name="brandName"
+                      required
+                      className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Toyota"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-primary text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70"
+                    >
+                      {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Brands List */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">รายการยี่ห้อรถ</h4>
+                <div className="space-y-2">
+                  {carBrands.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic">ไม่มีข้อมูล</p>
+                  ) : (
+                    carBrands.map(brand => (
+                      <div key={brand.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                        <span className="font-semibold text-slate-700">{brand.name}</span>
+                        <button 
+                          type="button"
+                          onClick={() => setDeleteBrandId(brand.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsBrandModalOpen(false)}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
-                >
-                  {t('cancel') || 'ยกเลิก'}
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100"
-                >
-                  {t('save') || 'บันทึก'}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
+
+      <ConfirmModal 
+        isOpen={!!deleteBrandId}
+        title="ยืนยันการลบยี่ห้อรถ"
+        message="คุณต้องการลบยี่ห้อรถนี้ใช่หรือไม่? การลบอาจไม่สำเร็จหากมียี่ห้อนี้ถูกใช้งานอยู่ในรถบางคัน"
+        onConfirm={async () => {
+          if (!deleteBrandId) return;
+          try {
+            await directusApi.deleteCarBrand(deleteBrandId);
+            setDeleteBrandId(null);
+            fetchCars();
+          } catch (err: any) {
+            console.error('Error deleting brand:', err);
+            setActionError('ไม่สามารถลบยี่ห้อนี้ได้ เนื่องจากอาจมีการใช้งานอยู่');
+            setDeleteBrandId(null);
+          }
+        }}
+        onCancel={() => setDeleteBrandId(null)}
+        confirmText="ลบ"
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">

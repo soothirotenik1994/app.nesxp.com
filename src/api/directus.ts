@@ -489,6 +489,35 @@ export const directusApi = {
     return response.data.data;
   },
 
+  getCarBrands: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/items/car_brands', {
+        params: {
+          limit: -1,
+          sort: 'name'
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching car brands:', error);
+      return [];
+    }
+  },
+
+  createCarBrand: async (data: { name: string }): Promise<any> => {
+    const response = await api.post('/items/car_brands', data);
+    return response.data.data;
+  },
+
+  deleteCarBrand: async (id: string): Promise<void> => {
+    await api.delete(`/items/car_brands/${id}`);
+  },
+
+  createItem: async (collection: string, data: any): Promise<any> => {
+    const response = await api.post(`/items/${collection}`, data);
+    return response.data.data;
+  },
+
   getCurrentUser: async (): Promise<any> => {
     const response = await api.get('/users/me', {
       params: {

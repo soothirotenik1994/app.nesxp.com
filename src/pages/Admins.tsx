@@ -113,7 +113,7 @@ export const Admins: React.FC = () => {
         line_user_id: admin.line_user_id || '',
         password: '', // Don't show password
         status: admin.status || 'active',
-        role: typeof admin.role === 'object' ? admin.role?.id : admin.role || ''
+        role: (admin.role && typeof admin.role === 'object') ? (admin.role as any).id : (admin.role || '')
       });
     } else {
       setEditingAdmin(null);
@@ -336,7 +336,7 @@ export const Admins: React.FC = () => {
                     {visibleColumns.includes('role') && (
                       <td className="px-6 py-4">
                         <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-                          {typeof admin.role === 'object' ? admin.role?.name : t('not_specified')}
+                          {admin.role && typeof admin.role === 'object' ? admin.role?.name : t('not_specified')}
                         </span>
                       </td>
                     )}

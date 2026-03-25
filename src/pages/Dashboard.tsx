@@ -31,10 +31,10 @@ export const Dashboard: React.FC = () => {
             const status = await gpsApi.getCarStatus(car.car_number);
             const assignedNames = (car.car_users || (car as any).line_users)?.map((cu: any) => {
               if (!cu) return null;
-              const user = cu.line_user_id || cu;
+              const user = cu.line_user_id && typeof cu.line_user_id === 'object' ? cu.line_user_id : cu;
               if (!user) return null;
-              const source = user.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
-              const name = user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null);
+              const source = user && typeof user === 'object' && (user as any).line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
+              const name = user && typeof user === 'object' ? (user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null)) : null;
               return name ? `${name} ${source}` : null;
             }).filter(Boolean).join(', ');
             return { 
@@ -176,7 +176,7 @@ export const Dashboard: React.FC = () => {
         if (userRole !== 'customer') {
           permittedCars = carsData.filter(car => 
             car.car_users?.some((cu: any) => {
-              const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
+              const cuId = cu.line_user_id && typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
               return String(cuId) === String(memberId);
             })
           );

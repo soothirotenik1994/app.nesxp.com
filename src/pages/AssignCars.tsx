@@ -54,7 +54,7 @@ export const AssignCars: React.FC = () => {
 
   const assignedCarIds = permissions.map(p => {
     if (!p.car_id) return null;
-    const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+    const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
     return String(id);
   }).filter(Boolean) as string[];
   
@@ -117,7 +117,7 @@ export const AssignCars: React.FC = () => {
   const handleRemovePermission = async (carId: string) => {
     const permission = permissions.find(p => {
       if (!p.car_id) return false;
-      const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+      const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
       return String(id) === String(carId);
     });
     if (!permission) return;

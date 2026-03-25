@@ -472,12 +472,12 @@ export const Members: React.FC = () => {
                               // Find permissions for this member
                               const memberPermissions = allPermissions.filter(p => {
                                 if (!p.line_user_id) return false;
-                                const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+                                const id = p.line_user_id && typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
                                 return String(id) === String(member.id);
                               });
                               const memberCars = allCars.filter(car => memberPermissions.some(p => {
                                 if (!p.car_id) return false;
-                                const id = typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+                                const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
                                 return String(id) === String(car.id);
                               }));
                               
