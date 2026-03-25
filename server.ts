@@ -30,7 +30,16 @@ async function startServer() {
 
     try {
       console.log("Logging in to GPS provider...");
-      const gpsToken = process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+      
+      // Fetch system settings from Directus to get the latest GPS API Token
+      const settingsResponse = await axios.get(`${process.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com'}/items/system_settings/1`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0'}`
+        }
+      });
+      
+      const gpsToken = settingsResponse.data?.data?.gps_api_token || process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+      
       const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`);
       if (response.data?.result?.sessionId) {
         sessionId = response.data.result.sessionId;
@@ -201,7 +210,7 @@ async function startServer() {
       const { to, messages } = req.body;
       const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken, messages });
+      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken });
 
       if (!accessToken) {
         return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured" });
@@ -217,7 +226,6 @@ async function startServer() {
       const results = [];
       for (let i = 0; i < recipients.length; i += 500) {
         const batch = recipients.slice(i, i + 500);
-        console.log('Sending batch to LINE:', { batch, messages });
         const response = await axios.post("https://api.line.me/v2/bot/message/multicast", {
           to: batch,
           messages: messages
@@ -235,7 +243,7 @@ async function startServer() {
       res.json({ success: true, results });
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
-      console.error("LINE broadcast error details:", JSON.stringify(errorData, null, 2));
+      console.error("LINE broadcast error details:", errorData);
       res.status(500).json({ 
         error: "Failed to broadcast LINE message", 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData

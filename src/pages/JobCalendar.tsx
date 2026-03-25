@@ -118,7 +118,7 @@ export const JobCalendar: React.FC = () => {
           };
         });
         setEvents(calendarEvents);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching data for calendar:', error);
       } finally {
         setLoading(false);

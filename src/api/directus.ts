@@ -63,7 +63,7 @@ api.interceptors.response.use(
       
       if (!isLoginPage && !isAuthRequest) {
         console.log('Redirecting to login due to 401...');
-        window.location.href = '/login';
+        window.parent.location.href = '/login';
       }
     }
     return Promise.reject(error);
