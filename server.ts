@@ -201,7 +201,7 @@ async function startServer() {
       const { to, messages } = req.body;
       const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken });
+      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken, messages });
 
       if (!accessToken) {
         return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured" });
@@ -217,6 +217,7 @@ async function startServer() {
       const results = [];
       for (let i = 0; i < recipients.length; i += 500) {
         const batch = recipients.slice(i, i + 500);
+        console.log('Sending batch to LINE:', { batch, messages });
         const response = await axios.post("https://api.line.me/v2/bot/message/multicast", {
           to: batch,
           messages: messages
@@ -234,7 +235,7 @@ async function startServer() {
       res.json({ success: true, results });
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
-      console.error("LINE broadcast error details:", errorData);
+      console.error("LINE broadcast error details:", JSON.stringify(errorData, null, 2));
       res.status(500).json({ 
         error: "Failed to broadcast LINE message", 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData

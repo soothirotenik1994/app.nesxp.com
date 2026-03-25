@@ -311,6 +311,11 @@ export const directusApi = {
     return response.data.data;
   },
 
+  createItem: async (collection: string, data: any): Promise<any> => {
+    const response = await api.post(`/items/${collection}`, data);
+    return response.data.data;
+  },
+
   updateWorkReport: async (id: string, data: any): Promise<any> => {
     const response = await api.patch(`/items/work_reports/${id}`, data);
     return response.data.data;
