@@ -135,12 +135,24 @@ async function startServer() {
   // LINE Config Check
   app.get("/api/line/config", async (req, res) => {
     const settings = await getLineSettingsFromDirectus();
-    const redirectUri = settings?.redirect_uri || `${req.protocol}://${req.get('host')}/line/callback`;
+    
+    // Use redirect_uri from Directus, or LINE_REDIRECT_URI from env, or APP_URL from env, or fallback
+    let redirectUri = settings?.redirect_uri || process.env.LINE_REDIRECT_URI;
+    
+    if (!redirectUri) {
+      if (process.env.APP_URL) {
+        redirectUri = `${process.env.APP_URL}/line/callback`;
+      } else {
+        // Default to the user's requested production URL
+        redirectUri = "https://app.nesxp.com/line/callback";
+      }
+    }
+
     const accessToken = settings?.channel_access_token;
     res.json({
       configured: !!accessToken,
       redirectUri,
-      channelId: settings?.channel_id || "2009240188" // Fallback to existing hardcoded ID if not in settings
+      channelId: settings?.channel_id || "2009240188"
     });
   });
 
