@@ -540,6 +540,8 @@ export const JobReport: React.FC = () => {
       const currentReportId = jobId || id;
 
       console.log(`Starting customer notification for status: ${status}, customer_id: ${currentCustomerId}, report_id: ${currentReportId}`);
+      console.log('Current formData customer_id:', formData.customer_id);
+      console.log('Current customers list length:', customers.length);
       
       const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
       console.log('LINE Notifications enabled in settings:', notificationsEnabled);
@@ -550,7 +552,7 @@ export const JobReport: React.FC = () => {
       }
 
       if (!currentCustomerId) {
-        console.log('No customer ID provided for notification');
+        console.log('No customer ID provided for notification. formData.customer_id:', formData.customer_id);
         return;
       }
 
@@ -559,18 +561,17 @@ export const JobReport: React.FC = () => {
         id: customerLoc.id,
         company_name: customerLoc.company_name,
         member_id: customerLoc.member_id,
-        members_count: customerLoc.members?.length || 0,
-        members_raw: customerLoc.members
+        members_count: customerLoc.members?.length || 0
       } : 'NOT FOUND');
       
       if (!customerLoc) {
-        console.log(`Customer location ${currentCustomerId} not found in customers list`);
-        console.log('Available customer IDs:', customers.map(c => c.id));
+        console.log(`Customer location ${currentCustomerId} not found in customers list. Available IDs:`, customers.map(c => c.id));
         return;
       }
       
       const memberIds: string[] = [];
       const primaryIdRaw = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+      console.log('Primary member ID raw:', primaryIdRaw);
       const primaryId = resolveMemberId(primaryIdRaw);
       if (primaryId) {
         memberIds.push(String(primaryId));
@@ -1894,7 +1895,8 @@ export const JobReport: React.FC = () => {
       setFormData(prev => ({ ...prev, status: 'accepted' }));
       
       // Notify customer
-      await sendCustomerStatusNotification('accepted');
+      const customerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
+      await sendCustomerStatusNotification('accepted', id, customerId);
 
       setStatusConfig({
         type: 'success',
@@ -1923,7 +1925,8 @@ export const JobReport: React.FC = () => {
       setFormData(prev => ({ ...prev, status: 'completed' }));
       
       // Notify customer
-      await sendCustomerStatusNotification('completed');
+      const customerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
+      await sendCustomerStatusNotification('completed', id, customerId);
       
       // Notify driver
       await sendDriverStatusNotification('completed');

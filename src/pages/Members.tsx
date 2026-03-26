@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { lineService } from '../services/lineService';
 import { Member } from '../types';
-import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check } from 'lucide-react';
+import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check, Shield, UserCheck } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -360,6 +360,25 @@ export const Members: React.FC = () => {
             console.error('Failed to send approval notification:', e);
           }
         }
+
+        // If changing from driver to another role, clear driver assignments
+        if (editingMember.role === 'driver' && payload.role !== 'driver') {
+          const driverName = `${editingMember.first_name} ${editingMember.last_name}`.trim();
+          const [cars, permissions] = await Promise.all([
+            directusApi.getCars(),
+            directusApi.getCarPermissions(editingMember.id)
+          ]);
+          
+          const carsToUpdate = cars.filter(c => c.owner_name === driverName);
+          for (const car of carsToUpdate) {
+            await directusApi.updateCar(car.id, { owner_name: '', driver_phone: '' });
+          }
+          
+          for (const permission of permissions) {
+            await directusApi.deleteCarPermission(permission.id);
+          }
+        }
+
         await directusApi.updateMember(editingMember.id, payload);
       } else {
         payload.status = 'pending';
@@ -717,20 +736,40 @@ export const Members: React.FC = () => {
                     {formData.line_user_id ? 'LINE' : 'Admin'}
                   </div>
                 </div>
+              <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">{t('role')}</label>
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-slate-400" />
+                    {t('role') || 'บทบาท'}
+                  </label>
                   <select 
                     required
                     value={formData.role}
                     onChange={(e) => setFormData({...formData, role: e.target.value as any})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
                     <option value="driver">{t('driver_role') || 'คนขับ'}</option>
                     <option value="customer">{t('customer_role') || 'ลูกค้า'}</option>
                     <option value="general">{'ทั่วไป'}</option>
-                    <option value="inactive">{t('disabled') || 'ระงับการใช้งาน'}</option>
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-slate-400" />
+                    {t('status') || 'สถานะ'}
+                  </label>
+                  <select 
+                    required
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
+                  >
+                    <option value="active">{t('active') || 'ใช้งาน'}</option>
+                    <option value="inactive">{t('disabled') || 'ระงับการใช้งาน'}</option>
+                    <option value="pending">{t('pending') || 'รออนุมัติ'}</option>
+                  </select>
+                </div>
+              </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>

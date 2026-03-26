@@ -4,6 +4,7 @@ import { directusApi } from '../api/directus';
 import { Car as CarType, Member } from '../types';
 import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { clsx } from 'clsx';
 
 // Memoized CarCard component to prevent unnecessary re-renders
 const CarCard = React.memo(({ 
@@ -33,30 +34,37 @@ const CarCard = React.memo(({
 
   const carMembers = useMemo(() => {
     // 1. Try to use expanded data first (most efficient)
+    let membersList: string[] = [];
     if (car.car_users && car.car_users.length > 0) {
-      return car.car_users.map(cu => {
+      membersList = car.car_users.map(cu => {
         const member = cu.line_user_id;
         if (!member) return null;
         return member.display_name || (member.first_name ? `${member.first_name} ${member.last_name}` : null);
-      }).filter(Boolean);
+      }).filter(Boolean) as string[];
+    } else {
+      // 2. Fallback to manual join if needed
+      const carPermissions = allPermissions.filter(p => {
+        const id = typeof p.car_id === 'object' ? (p.car_id as any)?.id : p.car_id;
+        return String(id) === String(car.id);
+      });
+      
+      membersList = allMembers
+        .filter(member => carPermissions.some(p => {
+          const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any)?.id : p.line_user_id;
+          return String(id) === String(member.id);
+        }))
+        .map(m => m.display_name || `${m.first_name} ${m.last_name}`);
     }
 
-    // 2. Fallback to manual join if needed
-    const carPermissions = allPermissions.filter(p => {
-      const id = typeof p.car_id === 'object' ? (p.car_id as any)?.id : p.car_id;
-      return String(id) === String(car.id);
-    });
-    
-    return allMembers
-      .filter(member => carPermissions.some(p => {
-        const id = typeof p.line_user_id === 'object' ? (p.line_user_id as any)?.id : p.line_user_id;
-        return String(id) === String(member.id);
-      }))
-      .map(m => m.display_name || `${m.first_name} ${m.last_name}`);
-  }, [car.car_users, car.id, allPermissions, allMembers]);
+    // Filter out the driver from the members list
+    return membersList.filter(name => name !== car.owner_name);
+  }, [car.car_users, car.id, allPermissions, allMembers, car.owner_name]);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 hover:border-primary/30 transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md">
+    <div className={clsx(
+      "rounded-2xl border transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md",
+      car.owner_name ? "border-red-500 bg-white" : "border-slate-200 bg-white hover:border-primary/30"
+    )}>
       <div className="relative h-48 bg-slate-100 overflow-hidden">
         {imageId ? (
           <img 
@@ -88,7 +96,10 @@ const CarCard = React.memo(({
         )}
         {car.vehicle_type && (
           <div className="absolute bottom-3 left-3">
-            <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
+            <span className={clsx(
+              "backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm",
+              car.owner_name ? "bg-red-500/90" : "bg-primary/90"
+            )}>
               {car.vehicle_type}
             </span>
           </div>
@@ -112,7 +123,10 @@ const CarCard = React.memo(({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('driver_name')}</p>
-            <p className="text-sm text-slate-700 font-bold truncate">{car.owner_name || 'N/A'}</p>
+            <p className={clsx(
+              "text-sm font-bold truncate",
+              car.owner_name ? "text-red-600" : "text-slate-700"
+            )}>{car.owner_name || 'N/A'}</p>
           </div>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>

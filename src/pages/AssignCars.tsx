@@ -42,7 +42,7 @@ export const AssignCars: React.FC = () => {
         console.error('Error fetching assignment data:', error);
         if (error.response?.status === 403) {
           alert('Permission Denied (403): You do not have access to manage car assignments.');
-        } else {
+        } else if (error.response?.status !== 401) {
           alert(t('error_loading_data') || 'Error loading data');
         }
       } finally {
@@ -73,11 +73,17 @@ export const AssignCars: React.FC = () => {
     if (!memberId) return;
     setProcessing(carId);
     try {
-      // 1. Check if the car is already assigned to anyone else
+      // 1. Enforce "One driver, one car" rule:
+      // Remove all existing car assignments for this driver
+      const existingPermissions = await directusApi.getCarPermissions(memberId);
+      await Promise.all(existingPermissions.map((p: any) => 
+        directusApi.deleteCarPermission(p.id)
+      ));
+
+      // 2. Enforce "One car, one driver" rule:
+      // Check if the car is already assigned to anyone else and remove that assignment
       const car = allCars.find(c => String(c.id) === String(carId));
       if (car && car.car_users && car.car_users.length > 0) {
-        // Enforce "One car, one driver" rule: 
-        // Clear all existing assignments for this car before adding the new one
         await Promise.all(car.car_users.map((cu: any) => 
           directusApi.deleteCarPermission(cu.id).catch(err => {
             console.warn(`Failed to delete existing permission ${cu.id}:`, err);
@@ -85,10 +91,10 @@ export const AssignCars: React.FC = () => {
         ));
       }
 
-      // 2. Add the new permission
-      const newPermission = await directusApi.addCarPermission(memberId, carId);
+      // 3. Add the new permission
+      await directusApi.addCarPermission(memberId, carId);
       
-      // 3. Update the car's owner_name and driver_phone to match the new driver
+      // 4. Update the car's owner_name and driver_phone to match the new driver
       if (car && member) {
         const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.display_name || '';
         await directusApi.updateCar(carId, {
@@ -97,7 +103,7 @@ export const AssignCars: React.FC = () => {
         });
       }
 
-      // 4. Refresh all data to ensure UI is in sync
+      // 5. Refresh all data to ensure UI is in sync
       const [carsData, permissionsData] = await Promise.all([
         directusApi.getCars(),
         directusApi.getCarPermissions(memberId)
