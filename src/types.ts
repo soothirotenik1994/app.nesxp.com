@@ -1,3 +1,12 @@
+export interface MaintenanceHistory {
+  id: string;
+  car_id: string | Car;
+  date: string;
+  mileage: number;
+  service_type: string;
+  notes?: string;
+}
+
 export interface Member {
   id: string;
   line_user_id: string;

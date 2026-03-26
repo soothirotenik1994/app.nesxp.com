@@ -17,6 +17,7 @@ export const SystemSettings: React.FC = () => {
     staticApiKey: localStorage.getItem('static_api_key') || 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4',
     websiteName: localStorage.getItem('website_name') || 'NES Tracking',
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
+    websiteBackground: localStorage.getItem('website_background') || '',
     appUrl: localStorage.getItem('app_url') || window.location.origin,
   });
 
@@ -29,12 +30,14 @@ export const SystemSettings: React.FC = () => {
             ...prev,
             websiteName: settings.website_name || prev.websiteName,
             websiteLogo: settings.website_logo || prev.websiteLogo,
+            websiteBackground: settings.website_background || prev.websiteBackground,
             appUrl: settings.app_url || prev.appUrl,
           }));
           
           // Sync to localStorage for immediate use in app
           if (settings.website_name) localStorage.setItem('website_name', settings.website_name);
           if (settings.website_logo) localStorage.setItem('website_logo', settings.website_logo);
+          if (settings.website_background) localStorage.setItem('website_background', settings.website_background);
           if (settings.app_url) localStorage.setItem('app_url', settings.app_url);
         }
       } catch (error) {
@@ -44,7 +47,7 @@ export const SystemSettings: React.FC = () => {
     fetchSettings();
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'websiteLogo' | 'websiteBackground') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -52,10 +55,10 @@ export const SystemSettings: React.FC = () => {
     try {
       const fileId = await directusApi.uploadFile(file);
       const fileUrl = directusApi.getFileUrl(fileId);
-      setFormData({ ...formData, websiteLogo: fileUrl });
+      setFormData({ ...formData, [field]: fileUrl });
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      const errorMsg = error.response?.data?.errors?.[0]?.message || error.message || 'Failed to upload logo';
+      const errorMsg = error.response?.data?.errors?.[0]?.message || error.message || 'Failed to upload file';
       alert(`Upload Error: ${errorMsg}`);
     } finally {
       setIsUploading(false);
@@ -69,6 +72,7 @@ export const SystemSettings: React.FC = () => {
       await directusApi.updateSystemSettings({
         website_name: formData.websiteName,
         website_logo: formData.websiteLogo,
+        website_background: formData.websiteBackground,
         app_url: formData.appUrl,
       });
 
@@ -77,6 +81,7 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('static_api_key', formData.staticApiKey);
       localStorage.setItem('website_name', formData.websiteName);
       localStorage.setItem('website_logo', formData.websiteLogo);
+      localStorage.setItem('website_background', formData.websiteBackground);
       localStorage.setItem('app_url', formData.appUrl);
       
       setTimeout(() => {
@@ -174,7 +179,42 @@ export const SystemSettings: React.FC = () => {
                 <input 
                   type="file" 
                   ref={fileInputRef}
-                  onChange={handleFileUpload}
+                  onChange={(e) => handleFileUpload(e, 'websiteLogo')}
+                  className="hidden"
+                  accept="image/*"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200 disabled:opacity-50"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Upload className="w-5 h-5" />
+                  )}
+                  Upload
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">
+                Website Background
+              </label>
+              <div className="flex gap-3">
+                <input 
+                  type="text" 
+                  value={formData.websiteBackground}
+                  onChange={(e) => setFormData({...formData, websiteBackground: e.target.value})}
+                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                  placeholder="https://example.com/background.jpg"
+                />
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  onChange={(e) => handleFileUpload(e, 'websiteBackground')}
                   className="hidden"
                   accept="image/*"
                 />
@@ -210,22 +250,41 @@ export const SystemSettings: React.FC = () => {
             <p className="text-[10px] text-slate-400">Used for generating deep links and LINE notifications</p>
           </div>
           
-          {formData.websiteLogo && (
-            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 inline-block">
-              <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Logo Preview</p>
-              <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
-                <img 
-                  src={formData.websiteLogo} 
-                  alt="Logo Preview" 
-                  className="max-w-full max-h-full object-contain"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
-                  }}
-                />
+          <div className="flex gap-6">
+            {formData.websiteLogo && (
+              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 inline-block">
+                <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Logo Preview</p>
+                <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                  <img 
+                    src={formData.websiteLogo} 
+                    alt="Logo Preview" 
+                    className="max-w-full max-h-full object-contain"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            
+            {formData.websiteBackground && (
+              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 inline-block">
+                <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Background Preview</p>
+                <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                  <img 
+                    src={formData.websiteBackground} 
+                    alt="Background Preview" 
+                    className="max-w-full max-h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

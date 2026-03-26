@@ -101,10 +101,18 @@ export const Login: React.FC = () => {
 
   const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
   const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
+  const websiteBackground = localStorage.getItem('website_background');
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={websiteBackground ? {
+        backgroundImage: `url(${websiteBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      } : {}}
+    >
+      <div className={clsx("max-w-md w-full", !websiteBackground && "bg-slate-50")}>
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 p-2 overflow-hidden">
             <img 

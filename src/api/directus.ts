@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Member, Car, CarPermission, AdminUser } from '../types';
+import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
 export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
@@ -502,6 +502,22 @@ export const directusApi = {
       console.error('Error fetching car brands:', error);
       return [];
     }
+  },
+
+  getMaintenanceHistory: async (carId: string): Promise<MaintenanceHistory[]> => {
+    const response = await api.get('/items/maintenance_history', {
+      params: {
+        filter: { car_id: { _eq: carId } },
+        sort: '-date',
+        limit: -1
+      }
+    });
+    return response.data.data || [];
+  },
+
+  createMaintenanceHistory: async (data: Partial<MaintenanceHistory>): Promise<MaintenanceHistory> => {
+    const response = await api.post('/items/maintenance_history', data);
+    return response.data.data;
   },
 
   createCarBrand: async (data: { name: string }): Promise<any> => {

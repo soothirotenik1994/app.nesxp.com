@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
-import { Car as CarType } from '../types';
-import { AlertCircle, Wrench, Calendar, Gauge, Edit2, X, Loader2, Save, Car as CarIcon, Plus, Trash2 } from 'lucide-react';
+import { Car as CarType, MaintenanceHistory } from '../types';
+import { AlertCircle, Wrench, Calendar, Gauge, Edit2, X, Loader2, Save, Car as CarIcon, Plus, Trash2, History } from 'lucide-react';
 
 export const MaintenanceDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -11,6 +11,14 @@ export const MaintenanceDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<CarType | null>(null);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistory[]>([]);
+  const [newHistoryData, setNewHistoryData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    mileage: '',
+    service_type: '',
+    notes: ''
+  });
+  const [addingHistory, setAddingHistory] = useState(false);
   const [formData, setFormData] = useState({
     car_number: '',
     vehicle_type: '',
@@ -45,7 +53,7 @@ export const MaintenanceDashboard: React.FC = () => {
     fetchCars();
   }, []);
 
-  const handleOpenModal = (car: CarType) => {
+  const handleOpenModal = async (car: CarType) => {
     setEditingCar(car);
     const carImageId = (car.car_image && typeof car.car_image === 'object') ? (car.car_image as any).id : car.car_image;
     
@@ -62,7 +70,38 @@ export const MaintenanceDashboard: React.FC = () => {
       next_maintenance_mileage: (car as any).next_maintenance_mileage?.toString() || '',
       current_mileage: (car as any).current_mileage?.toString() || ''
     });
+    
+    try {
+      const history = await directusApi.getMaintenanceHistory(car.id);
+      setMaintenanceHistory(history);
+    } catch (err) {
+      console.error('Failed to fetch maintenance history', err);
+    }
+    
     setIsModalOpen(true);
+  };
+
+  const handleCreateHistory = async () => {
+    if (!editingCar) return;
+    setAddingHistory(true);
+    try {
+      const newRecord = await directusApi.createMaintenanceHistory({
+        ...newHistoryData,
+        car_id: editingCar.id,
+        mileage: Number(newHistoryData.mileage)
+      });
+      setMaintenanceHistory([...maintenanceHistory, newRecord]);
+      setNewHistoryData({
+        date: new Date().toISOString().split('T')[0],
+        mileage: '',
+        service_type: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Error creating maintenance record:', error);
+    } finally {
+      setAddingHistory(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,11 +169,36 @@ export const MaintenanceDashboard: React.FC = () => {
     return alerts;
   };
 
+  const allAlerts = useMemo(() => {
+    return cars.flatMap(car => checkMaintenance(car).map(alert => ({ ...alert, carNumber: car.car_number })));
+  }, [cars]);
+
+  const criticalAlerts = allAlerts.filter(a => a.color === 'text-red-500');
+  const warningAlerts = allAlerts.filter(a => a.color === 'text-yellow-500');
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">{t('maintenance_dashboard')}</h2>
-        <p className="text-slate-500">{t('maintenance_dashboard_desc')}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">{t('maintenance_dashboard')}</h2>
+          <p className="text-slate-500">{t('maintenance_dashboard_desc')}</p>
+        </div>
+        {allAlerts.length > 0 && (
+          <div className="flex gap-4">
+            {criticalAlerts.length > 0 && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold">
+                <AlertCircle className="w-5 h-5" />
+                {criticalAlerts.length} {t('critical_alerts')}
+              </div>
+            )}
+            {warningAlerts.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold">
+                <AlertCircle className="w-5 h-5" />
+                {warningAlerts.length} {t('warning_alerts')}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -221,6 +285,54 @@ export const MaintenanceDashboard: React.FC = () => {
                 </button>
               </div>
             </form>
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-4">{t('maintenance_history')}</h3>
+              <div className="space-y-4">
+                {maintenanceHistory.map((record) => (
+                  <div key={record.id} className="bg-gray-50 p-4 rounded-md">
+                    <p className="text-sm text-gray-600">{record.date} - {record.mileage} km</p>
+                    <p className="font-medium">{record.service_type}</p>
+                    <p className="text-sm">{record.notes}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 space-y-2">
+                <input
+                  type="date"
+                  value={newHistoryData.date}
+                  onChange={(e) => setNewHistoryData({ ...newHistoryData, date: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+                <input
+                  type="number"
+                  placeholder={t('history_mileage')}
+                  value={newHistoryData.mileage}
+                  onChange={(e) => setNewHistoryData({ ...newHistoryData, mileage: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+                <input
+                  type="text"
+                  placeholder={t('history_service_type')}
+                  value={newHistoryData.service_type}
+                  onChange={(e) => setNewHistoryData({ ...newHistoryData, service_type: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+                <input
+                  type="text"
+                  placeholder={t('history_notes')}
+                  value={newHistoryData.notes}
+                  onChange={(e) => setNewHistoryData({ ...newHistoryData, notes: e.target.value })}
+                  className="w-full p-2 border rounded"
+                />
+                <button
+                  onClick={handleCreateHistory}
+                  disabled={addingHistory}
+                  className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+                >
+                  {addingHistory ? '...' : t('save_maintenance_record')}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
