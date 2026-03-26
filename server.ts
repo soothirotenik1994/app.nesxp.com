@@ -13,7 +13,7 @@ async function startServer() {
     try {
       const response = await axios.get(`${process.env.DIRECTUS_URL || 'https://data.nesxp.com'}/items/line_settings/1`, {
         headers: {
-          'Authorization': `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+          'Authorization': `Bearer ${process.env.VITE_DIRECTUS_STATIC_TOKEN || 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4'}`
         }
       });
       return response.data.data;
