@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Car as CarType, Member } from '../types';
 import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { clsx } from 'clsx';
 
 // Memoized CarCard component to prevent unnecessary re-renders
 const CarCard = React.memo(({ 
@@ -60,10 +60,12 @@ const CarCard = React.memo(({
     return membersList.filter(name => name !== car.owner_name);
   }, [car.car_users, car.id, allPermissions, allMembers, car.owner_name]);
 
+  const isAssigned = !!car.owner_name;
+
   return (
     <div className={clsx(
-      "rounded-2xl border transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md",
-      car.owner_name ? "border-red-500 bg-white" : "border-slate-200 bg-white hover:border-primary/30"
+      "bg-white rounded-2xl border transition-all group overflow-hidden flex flex-col shadow-sm hover:shadow-md",
+      isAssigned ? "border-slate-200" : "border-slate-200 hover:border-primary/30"
     )}>
       <div className="relative h-48 bg-slate-100 overflow-hidden">
         {imageId ? (
@@ -96,10 +98,7 @@ const CarCard = React.memo(({
         )}
         {car.vehicle_type && (
           <div className="absolute bottom-3 left-3">
-            <span className={clsx(
-              "backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm",
-              car.owner_name ? "bg-red-500/90" : "bg-primary/90"
-            )}>
+            <span className="bg-primary/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
               {car.vehicle_type}
             </span>
           </div>
@@ -123,10 +122,7 @@ const CarCard = React.memo(({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('driver_name')}</p>
-            <p className={clsx(
-              "text-sm font-bold truncate",
-              car.owner_name ? "text-red-600" : "text-slate-700"
-            )}>{car.owner_name || 'N/A'}</p>
+            <p className="text-sm text-slate-700 font-bold truncate">{car.owner_name || 'N/A'}</p>
           </div>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>

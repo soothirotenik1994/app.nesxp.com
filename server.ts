@@ -236,7 +236,7 @@ async function startServer() {
       const settings = await getLineSettingsFromDirectus();
       const accessToken = settings?.channel_access_token;
 
-      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken });
+      console.log('Backend: Received request to broadcast LINE message', { recipientsCount: Array.isArray(to) ? to.length : 1, hasToken: !!accessToken, body: req.body });
 
       if (!accessToken) {
         return res.status(500).json({ error: "LINE_CHANNEL_ACCESS_TOKEN is not configured in Directus" });
@@ -270,8 +270,17 @@ async function startServer() {
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
       console.error("LINE broadcast error details:", errorData);
+      
+      // Provide more helpful error messages for common LINE errors
+      let helpfulMessage = "Failed to broadcast LINE message";
+      if (error.response?.status === 401) {
+        helpfulMessage = "Invalid LINE Channel Access Token.";
+      } else if (error.response?.status === 400) {
+        helpfulMessage = `LINE API Error: ${JSON.stringify(errorData)}`;
+      }
+
       res.status(500).json({ 
-        error: "Failed to broadcast LINE message", 
+        error: helpfulMessage, 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
       });
     }

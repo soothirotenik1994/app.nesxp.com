@@ -2924,7 +2924,7 @@ export const JobReport: React.FC = () => {
               </label>
               <select 
                 required
-                disabled={!!id && !isAdmin}
+                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== formData.driver_id}
                 value={formData.driver_id}
                 onChange={e => {
                   const selectedId = e.target.value;

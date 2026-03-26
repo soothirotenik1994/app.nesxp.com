@@ -20,6 +20,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
     picture: localStorage.getItem('user_picture') || ''
   });
   
+  const isAdmin = localStorage.getItem('user_role')?.toLowerCase() === 'administrator' || localStorage.getItem('user_role')?.toLowerCase() === 'admin';
+  
   const handleLogout = () => {
     // Clear all auth-related items from localStorage
     const itemsToRemove = [
@@ -53,13 +55,15 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <Link 
-          to="/jobs/new"
-          className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span className="hidden sm:inline">{t('new_job_assignment')}</span>
-        </Link>
+        {isAdmin && (
+          <Link 
+            to="/jobs/new"
+            className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('new_job_assignment')}</span>
+          </Link>
+        )}
         <LanguageSwitcher />
         
         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
