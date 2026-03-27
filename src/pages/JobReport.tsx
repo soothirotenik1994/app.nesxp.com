@@ -21,6 +21,7 @@ import {
   FileText, 
   Camera, 
   Send, 
+  Save,
   Loader2, 
   CheckCircle2,
   Circle,
@@ -270,9 +271,52 @@ export const JobReport: React.FC = () => {
     message: string;
     action?: () => void;
   }>({ type: 'success', title: '', message: '' });
-  const [photos, setPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
+  
+  // Separate photo states
+  const [pickupPhotos, setPickupPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
+  const [deliveryPhotos, setDeliveryPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
+  const [documentPhotos, setDocumentPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
+  
+  const renderPhotoSection = (
+    title: string, 
+    photos: {file: File, metadata: any, preview: string}[], 
+    existingPhotos: string[],
+    type: 'pickup' | 'delivery' | 'document',
+    onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
+    onRemove: (index: number) => void
+  ) => (
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        {existingPhotos.map((fileId, i) => (
+          <div key={`existing-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
+            <img src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} alt="existing" className="w-full h-full object-cover" />
+            <button onClick={() => {}} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        {photos.map((p, i) => (
+          <div key={`new-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
+            <img src={p.preview} alt="preview" className="w-full h-full object-cover" />
+            <button onClick={() => onRemove(i)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <label className="flex items-center justify-center gap-2 w-full py-3 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200 transition-colors">
+        <Camera className="w-5 h-5 text-slate-600" />
+        <span className="font-semibold text-slate-700">อัปโหลดภาพ</span>
+        <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
+      </label>
+    </div>
+  );
+  
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
-  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
+  const [existingPickupPhotos, setExistingPickupPhotos] = useState<string[]>([]);
+  const [existingDeliveryPhotos, setExistingDeliveryPhotos] = useState<string[]>([]);
+  const [existingDocumentPhotos, setExistingDocumentPhotos] = useState<string[]>([]);
   const [initialValues, setInitialValues] = useState<any>({
     standby_time: '',
     departure_time: '',
@@ -396,13 +440,17 @@ export const JobReport: React.FC = () => {
             carId: String(initialData.car_id)
           });
           
-          if (report.photos && Array.isArray(report.photos)) {
-            const photoIds = report.photos.map((p: any) => typeof p === 'string' ? p : p.id);
-            setExistingPhotos(photoIds);
-            const previews = photoIds.map((fileId: string) => {
-              return directusApi.getFileUrl(fileId, { key: 'system-large-contain' });
-            });
-            setPhotoPreviews(previews);
+          if (report.pickup_photos && Array.isArray(report.pickup_photos)) {
+            const photoIds = report.pickup_photos.map((p: any) => typeof p === 'string' ? p : p.id);
+            setExistingPickupPhotos(photoIds);
+          }
+          if (report.delivery_photos && Array.isArray(report.delivery_photos)) {
+            const photoIds = report.delivery_photos.map((p: any) => typeof p === 'string' ? p : p.id);
+            setExistingDeliveryPhotos(photoIds);
+          }
+          if (report.document_photos && Array.isArray(report.document_photos)) {
+            const photoIds = report.document_photos.map((p: any) => typeof p === 'string' ? p : p.id);
+            setExistingDocumentPhotos(photoIds);
           }
         } else {
           if (!isAdmin) {
@@ -444,14 +492,16 @@ export const JobReport: React.FC = () => {
     }
   }, [formData.driver_id, members]);
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pickup' | 'delivery' | 'document') => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
     setSubmitting(true);
     try {
-      const newPhotos = [...photos];
-      const newPreviews = [...photoPreviews];
+      let newPhotos: any[] = [];
+      if (type === 'pickup') newPhotos = [...pickupPhotos];
+      else if (type === 'delivery') newPhotos = [...deliveryPhotos];
+      else newPhotos = [...documentPhotos];
 
       for (const file of files) {
         // Extract EXIF data
@@ -497,11 +547,15 @@ export const JobReport: React.FC = () => {
           metadata,
           preview: previewUrl
         } as any);
-        newPreviews.push(previewUrl);
       }
 
-      setPhotos(newPhotos);
-      setPhotoPreviews(newPreviews);
+      if (type === 'pickup') {
+        setPickupPhotos(newPhotos);
+      } else if (type === 'delivery') {
+        setDeliveryPhotos(newPhotos);
+      } else {
+        setDocumentPhotos(newPhotos);
+      }
     } catch (err) {
       console.error("Error processing photos:", err);
       setError("Error processing photos. Please try again.");
@@ -510,16 +564,14 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const removePhoto = (index: number) => {
-    // If it's an existing photo (index < existingPhotos.length)
-    if (index < existingPhotos.length) {
-      setExistingPhotos(prev => prev.filter((_, i) => i !== index));
+  const removePhoto = (index: number, type: 'pickup' | 'delivery' | 'document') => {
+    if (type === 'pickup') {
+      setPickupPhotos(prev => prev.filter((_, i) => i !== index));
+    } else if (type === 'delivery') {
+      setDeliveryPhotos(prev => prev.filter((_, i) => i !== index));
     } else {
-      // It's a new photo
-      const newPhotoIndex = index - existingPhotos.length;
-      setPhotos(prev => prev.filter((_, i) => i !== newPhotoIndex));
+      setDocumentPhotos(prev => prev.filter((_, i) => i !== index));
     }
-    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const sendLineNotification = async (to: string, messages: any[], altText: string) => {
@@ -1019,14 +1071,16 @@ export const JobReport: React.FC = () => {
       }
 
       // 1. Upload new photos to Directus if any
-      const uploadedPhotoIds: string[] = [];
+      const pickupPhotoIds: string[] = [];
+      const deliveryPhotoIds: string[] = [];
+      const documentPhotoIds: string[] = [];
       const newPhotoMetadata: any[] = [];
       
-      if (photos.length > 0) {
+      const uploadPhotos = async (photos: any[], targetArray: string[]) => {
         for (const photoObj of photos) {
           try {
             const fileId = await directusApi.uploadFile(photoObj.file);
-            uploadedPhotoIds.push(fileId);
+            targetArray.push(fileId);
             
             if (photoObj.metadata) {
               newPhotoMetadata.push({
@@ -1042,13 +1096,17 @@ export const JobReport: React.FC = () => {
             throw new Error(`Failed to upload photo: ${detail}`);
           }
         }
-      }
+      };
+
+      await uploadPhotos(pickupPhotos, pickupPhotoIds);
+      await uploadPhotos(deliveryPhotos, deliveryPhotoIds);
+      await uploadPhotos(documentPhotos, documentPhotoIds);
 
       // 1.6 Mandatory photos check for drivers
-      if (!isAdmin && id) {
-        const totalPhotos = (existingPhotos.length + uploadedPhotoIds.length);
-        if (totalPhotos < 2) {
-          setError(t('mandatory_photos_error'));
+      if (!isAdmin && id && formData.status === 'completed') {
+        // Require at least one photo for each category: pickup, delivery
+        if (pickupPhotos.length === 0 || deliveryPhotos.length === 0) {
+          setError("กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ");
           setSubmitting(false);
           return;
         }
@@ -1104,10 +1162,6 @@ export const JobReport: React.FC = () => {
         const val = parseInt(formData.mileage_end.toString());
         if (!isNaN(val)) {
           reportData.mileage_end = val;
-          // If driver finishes the job, mark as completed
-          if (formData.status === 'accepted') {
-            reportData.status = 'completed';
-          }
         }
       }
 
@@ -1135,10 +1189,10 @@ export const JobReport: React.FC = () => {
         reportData.status = formData.status;
       }
 
-      if (uploadedPhotoIds.length > 0 || existingPhotos.length > 0) {
-        reportData.photos = [...existingPhotos, ...uploadedPhotoIds];
-        reportData.photo_metadata = [...(formData.photo_metadata || []), ...newPhotoMetadata];
-      }
+      reportData.pickup_photos = [...existingPickupPhotos, ...pickupPhotoIds];
+      reportData.delivery_photos = [...existingDeliveryPhotos, ...deliveryPhotoIds];
+      reportData.document_photos = [...existingDocumentPhotos, ...documentPhotoIds];
+      reportData.photo_metadata = [...(formData.photo_metadata || []), ...newPhotoMetadata];
       
       console.log('Submitting report data:', reportData);
 
@@ -1919,6 +1973,20 @@ export const JobReport: React.FC = () => {
 
   const handleCompleteJob = async () => {
     if (!id) return;
+    
+    // Mandatory photos check
+    if (!isAdmin) {
+      if (pickupPhotos.length === 0 || deliveryPhotos.length === 0) {
+        setStatusConfig({
+          type: 'error',
+          title: t('incomplete_info'),
+          message: "กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ"
+        });
+        setShowStatusModal(true);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await directusApi.updateWorkReport(id, { status: 'completed' });
@@ -2237,7 +2305,9 @@ export const JobReport: React.FC = () => {
                 mileage_start: formData.mileage_end, // Carry over end mileage as new start
                 mileage_end: ''
               });
-              setPhotos([]);
+              setPickupPhotos([]);
+              setDeliveryPhotos([]);
+              setDocumentPhotos([]);
               setPhotoPreviews([]);
             }}
             className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100"
@@ -3130,98 +3200,44 @@ export const JobReport: React.FC = () => {
             </label>
             
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {photoPreviews.map((preview, index) => {
-                // Find metadata for this photo
-                let meta: any = null;
-                if (index < existingPhotos.length) {
-                  const fileId = existingPhotos[index];
-                  meta = formData.photo_metadata?.find((m: any) => m.file_id === fileId);
-                } else {
-                  const newPhotoIndex = index - existingPhotos.length;
-                  meta = photos[newPhotoIndex]?.metadata;
-                }
+              {renderPhotoSection("ภาพตอนขึ้นของ (Pickup)", pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'))}
+              {renderPhotoSection("ภาพตอนส่งของ (Delivery)", deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'))}
+              {renderPhotoSection("ภาพเอกสาร (Document)", documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'))}
 
-                return (
-                  <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group">
-                    <img 
-                      src={preview} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
-                      referrerPolicy="no-referrer"
-                      onClick={() => setFullscreenImage(preview)}
-                    />
-                    
-                    {meta && (
-                      <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-[8px] text-white leading-tight">
-                        {meta.timestamp && <div>{meta.timestamp}</div>}
-                        {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
-                      </div>
-                    )}
-
-                    <button 
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-              <label className={clsx(
-                "aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1 transition-colors",
-                !isEditable ? "bg-slate-100 cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"
-              )}>
-                <Plus className="w-6 h-6 text-slate-400" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase">{t('add_photo')}</span>
-                <input 
-                  type="file" 
-                  multiple 
-                  disabled={!isEditable}
-                  accept="image/*" 
-                  onChange={handlePhotoChange} 
-                  className="hidden" 
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <FileText className="w-4 h-4" /> {t('notes')}
-            </label>
-            <textarea 
-              rows={3}
-              disabled={!isEditable}
-              placeholder={t('notes')}
-              value={formData.notes || ''}
-              onChange={e => setFormData({...formData, notes: e.target.value})}
-              className={clsx(
-                "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
-                !isEditable ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-              )}
-            />
           </div>
         </div>
+      </div>
 
-
-        <button 
-          type="submit"
-          disabled={submitting || !isEditable}
-          className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              {id ? t('loading') : t('loading')}
-            </>
-          ) : (
-            <>
-              <Send className="w-5 h-5" />
-              {id ? t('submit_report') : t('submit_report')}
-            </>
+        {/* Action Buttons */}
+        <div className="space-y-4">
+          {!isAdmin && formData.status === 'accepted' && (
+            <button
+              type="button"
+              onClick={handleCompleteJob}
+              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
+            >
+              จัดส่งสำเร็จ
+            </button>
           )}
-        </button>
+
+          <button 
+            type="submit"
+            disabled={submitting || !isEditable}
+            className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {t('loading')}
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                บันทึกข้อมูล
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* Fullscreen Image Preview */}
