@@ -320,7 +320,11 @@ const resources = {
       "contact_name": "Contact Name",
       "contact_phone": "Contact Phone",
       "arrival_before_departure_error": "Arrival time cannot be before departure time",
-      "export_excel": "Export Excel"
+      "export_excel": "Export Excel",
+      "secure_system_footer": "Secure Logistics Management System",
+      "all_rights_reserved": "All rights reserved.",
+      "permission_error_directus": "Permission Error: Please enable \"Public\" Read access for \"line_users\" in Directus Settings.",
+      "network_error": "Network Error: Cannot connect to database server."
     }
   },
   th: {
@@ -640,7 +644,11 @@ const resources = {
       "contact_name": "ผู้ติดต่อ",
       "contact_phone": "เบอร์โทรศัพท์",
       "arrival_before_departure_error": "เวลาถึงต้องไม่น้อยกว่าเวลาออกเดินทาง",
-      "export_excel": "ส่งออก Excel"
+      "export_excel": "ส่งออก Excel",
+      "secure_system_footer": "ระบบจัดการโลจิสติกส์ที่ปลอดภัย",
+      "all_rights_reserved": "สงวนลิขสิทธิ์",
+      "permission_error_directus": "ข้อผิดพลาดเกี่ยวกับสิทธิ์: โปรดเปิดสิทธิ์การอ่านแบบสาธารณะ (Public Read) สำหรับ \"line_users\" ในการตั้งค่า Directus",
+      "network_error": "ข้อผิดพลาดของเครือข่าย: ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ฐานข้อมูลได้"
     }
   }
 };
