@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || 'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn';
+export const STATIC_API_KEY = 'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
