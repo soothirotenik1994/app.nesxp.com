@@ -25,6 +25,7 @@ export const SystemSettings: React.FC = () => {
     const fetchSettings = async () => {
       try {
         const settings = await directusApi.getSystemSettings();
+        console.log('Fetched settings from Directus:', settings);
         if (settings) {
           setFormData(prev => ({
             ...prev,
@@ -35,10 +36,10 @@ export const SystemSettings: React.FC = () => {
           }));
           
           // Sync to localStorage for immediate use in app
-          if (settings.website_name) localStorage.setItem('website_name', settings.website_name);
-          if (settings.website_logo) localStorage.setItem('website_logo', settings.website_logo);
-          if (settings.website_background) localStorage.setItem('website_background', settings.website_background);
-          if (settings.app_url) localStorage.setItem('app_url', settings.app_url);
+          localStorage.setItem('website_name', settings.website_name || '');
+          localStorage.setItem('website_logo', settings.website_logo || '');
+          localStorage.setItem('website_background', settings.website_background || '');
+          localStorage.setItem('app_url', settings.app_url || '');
         }
       } catch (error) {
         console.error('Failed to fetch settings from Directus:', error);

@@ -98,7 +98,8 @@ export const LineBroadcast: React.FC = () => {
       setIsScheduled(false);
     } catch (error: any) {
       console.error('Broadcast failed:', error);
-      setStatus({ type: 'error', message: `Failed: ${error.message}` });
+      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message;
+      setStatus({ type: 'error', message: `Failed: ${errorMessage}` });
     } finally {
       setIsSending(false);
     }

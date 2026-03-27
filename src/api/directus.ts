@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || 'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -410,12 +410,13 @@ export const directusApi = {
       try {
         const response = await api.patch('/items/system_settings/1', data);
         return response.data.data;
-      } catch (e) {
+      } catch (e: any) {
+        console.error('Patch failed, trying post:', e.response?.data || e.message);
         const response = await api.post('/items/system_settings', { id: 1, ...data });
         return response.data.data;
       }
-    } catch (error) {
-      console.error('Error updating system settings:', error);
+    } catch (error: any) {
+      console.error('Error updating system settings:', error.response?.data || error.message);
       throw error;
     }
   },
