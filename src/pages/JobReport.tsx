@@ -272,51 +272,9 @@ export const JobReport: React.FC = () => {
     action?: () => void;
   }>({ type: 'success', title: '', message: '' });
   
-  // Separate photo states
-  const [pickupPhotos, setPickupPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
-  const [deliveryPhotos, setDeliveryPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
-  const [documentPhotos, setDocumentPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
-  
-  const renderPhotoSection = (
-    title: string, 
-    photos: {file: File, metadata: any, preview: string}[], 
-    existingPhotos: string[],
-    type: 'pickup' | 'delivery' | 'document',
-    onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
-    onRemove: (index: number) => void
-  ) => (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        {existingPhotos.map((fileId, i) => (
-          <div key={`existing-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
-            <img src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} alt="existing" className="w-full h-full object-cover" />
-            <button onClick={() => {}} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
-        {photos.map((p, i) => (
-          <div key={`new-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
-            <img src={p.preview} alt="preview" className="w-full h-full object-cover" />
-            <button onClick={() => onRemove(i)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
-      </div>
-      <label className="flex items-center justify-center gap-2 w-full py-3 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200 transition-colors">
-        <Camera className="w-5 h-5 text-slate-600" />
-        <span className="font-semibold text-slate-700">อัปโหลดภาพ</span>
-        <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
-      </label>
-    </div>
-  );
-  
+  const [photos, setPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
-  const [existingPickupPhotos, setExistingPickupPhotos] = useState<string[]>([]);
-  const [existingDeliveryPhotos, setExistingDeliveryPhotos] = useState<string[]>([]);
-  const [existingDocumentPhotos, setExistingDocumentPhotos] = useState<string[]>([]);
+  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
   const [initialValues, setInitialValues] = useState<any>({
     standby_time: '',
     departure_time: '',
@@ -440,17 +398,9 @@ export const JobReport: React.FC = () => {
             carId: String(initialData.car_id)
           });
           
-          if (report.pickup_photos && Array.isArray(report.pickup_photos)) {
-            const photoIds = report.pickup_photos.map((p: any) => typeof p === 'string' ? p : p.id);
-            setExistingPickupPhotos(photoIds);
-          }
-          if (report.delivery_photos && Array.isArray(report.delivery_photos)) {
-            const photoIds = report.delivery_photos.map((p: any) => typeof p === 'string' ? p : p.id);
-            setExistingDeliveryPhotos(photoIds);
-          }
-          if (report.document_photos && Array.isArray(report.document_photos)) {
-            const photoIds = report.document_photos.map((p: any) => typeof p === 'string' ? p : p.id);
-            setExistingDocumentPhotos(photoIds);
+          if (report.photos && Array.isArray(report.photos)) {
+            const photoIds = report.photos.map((p: any) => typeof p === 'string' ? p : p.id);
+            setExistingPhotos(photoIds);
           }
         } else {
           if (!isAdmin) {
@@ -492,16 +442,13 @@ export const JobReport: React.FC = () => {
     }
   }, [formData.driver_id, members]);
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pickup' | 'delivery' | 'document') => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
     setSubmitting(true);
     try {
-      let newPhotos: any[] = [];
-      if (type === 'pickup') newPhotos = [...pickupPhotos];
-      else if (type === 'delivery') newPhotos = [...deliveryPhotos];
-      else newPhotos = [...documentPhotos];
+      const newPhotos = [...photos];
 
       for (const file of files) {
         // Extract EXIF data
@@ -549,13 +496,7 @@ export const JobReport: React.FC = () => {
         } as any);
       }
 
-      if (type === 'pickup') {
-        setPickupPhotos(newPhotos);
-      } else if (type === 'delivery') {
-        setDeliveryPhotos(newPhotos);
-      } else {
-        setDocumentPhotos(newPhotos);
-      }
+      setPhotos(newPhotos);
     } catch (err) {
       console.error("Error processing photos:", err);
       setError("Error processing photos. Please try again.");
@@ -564,14 +505,8 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const removePhoto = (index: number, type: 'pickup' | 'delivery' | 'document') => {
-    if (type === 'pickup') {
-      setPickupPhotos(prev => prev.filter((_, i) => i !== index));
-    } else if (type === 'delivery') {
-      setDeliveryPhotos(prev => prev.filter((_, i) => i !== index));
-    } else {
-      setDocumentPhotos(prev => prev.filter((_, i) => i !== index));
-    }
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const sendLineNotification = async (to: string, messages: any[], altText: string) => {
@@ -1071,16 +1006,14 @@ export const JobReport: React.FC = () => {
       }
 
       // 1. Upload new photos to Directus if any
-      const pickupPhotoIds: string[] = [];
-      const deliveryPhotoIds: string[] = [];
-      const documentPhotoIds: string[] = [];
+      const photoIds: string[] = [];
       const newPhotoMetadata: any[] = [];
       
-      const uploadPhotos = async (photos: any[], targetArray: string[]) => {
+      const uploadPhotos = async (photos: any[]) => {
         for (const photoObj of photos) {
           try {
             const fileId = await directusApi.uploadFile(photoObj.file);
-            targetArray.push(fileId);
+            photoIds.push(fileId);
             
             if (photoObj.metadata) {
               newPhotoMetadata.push({
@@ -1098,19 +1031,7 @@ export const JobReport: React.FC = () => {
         }
       };
 
-      await uploadPhotos(pickupPhotos, pickupPhotoIds);
-      await uploadPhotos(deliveryPhotos, deliveryPhotoIds);
-      await uploadPhotos(documentPhotos, documentPhotoIds);
-
-      // 1.6 Mandatory photos check for drivers
-      if (!isAdmin && id && formData.status === 'completed') {
-        // Require at least one photo for each category: pickup, delivery
-        if (pickupPhotos.length === 0 || deliveryPhotos.length === 0) {
-          setError("กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ");
-          setSubmitting(false);
-          return;
-        }
-      }
+      await uploadPhotos(photos);
 
       // 1.7 Mileage validation check
       if (formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id)) {
@@ -1189,9 +1110,7 @@ export const JobReport: React.FC = () => {
         reportData.status = formData.status;
       }
 
-      reportData.pickup_photos = [...existingPickupPhotos, ...pickupPhotoIds];
-      reportData.delivery_photos = [...existingDeliveryPhotos, ...deliveryPhotoIds];
-      reportData.document_photos = [...existingDocumentPhotos, ...documentPhotoIds];
+      reportData.photos = [...existingPhotos, ...photoIds];
       reportData.photo_metadata = [...(formData.photo_metadata || []), ...newPhotoMetadata];
       
       console.log('Submitting report data:', reportData);
@@ -1976,11 +1895,11 @@ export const JobReport: React.FC = () => {
     
     // Mandatory photos check
     if (!isAdmin) {
-      if (pickupPhotos.length === 0 || deliveryPhotos.length === 0) {
+      if (photos.length === 0 && existingPhotos.length === 0) {
         setStatusConfig({
           type: 'error',
           title: t('incomplete_info'),
-          message: "กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ"
+          message: "กรุณาอัปโหลดภาพถ่ายการทำงาน"
         });
         setShowStatusModal(true);
         return;
@@ -2218,9 +2137,9 @@ export const JobReport: React.FC = () => {
 👉 ${t('standby_time')} : ${formatDisplayDT(formData.standby_time)}
 👉 ${t('departure_time')} : ${formatDisplayDT(formData.departure_time)}
 👉 ${t('arrival_time')} : ${formatDisplayDT(formData.arrival_time)}
-
+${!isCustomer ? `
 🍄 ${t('mileage_start')} : ${formData.mileage_start}
-🍄 ${t('mileage_end')} : ${formData.mileage_end}
+🍄 ${t('mileage_end')} : ${formData.mileage_end}` : ''}
 
 📌 ${t('notes')} : ${formData.notes || '-'}`;
   };
@@ -2305,9 +2224,8 @@ export const JobReport: React.FC = () => {
                 mileage_start: formData.mileage_end, // Carry over end mileage as new start
                 mileage_end: ''
               });
-              setPickupPhotos([]);
-              setDeliveryPhotos([]);
-              setDocumentPhotos([]);
+              setPhotos([]);
+              setExistingPhotos([]);
               setPhotoPreviews([]);
             }}
             className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100"
@@ -2315,162 +2233,6 @@ export const JobReport: React.FC = () => {
             {t('create_new_report')}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (isCustomer && id) {
-    return (
-      <div className="max-w-2xl mx-auto pb-12 space-y-6">
-        {/* Header Section */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">{t('job_details')}</h2>
-            <p className="text-slate-500">{t('tracking_your_delivery') || 'ติดตามสถานะการขนส่งของคุณ'}</p>
-          </div>
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Status Timeline */}
-        <StatusTimeline status={formData.status} />
-
-        {/* Driver & Vehicle Card */}
-        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
-              {selectedMember?.picture_url ? (
-                <img 
-                  src={directusApi.getFileUrl(selectedMember.picture_url)} 
-                  alt={selectedMember.display_name} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
-                  <User className="w-8 h-8" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{t('driver_name')}</p>
-              <h3 className="text-lg font-bold text-slate-900">
-                {selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : t('not_assigned')}
-              </h3>
-              <div className="flex items-center gap-3 mt-1">
-                {formData.phone && (
-                  <a 
-                    href={`tel:${formData.phone}`}
-                    className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
-                  >
-                    <Phone className="w-3 h-3" /> {formData.phone}
-                  </a>
-                )}
-              </div>
-            </div>
-            {selectedCar?.car_number && (
-              <button 
-                onClick={() => navigate(`/?vehicle=${selectedCar.car_number}`)}
-                className="bg-primary text-white p-4 rounded-2xl shadow-lg shadow-blue-100 hover:scale-105 active:scale-95 transition-all"
-                title="Track GPS"
-              >
-                <MapPin className="w-6 h-6" />
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('car_number')}</p>
-              <div className="flex items-center gap-2 text-slate-700">
-                <Truck className="w-4 h-4 text-primary" />
-                <span className="font-bold">{selectedCar?.car_number || '-'}</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('vehicle_type')}</p>
-              <div className="flex items-center gap-2 text-slate-700">
-                <Package className="w-4 h-4 text-primary" />
-                <span className="font-bold">{formData.vehicle_type || '-'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Job Details Grid */}
-        <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InfoRow icon={<Calendar className="w-3 h-3" />} label={t('report_date')} value={formData.work_date.replace('T', ' ')} />
-            <InfoRow icon={<Building2 className="w-3 h-3" />} label={t('customer_name')} value={formData.customer_name} />
-            <InfoRow icon={<MapPin className="w-3 h-3 text-emerald-500" />} label={t('origin')} value={formData.origin} />
-            <InfoRow icon={<MapPin className="w-3 h-3 text-red-500" />} label={t('destination')} value={formData.destination} />
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('standby_time')}</p>
-              <p className="text-xs font-bold text-slate-700">{formData.standby_time ? new Date(formData.standby_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('departure_time')}</p>
-              <p className="text-xs font-bold text-slate-700">{formData.departure_time ? new Date(formData.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('arrival_time')}</p>
-              <p className="text-xs font-bold text-slate-700">{formData.arrival_time ? new Date(formData.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
-            </div>
-          </div>
-
-          {formData.notes && (
-            <div className="pt-6 border-t border-slate-50">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('notes')}</p>
-              <p className="text-sm text-slate-600 italic leading-relaxed bg-slate-50 p-4 rounded-2xl">
-                "{formData.notes}"
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Photos Section */}
-        {photoPreviews.length > 0 && (
-          <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <Camera className="w-5 h-5 text-primary" /> {t('photos')}
-              </h3>
-              <span className="text-xs font-bold text-slate-400">{photoPreviews.length} {t('images') || 'รูปภาพ'}</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {photoPreviews.map((preview, index) => (
-                <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
-                  <img 
-                    src={preview} 
-                    alt="Job Photo" 
-                    className="w-full h-full object-cover cursor-pointer hover:scale-110 transition-transform duration-500"
-                    onClick={() => setFullscreenImage(preview)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Fullscreen Image Preview */}
-        {fullscreenImage && (
-          <div 
-            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
-            onClick={() => setFullscreenImage(null)}
-          >
-            <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
-              <X className="w-8 h-8" />
-            </button>
-            <img src={fullscreenImage} alt="Fullscreen" className="max-w-full max-h-full object-contain rounded-lg" />
-          </div>
-        )}
       </div>
     );
   }
@@ -3127,49 +2889,51 @@ export const JobReport: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4" /> {t('mileage_start')}
-                </label>
-                <input 
-                  type="number" 
-                  disabled={!isEditable || isFieldLocked('mileage_start')}
-                  placeholder="0"
-                  value={formData.mileage_start || ''}
-                  onChange={e => setFormData({...formData, mileage_start: e.target.value})}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('mileage_start')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4" /> {t('mileage_end')}
-                </label>
-                <input 
-                  type="number" 
-                  disabled={!isEditable || isFieldLocked('mileage_end')}
-                  placeholder="0"
-                  value={formData.mileage_end || ''}
-                  onChange={e => setFormData({...formData, mileage_end: e.target.value})}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('mileage_end')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Truck className="w-4 h-4" /> {t('total_distance')}
-                </label>
-                <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 font-bold flex items-center justify-between">
-                  <span>{totalDistance.toLocaleString()}</span>
-                  <span className="text-xs text-slate-400 font-normal">km</span>
+            {!isCustomer && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Gauge className="w-4 h-4" /> {t('mileage_start')}
+                  </label>
+                  <input 
+                    type="number" 
+                    disabled={!isEditable || isFieldLocked('mileage_start')}
+                    placeholder="0"
+                    value={formData.mileage_start || ''}
+                    onChange={e => setFormData({...formData, mileage_start: e.target.value})}
+                    className={clsx(
+                      "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                      (!isEditable || isFieldLocked('mileage_start')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Gauge className="w-4 h-4" /> {t('mileage_end')}
+                  </label>
+                  <input 
+                    type="number" 
+                    disabled={!isEditable || isFieldLocked('mileage_end')}
+                    placeholder="0"
+                    value={formData.mileage_end || ''}
+                    onChange={e => setFormData({...formData, mileage_end: e.target.value})}
+                    className={clsx(
+                      "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                      (!isEditable || isFieldLocked('mileage_end')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Truck className="w-4 h-4" /> {t('total_distance')}
+                  </label>
+                  <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 font-bold flex items-center justify-between">
+                    <span>{totalDistance.toLocaleString()}</span>
+                    <span className="text-xs text-slate-400 font-normal">km</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id) && (
               <div className="p-4 bg-red-50 rounded-2xl border border-red-200 flex items-start gap-3">
@@ -3199,11 +2963,59 @@ export const JobReport: React.FC = () => {
               <Camera className="w-4 h-4" /> {t('upload_photos')}
             </label>
             
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {renderPhotoSection("ภาพตอนขึ้นของ (Pickup)", pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'))}
-              {renderPhotoSection("ภาพตอนส่งของ (Delivery)", deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'))}
-              {renderPhotoSection("ภาพเอกสาร (Document)", documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'))}
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {existingPhotos.map((fileId, i) => (
+              <div key={`existing-${i}`} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                <img 
+                  src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} 
+                  alt="Existing" 
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  referrerPolicy="no-referrer"
+                  onClick={() => setFullscreenImage(directusApi.getFileUrl(fileId))}
+                />
+                {isEditable && (
+                  <button 
+                    type="button"
+                    onClick={() => setExistingPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+            
+            {photos.map((p, i) => (
+              <div key={`new-${i}`} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                <img 
+                  src={p.preview} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setFullscreenImage(p.preview)}
+                />
+                <button 
+                  type="button"
+                  onClick={() => removePhoto(i)}
+                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
 
+            {isEditable && (
+              <label className="relative aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-slate-100 hover:border-primary/30 transition-all group">
+                <Camera className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-primary transition-colors uppercase tracking-wider">{t('add_photo')}</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  multiple
+                  onChange={handlePhotoChange}
+                  className="hidden" 
+                />
+              </label>
+            )}
           </div>
         </div>
       </div>
