@@ -30,11 +30,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
     const fetchMember = async () => {
       if (!lineUserId || !isOpen) return;
       setLoading(true);
+      console.log('Fetching member for lineUserId:', lineUserId);
       try {
         const isAdmin = localStorage.getItem('is_admin') === 'true';
+        console.log('Is Admin:', isAdmin);
         
         if (isAdmin) {
           const user = await directusApi.getCurrentUser();
+          console.log('Admin user fetched:', user);
           const adminMember: Member = {
             id: user.id,
             line_user_id: user.id,
@@ -56,7 +59,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
           });
         } else {
           const members = await directusApi.getMembers();
+          console.log('All members fetched:', members);
           const found = members.find(m => m.line_user_id === lineUserId || m.id === lineUserId);
+          console.log('Member found:', found);
           
           if (found) {
             setMember(found);
@@ -71,6 +76,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
+        setError('Error fetching profile: ' + err);
       } finally {
         setLoading(false);
       }
@@ -173,7 +179,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
               <User className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">Member Not Found</h2>
-            <p className="text-slate-500 mb-6">We couldn't find your profile in our system.</p>
+            <p className="text-slate-500 mb-6">{error || "We couldn't find your profile in our system."}</p>
             <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">Close</button>
           </div>
         ) : (
