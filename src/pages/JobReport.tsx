@@ -1448,10 +1448,7 @@ export const JobReport: React.FC = () => {
               }
             ];
             
-            await axios.post('/api/line/send', {
-              to: lineId,
-              messages: messages
-            });
+            await lineService.sendPushMessage(lineId, messages);
             console.log('LINE notifications sent successfully');
           } else if (!notificationsEnabled) {
             console.log('Notifications are disabled in settings');

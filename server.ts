@@ -215,7 +215,6 @@ async function startServer() {
       res.json(response.data);
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
-      console.error("LINE error details:", errorData);
       
       // Provide more helpful error messages for common LINE errors
       let helpfulMessage = "Failed to send LINE message";
@@ -223,8 +222,17 @@ async function startServer() {
         helpfulMessage = "Invalid LINE Channel Access Token. Please check your token in AI Studio Secrets.";
       } else if (error.response?.status === 400) {
         helpfulMessage = `LINE API Error: ${errorData.message || 'Bad Request'}`;
+      } else if (errorData?.message?.includes('monthly limit')) {
+        helpfulMessage = "LINE Messaging API monthly limit reached. Notifications are temporarily disabled.";
+        console.warn("LINE monthly limit reached:", errorData);
+        return res.status(429).json({ 
+          error: helpfulMessage, 
+          details: errorData,
+          limitReached: true
+        });
       }
 
+      console.error("LINE error details:", errorData);
       res.status(500).json({ 
         error: helpfulMessage, 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
@@ -272,7 +280,6 @@ async function startServer() {
       res.json({ success: true, results });
     } catch (error: any) {
       const errorData = error.response?.data || error.message;
-      console.error("LINE broadcast error details:", errorData);
       
       // Provide more helpful error messages for common LINE errors
       let helpfulMessage = "Failed to broadcast LINE message";
@@ -280,8 +287,17 @@ async function startServer() {
         helpfulMessage = "Invalid LINE Channel Access Token.";
       } else if (error.response?.status === 400) {
         helpfulMessage = `LINE API Error: ${JSON.stringify(errorData)}`;
+      } else if (errorData?.message?.includes('monthly limit')) {
+        helpfulMessage = "LINE Messaging API monthly limit reached. Notifications are temporarily disabled.";
+        console.warn("LINE monthly limit reached (broadcast):", errorData);
+        return res.status(429).json({ 
+          error: helpfulMessage, 
+          details: errorData,
+          limitReached: true
+        });
       }
 
+      console.error("LINE broadcast error details:", errorData);
       res.status(500).json({ 
         error: helpfulMessage, 
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
