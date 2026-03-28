@@ -42,7 +42,7 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const steps = [
     { key: 'pending', label: t('status_pending') },
     { key: 'accepted', label: t('status_accepted') },
-    { key: 'arrived', label: 'Arrived' },
+    { key: 'arrived', label: t('status_arrived') },
     { key: 'completed', label: t('status_completed') }
   ];
 
@@ -133,6 +133,7 @@ export const JobReport: React.FC = () => {
     cancel_reason: '',
     status_logs: [] as any[],
     photo_metadata: [] as any[],
+    case_number: '',
     current_mileage: undefined as number | undefined,
     next_maintenance_date: undefined as string | undefined,
     next_maintenance_mileage: undefined as number | undefined
@@ -331,6 +332,18 @@ export const JobReport: React.FC = () => {
     // No redirect needed here, permissions are handled by the backend
   }, [id, isAdmin, navigate]);
 
+  const generateCaseNumber = () => {
+    const now = new Date();
+    const dateStr = now.getFullYear().toString() + 
+                    (now.getMonth() + 1).toString().padStart(2, '0') + 
+                    now.getDate().toString().padStart(2, '0');
+    const timeStr = now.getHours().toString().padStart(2, '0') + 
+                    now.getMinutes().toString().padStart(2, '0') + 
+                    now.getSeconds().toString().padStart(2, '0');
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `TH${dateStr}${timeStr}${random}`;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -428,6 +441,7 @@ export const JobReport: React.FC = () => {
             cancel_reason: report.cancel_reason || '',
             status_logs: report.status_logs || [],
             photo_metadata: report.photo_metadata || [],
+            case_number: report.case_number || '',
             current_mileage: report.car_id?.current_mileage,
             next_maintenance_date: report.car_id?.next_maintenance_date,
             next_maintenance_mileage: report.car_id?.next_maintenance_mileage
@@ -453,6 +467,9 @@ export const JobReport: React.FC = () => {
             setExistingDocumentPhotos(photoIds);
           }
         } else {
+          // Generate new case number for new reports
+          const newCaseNumber = generateCaseNumber();
+          
           if (!isAdmin) {
             // Pre-fill driver_id for new reports if user is a driver
             const memberId = localStorage.getItem('member_id');
@@ -462,10 +479,15 @@ export const JobReport: React.FC = () => {
               const memberPhone = member?.phone || (member as any)?.Phone || (member as any)?.phone_number || userPhone || '';
               setFormData(prev => ({
                 ...prev,
+                case_number: newCaseNumber,
                 driver_id: memberId,
                 phone: memberPhone || prev.phone
               }));
+            } else {
+              setFormData(prev => ({ ...prev, case_number: newCaseNumber }));
             }
+          } else {
+            setFormData(prev => ({ ...prev, case_number: newCaseNumber }));
           }
         }
       } catch (error) {
@@ -1187,6 +1209,7 @@ export const JobReport: React.FC = () => {
         if (formData.driver_id && formData.driver_id !== '') reportData.driver_id = formData.driver_id;
         if (formData.vehicle_type) reportData.vehicle_type = formData.vehicle_type;
         reportData.status = formData.status;
+        if (formData.case_number) reportData.case_number = formData.case_number;
       }
 
       reportData.pickup_photos = [...existingPickupPhotos, ...pickupPhotoIds];
@@ -1245,6 +1268,27 @@ export const JobReport: React.FC = () => {
         console.log('Creating new report...');
         const result = await directusApi.createWorkReport(reportData);
         console.log('Creation successful:', result);
+
+        // Generate case number: TH + DDMMYYYY + Sequence(4) + Random(4)
+        const generateCaseNumber = (id: number) => {
+          const date = new Date();
+          const dd = String(date.getDate()).padStart(2, '0');
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const yyyy = date.getFullYear();
+          const dateStr = `${dd}${mm}${yyyy}`;
+          const sequence = String(id).padStart(4, '0');
+          const random = Math.floor(1000 + Math.random() * 9000);
+          return `TH${dateStr}${sequence}${random}`;
+        };
+
+        const newCaseNumber = generateCaseNumber(result.id);
+        try {
+          await directusApi.updateWorkReport(result.id, { case_number: newCaseNumber });
+          result.case_number = newCaseNumber; // Update local object for notifications
+          console.log('Case number generated and saved:', newCaseNumber);
+        } catch (updateErr) {
+          console.error('Failed to update case number:', updateErr);
+        }
         
         // 1. Assign car to customer's members AND the driver
         if (currentCustomerId && currentCarId) {
@@ -1488,7 +1532,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "คนขับ",
+                                text: t('driver_label'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1529,10 +1573,7 @@ export const JobReport: React.FC = () => {
               }
             ];
             
-            await axios.post('/api/line/send', {
-              to: lineId,
-              messages: messages
-            });
+            await lineService.sendPushMessage(lineId, messages);
             console.log('LINE notifications sent successfully');
           } else if (!notificationsEnabled) {
             console.log('Notifications are disabled in settings');
@@ -1547,8 +1588,8 @@ export const JobReport: React.FC = () => {
           // Show error but don't return early, so customer notification can still be attempted
           setStatusConfig({
             type: 'error',
-            title: 'การแจ้งเตือน LINE ล้มเหลว',
-            message: `บันทึกงานแล้ว แต่ไม่สามารถส่งการแจ้งเตือน LINE ได้: ${errorDetails}`,
+            title: t('line_notification_failed'),
+            message: `${t('report_saved')}. ${t('line_notification_error_details')}: ${errorDetails}`,
             action: () => setShowStatusModal(false)
           });
           setShowStatusModal(true);
@@ -1980,7 +2021,7 @@ export const JobReport: React.FC = () => {
         setStatusConfig({
           type: 'error',
           title: t('incomplete_info'),
-          message: "กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ"
+          message: t('upload_required_photos_error')
         });
         setShowStatusModal(true);
         return;
@@ -2265,7 +2306,6 @@ export const JobReport: React.FC = () => {
           </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-bold text-slate-900">{t('report_submitted')}</h2>
-            <p className="text-slate-500">{t('report_saved')}</p>
           </div>
         </div>
 
@@ -2326,7 +2366,6 @@ export const JobReport: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">{t('job_details')}</h2>
-            <p className="text-slate-500">{t('tracking_your_delivery') || 'ติดตามสถานะการขนส่งของคุณ'}</p>
           </div>
           <button 
             onClick={() => navigate(-1)}
@@ -2404,6 +2443,7 @@ export const JobReport: React.FC = () => {
         {/* Job Details Grid */}
         <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InfoRow icon={<Hash className="w-3 h-3" />} label={t('case_number')} value={formData.case_number} />
             <InfoRow icon={<Calendar className="w-3 h-3" />} label={t('report_date')} value={formData.work_date.replace('T', ' ')} />
             <InfoRow icon={<Building2 className="w-3 h-3" />} label={t('customer_name')} value={formData.customer_name} />
             <InfoRow icon={<MapPin className="w-3 h-3 text-emerald-500" />} label={t('origin')} value={formData.origin} />
@@ -2479,8 +2519,14 @@ export const JobReport: React.FC = () => {
     <div className="max-w-2xl mx-auto pb-12">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">{id ? t('update_job_details') : t('new_job_assignment_title')}</h2>
-          <p className="text-slate-500">{id ? t('update_job_desc') : t('assign_new_job_desc')}</p>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-slate-900">{id ? t('update_job_details') : t('new_job_assignment_title')}</h2>
+            {formData.case_number && (
+              <span className="px-3 py-1 bg-blue-50 text-primary text-xs font-black rounded-full border border-blue-100 shadow-sm">
+                {formData.case_number}
+              </span>
+            )}
+          </div>
         </div>
         {id && (
           <div className="flex flex-wrap items-center gap-3">
@@ -2641,6 +2687,23 @@ export const JobReport: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Hash className="w-4 h-4" /> {t('case_number')}
+              </label>
+              <input 
+                type="text" 
+                disabled={true}
+                placeholder={t('case_number')}
+                value={formData.case_number || ''}
+                onChange={e => setFormData({...formData, case_number: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
+                )}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> {t('report_date')}
               </label>
               <input 
@@ -2659,7 +2722,7 @@ export const JobReport: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> {t('customer_name')}
               </label>

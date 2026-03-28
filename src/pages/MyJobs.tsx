@@ -126,6 +126,22 @@ export const MyJobs: React.FC = () => {
     return time.split(':').slice(0, 2).join(':');
   };
 
+  const formatCaseNumber = (report: WorkReport) => {
+    if (report.case_number) return report.case_number;
+    
+    // Fallback for existing reports
+    const date = new Date(report.work_date || report.date_created || Date.now());
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const dateStr = `${dd}${mm}${yyyy}`;
+    const sequence = String(report.id).padStart(4, '0');
+    
+    // Consistent "random" part based on ID
+    const random = Math.floor((Math.abs(Math.sin(Number(report.id)) * 10000) % 9000) + 1000);
+    return `TH${dateStr}${sequence}${random}`;
+  };
+
   const handleExportExcel = () => {
     const dataToExport = filteredReports.map(r => {
       const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
@@ -133,8 +149,7 @@ export const MyJobs: React.FC = () => {
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
       return {
-        'ID': r.id || '-',
-        'Case Number': r.case_number || '-',
+        'Case Number': formatCaseNumber(r),
         'Status': t(`status_${r.status || 'pending'}`),
         'Date': workDate,
         'Customer Name': r.customer_name || '-',
@@ -246,7 +261,6 @@ export const MyJobs: React.FC = () => {
         <h2 className="text-2xl font-bold text-slate-900">
           {isAdmin ? t('all_jobs') : t('my_assigned_jobs')}
         </h2>
-        <p className="text-slate-500">{t('select_job_to_update')}</p>
       </div>
 
       {reports.length === 0 ? (
@@ -332,7 +346,7 @@ export const MyJobs: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number') || 'Case No.'}</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('status')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('date')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
@@ -356,8 +370,8 @@ export const MyJobs: React.FC = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <Hash className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="font-mono text-sm font-bold text-slate-700">
-                              {report.id || '-'}
+                            <span className="font-mono text-xs font-bold text-slate-700">
+                              {formatCaseNumber(report)}
                             </span>
                           </div>
                         </td>

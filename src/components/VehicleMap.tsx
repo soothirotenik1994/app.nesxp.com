@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useTranslation } from 'react-i18next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CarStatus } from '../types';
@@ -49,6 +50,7 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
   center,
   zoom = 12
 }) => {
+  const { t } = useTranslation();
   const defaultCenter: [number, number] = [13.7563, 100.5018]; // Bangkok
 
   return (
@@ -80,14 +82,14 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                   vehicle.status === 'online' ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-600"
                 }`}>
-                  {vehicle.status}
+                  {vehicle.status === 'online' ? t('online') : t('offline')}
                 </span>
               </div>
               
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <Navigation className="w-3 h-3 text-slate-400" />
-                  <span className="font-medium">Speed: {vehicle.speed} km/h</span>
+                  <span className="font-medium">{t('speed')}: {vehicle.speed} km/h</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <MapPin className="w-3 h-3 text-slate-400" />
@@ -95,7 +97,7 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Clock className="w-3 h-3" />
-                  <span>Last Update: {format(new Date(vehicle.lastUpdate), 'HH:mm:ss')}</span>
+                  <span>{t('last_update')}: {format(new Date(vehicle.lastUpdate), 'HH:mm:ss')}</span>
                 </div>
               </div>
             </div>

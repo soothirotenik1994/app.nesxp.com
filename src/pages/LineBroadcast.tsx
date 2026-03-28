@@ -4,6 +4,7 @@ import axios from 'axios';
 import { MessageSquare, Send, Loader2, CheckCircle2, XCircle, User, Image as ImageIcon, Users, X, Plus } from 'lucide-react';
 import { directusApi } from '../api/directus';
 import { Member } from '../types';
+import { lineService } from '../services/lineService';
 
 export const LineBroadcast: React.FC = () => {
   const { t } = useTranslation();
@@ -81,10 +82,7 @@ export const LineBroadcast: React.FC = () => {
 
         console.log('Sending broadcast request:', { to: targets, messages });
 
-        await axios.post('/api/line/broadcast', {
-          to: targets,
-          messages: messages
-        });
+        await lineService.broadcastMessage(targets, messages);
       }
 
       // Save to Directus
@@ -109,7 +107,6 @@ export const LineBroadcast: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">LINE Broadcast</h1>
-        <p className="text-slate-500">Send or schedule messages to members</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">

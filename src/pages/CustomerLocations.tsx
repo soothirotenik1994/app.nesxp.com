@@ -209,7 +209,6 @@ export const CustomerLocations: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('customer_locations')}</h2>
-          <p className="text-slate-500">{t('manage_customer_locations')}</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
@@ -361,7 +360,7 @@ export const CustomerLocations: React.FC = () => {
                       <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
                         <User className="w-3.5 h-3.5 text-primary" />
                         <div className="flex flex-col">
-                          <p className="text-[10px] font-bold text-primary uppercase leading-none mb-1">{t('contact_person') || 'Contact Person'}</p>
+                          <p className="text-[10px] font-bold text-primary uppercase leading-none mb-1">{t('contact_person')}</p>
                           <p className="text-xs text-slate-700 font-medium">{loc.contact_name || '-'} {loc.contact_phone ? `(${loc.contact_phone})` : ''}</p>
                         </div>
                       </div>
@@ -409,7 +408,7 @@ export const CustomerLocations: React.FC = () => {
                   value={formData.company_name}
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g. ABC Logistics"
+                  placeholder={t('company_name')}
                 />
               </div>
 
@@ -421,7 +420,7 @@ export const CustomerLocations: React.FC = () => {
                     value={formData.tax_id}
                     onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Tax ID"
+                    placeholder={t('tax_id')}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -431,7 +430,7 @@ export const CustomerLocations: React.FC = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Phone Number"
+                    placeholder={t('phone')}
                   />
                 </div>
               </div>
@@ -444,7 +443,7 @@ export const CustomerLocations: React.FC = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Email Address"
+                    placeholder={t('email')}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -454,7 +453,7 @@ export const CustomerLocations: React.FC = () => {
                     value={formData.branch}
                     onChange={(e) => setFormData({...formData, branch: e.target.value})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Office/Branch"
+                    placeholder={t('branch')}
                   />
                 </div>
               </div>
@@ -508,7 +507,7 @@ export const CustomerLocations: React.FC = () => {
                   value={formData.address}
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary min-h-[80px]"
-                  placeholder="Full Address"
+                  placeholder={t('address')}
                 />
               </div>
               <div className="space-y-1.5">
@@ -571,7 +570,7 @@ export const CustomerLocations: React.FC = () => {
                       member_ids: selectedIds
                     });
                   }}
-                  placeholder={`-- ${t('select_role')} --`}
+                  placeholder={t('select_members')}
                   className="react-select-container"
                   classNamePrefix="react-select"
                   styles={{
@@ -615,7 +614,7 @@ export const CustomerLocations: React.FC = () => {
                   disabled={submitting}
                   className="flex-[2] px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center"
                 >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t('save')}
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingLocation ? t('save_changes') : t('add_customer_location'))}
                 </button>
               </div>
             </form>

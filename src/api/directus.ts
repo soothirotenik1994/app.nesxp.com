@@ -530,6 +530,16 @@ export const directusApi = {
     await api.delete(`/items/car_brands/${id}`);
   },
 
+  getItems: async (collection: string, params: any = {}): Promise<any[]> => {
+    const response = await api.get(`/items/${collection}`, { params });
+    return response.data.data;
+  },
+
+  updateItem: async (collection: string, id: string | number, data: any): Promise<any> => {
+    const response = await api.patch(`/items/${collection}/${id}`, data);
+    return response.data.data;
+  },
+
   createItem: async (collection: string, data: any): Promise<any> => {
     const response = await api.post(`/items/${collection}`, data);
     return response.data.data;
@@ -542,6 +552,51 @@ export const directusApi = {
       }
     });
     return response.data.data;
+  },
+
+  trackJob: async (caseNumber: string, phone: string): Promise<any> => {
+    try {
+      // 1. Find the job by case number
+      const response = await api.get('/items/work_reports', {
+        params: {
+          filter: {
+            case_number: { _eq: caseNumber }
+          },
+          fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+          limit: 1
+        }
+      });
+
+      const job = response.data.data[0];
+      if (!job) return null;
+
+      // 2. Verify phone number
+      // Normalize phone numbers for comparison (remove non-digits)
+      const normalize = (p: string) => p.replace(/\D/g, '');
+      const searchPhone = normalize(phone);
+
+      // Check driver phone
+      const driverPhone = normalize(job.driver_id?.phone || job.driver_id?.Phone || '');
+      if (driverPhone === searchPhone) return job;
+
+      // Check customer primary member phone
+      const customerMemberPhone = normalize(job.customer_id?.member_id?.phone || job.customer_id?.member_id?.Phone || '');
+      if (customerMemberPhone === searchPhone) return job;
+
+      // Check other customer members
+      if (job.customer_id?.members && Array.isArray(job.customer_id.members)) {
+        for (const m of job.customer_id.members) {
+          const mPhone = normalize(m.line_user_id?.phone || m.line_user_id?.Phone || '');
+          if (mPhone === searchPhone) return job;
+        }
+      }
+
+      // If no match
+      throw new Error('Verification failed: Phone number does not match this case.');
+    } catch (error) {
+      console.error('Tracking error:', error);
+      throw error;
+    }
   },
 
   logout: () => {

@@ -21,6 +21,7 @@ import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
 import { useEffect } from 'react';
 import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { SystemAlertProvider } from './context/SystemAlertContext';
 
 export default function App() {
   useEffect(() => {
@@ -53,36 +54,38 @@ export default function App() {
   }, []);
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/line/callback" element={<LineCallback />} />
-        
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/members" element={<Members />} />
-            <Route path="/cars" element={<Cars />} />
-            <Route path="/locations" element={<CustomerLocations />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/admins" element={<Admins />} />
-            <Route path="/jobs/new" element={<JobReport />} />
-            <Route path="/jobs/edit/:id" element={<JobReport />} />
-            <Route path="/jobs/my" element={<MyJobs />} />
-            <Route path="/jobs/calendar" element={<JobCalendar />} />
-            <Route path="/jobs/history" element={<JobHistory />} />
-            <Route path="/line/settings" element={<LineSettings />} />
-            <Route path="/line/api-settings" element={<LineApiSettings />} />
-            <Route path="/line/broadcast" element={<LineBroadcast />} />
-            <Route path="/maintenance" element={<MaintenanceDashboard />} />
-            <Route path="/settings/system" element={<SystemSettings />} />
-            <Route path="/permissions" element={<Members />} />
-            <Route path="/permissions/:memberId" element={<AssignCars />} />
+    <SystemAlertProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/line/callback" element={<LineCallback />} />
+          
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/members" element={<Members />} />
+              <Route path="/cars" element={<Cars />} />
+              <Route path="/locations" element={<CustomerLocations />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/admins" element={<Admins />} />
+              <Route path="/jobs/new" element={<JobReport />} />
+              <Route path="/jobs/edit/:id" element={<JobReport />} />
+              <Route path="/jobs/my" element={<MyJobs />} />
+              <Route path="/jobs/calendar" element={<JobCalendar />} />
+              <Route path="/jobs/history" element={<JobHistory />} />
+              <Route path="/line/settings" element={<LineSettings />} />
+              <Route path="/line/api-settings" element={<LineApiSettings />} />
+              <Route path="/line/broadcast" element={<LineBroadcast />} />
+              <Route path="/maintenance" element={<MaintenanceDashboard />} />
+              <Route path="/settings/system" element={<SystemSettings />} />
+              <Route path="/permissions" element={<Members />} />
+              <Route path="/permissions/:memberId" element={<AssignCars />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </SystemAlertProvider>
   );
 }

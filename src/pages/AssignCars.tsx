@@ -181,12 +181,6 @@ export const AssignCars: React.FC = () => {
         </button>
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('assign_cars')}</h2>
-          <p className="text-slate-500">
-            {t('managing_permissions_for')}{' '}
-            <span className="font-bold text-slate-700">
-              {member?.display_name || `${member?.first_name} ${member?.last_name}`}
-            </span>
-          </p>
         </div>
       </div>
 
@@ -207,7 +201,7 @@ export const AssignCars: React.FC = () => {
           )}
           <div>
             <h3 className="text-xl font-bold text-slate-900">{member?.display_name || `${member?.first_name} ${member?.last_name}`}</h3>
-            <p className="text-sm text-slate-500">LINE ID: {member?.line_user_id || 'N/A'}</p>
+            <p className="text-sm text-slate-500">{t('line_id')}: {member?.line_user_id || 'N/A'}</p>
           </div>
         </div>
         {/* Available Cars */}

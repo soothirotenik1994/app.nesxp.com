@@ -133,7 +133,8 @@ export interface WorkReport {
   photos?: string[];
   pickup_photos?: string[];
   delivery_photos?: string[];
-  document_photos?: string[];
+  signature_pickup?: string;
+  signature_delivery?: string;
   photo_metadata?: {
     file_id: string;
     latitude?: number;

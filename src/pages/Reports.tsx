@@ -128,6 +128,22 @@ export const Reports: React.FC = () => {
     }).sort((a, b) => b.count - a.count).slice(0, 10);
   }, [members, reports]);
 
+  const formatCaseNumber = (report: any) => {
+    if (report.case_number) return report.case_number;
+    
+    // Fallback for existing reports
+    const date = new Date(report.work_date || report.date_created || Date.now());
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const dateStr = `${dd}${mm}${yyyy}`;
+    const sequence = String(report.id).padStart(4, '0');
+    
+    // Consistent "random" part based on ID
+    const random = Math.floor((Math.abs(Math.sin(Number(report.id)) * 10000) % 9000) + 1000);
+    return `TH${dateStr}${sequence}${random}`;
+  };
+
   const handleExportExcel = useCallback(() => {
     const dataToExport = filteredData.map(r => {
       const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
@@ -135,8 +151,7 @@ export const Reports: React.FC = () => {
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
       return {
-        'ID': r.id || '-',
-        'Case Number': r.case_number || '-',
+        'Case Number': formatCaseNumber(r),
         'Status': t(`status_${r.status || 'pending'}`),
         'Date': workDate,
         'Customer Name': r.customer_name || '-',
@@ -249,7 +264,6 @@ export const Reports: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t('reports')}</h1>
-          <p className="text-slate-500">{t('real_time_monitoring')}</p>
         </div>
         
         <div className="flex items-center gap-3">

@@ -181,7 +181,6 @@ export const MaintenanceDashboard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('maintenance_dashboard')}</h2>
-          <p className="text-slate-500">{t('maintenance_dashboard_desc')}</p>
         </div>
         {allAlerts.length > 0 && (
           <div className="flex gap-4">
@@ -247,41 +246,41 @@ export const MaintenanceDashboard: React.FC = () => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">แก้ไขข้อมูลซ่อมบำรุง</h3>
+              <h3 className="text-xl font-bold text-slate-900">{t('edit_maintenance_info')}</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-6 h-6 text-slate-400" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">เลขทะเบียนรถ</label>
+                <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
                 <input type="text" value={formData.car_number} disabled className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">สถานะซ่อมบำรุง</label>
+                <label className="text-sm font-semibold text-slate-700">{t('maintenance_status')}</label>
                 <select value={formData.maintenance_status} onChange={(e) => setFormData(prev => ({...prev, maintenance_status: e.target.value}))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary">
-                  <option value="normal">ปกติ</option>
-                  <option value="maintenance">กำลังซ่อมบำรุง</option>
+                  <option value="normal">{t('normal')}</option>
+                  <option value="maintenance">{t('maintenance')}</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">วันที่ซ่อมครั้งถัดไป</label>
+                  <label className="text-sm font-semibold text-slate-700">{t('next_maintenance_date')}</label>
                   <input type="date" value={formData.next_maintenance_date} onChange={(e) => setFormData(prev => ({...prev, next_maintenance_date: e.target.value}))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">เลขไมล์ซ่อมครั้งถัดไป</label>
+                  <label className="text-sm font-semibold text-slate-700">{t('next_maintenance_mileage')}</label>
                   <input type="number" value={formData.next_maintenance_mileage} onChange={(e) => setFormData(prev => ({...prev, next_maintenance_mileage: e.target.value}))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">เลขไมล์ปัจจุบัน</label>
+                <label className="text-sm font-semibold text-slate-700">{t('current_mileage')}</label>
                 <input type="number" value={formData.current_mileage} onChange={(e) => setFormData(prev => ({...prev, current_mileage: e.target.value}))} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors">ยกเลิก</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors">{t('cancel')}</button>
                 <button type="submit" disabled={submitting} className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center gap-2">
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> บันทึก</>}
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> {t('save')}</>}
                 </button>
               </div>
             </form>

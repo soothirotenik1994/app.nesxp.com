@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification for the admin panel",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "description": "The notification message" },
+        "type": { "type": "string", "description": "The type of notification (e.g., error, warning)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the notification was created" },
+        "read": { "type": "boolean", "description": "Whether the notification has been read" }
+      },
+      "required": ["message", "type", "createdAt", "read"]
+    }
+  },
+  "firestore": {
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "Notification" },
+      "description": "Collection of admin notifications"
+    }
+  }
+}

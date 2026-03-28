@@ -46,7 +46,6 @@ export const LineApiSettings: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">LINE API Settings</h1>
-          <p className="text-slate-500">Configure your LINE Channel Access Token and Secret.</p>
         </div>
       </div>
 

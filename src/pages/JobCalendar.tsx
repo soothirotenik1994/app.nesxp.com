@@ -105,7 +105,7 @@ export const JobCalendar: React.FC = () => {
 
           return {
             id: job.id,
-            title: `${carNumber} - ${job.customer_name}`,
+            title: `${job.case_number ? `[${job.case_number}] ` : ''}${carNumber} - ${job.customer_name}`,
             start: start,
             end: end,
             extendedProps: {
@@ -150,7 +150,6 @@ export const JobCalendar: React.FC = () => {
             <CalendarIcon className="w-8 h-8 text-primary" />
             {t('job_calendar')}
           </h2>
-          <p className="text-slate-500">{t('job_calendar_desc')}</p>
         </div>
       </div>
 

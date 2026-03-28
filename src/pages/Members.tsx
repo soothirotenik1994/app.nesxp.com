@@ -457,7 +457,6 @@ export const Members: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('members')}</h2>
-          <p className="text-slate-500">{t('manage_members')}</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
@@ -733,14 +732,14 @@ export const Members: React.FC = () => {
                     "px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider inline-block",
                     formData.line_user_id ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
                   )}>
-                    {formData.line_user_id ? 'LINE' : 'Admin'}
+                    {formData.line_user_id ? 'LINE' : t('admin_user')}
                   </div>
                 </div>
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Shield className="w-4 h-4 text-slate-400" />
-                    {t('role') || 'บทบาท'}
+                    {t('role')}
                   </label>
                   <select 
                     required
@@ -748,15 +747,15 @@ export const Members: React.FC = () => {
                     onChange={(e) => setFormData({...formData, role: e.target.value as any})}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
-                    <option value="driver">{t('driver_role') || 'คนขับ'}</option>
-                    <option value="customer">{t('customer_role') || 'ลูกค้า'}</option>
-                    <option value="general">{'ทั่วไป'}</option>
+                    <option value="driver">{t('driver_role')}</option>
+                    <option value="customer">{t('customer_role')}</option>
+                    <option value="general">{t('general_role')}</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-slate-400" />
-                    {t('status') || 'สถานะ'}
+                    {t('status')}
                   </label>
                   <select 
                     required
@@ -764,9 +763,9 @@ export const Members: React.FC = () => {
                     onChange={(e) => setFormData({...formData, status: e.target.value as any})}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
-                    <option value="active">{t('active') || 'ใช้งาน'}</option>
-                    <option value="inactive">{t('disabled') || 'ระงับการใช้งาน'}</option>
-                    <option value="pending">{t('pending') || 'รออนุมัติ'}</option>
+                    <option value="active">{t('active')}</option>
+                    <option value="inactive">{t('disabled')}</option>
+                    <option value="pending">{t('pending')}</option>
                   </select>
                 </div>
               </div>
@@ -774,7 +773,7 @@ export const Members: React.FC = () => {
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>
                 <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 text-sm font-mono break-all">
-                  {formData.line_user_id || t('not_linked') || 'Not linked to LINE'}
+                  {formData.line_user_id || t('not_linked')}
                 </div>
               </div>
               <div className="pt-4 flex gap-3">

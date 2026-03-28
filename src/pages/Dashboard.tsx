@@ -5,7 +5,7 @@ import { VehicleMap } from '../components/VehicleMap';
 import { directusApi } from '../api/directus';
 import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
-import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle } from 'lucide-react';
+import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
@@ -13,6 +13,7 @@ export const Dashboard: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [carStatuses, setCarStatuses] = useState<CarStatus[]>([]);
+  const [activeJobsByCar, setActiveJobsByCar] = useState<Map<string, any>>(new Map());
   const [selectedVehicle, setSelectedVehicle] = useState<CarStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +34,9 @@ export const Dashboard: React.FC = () => {
               if (!cu) return null;
               const user = cu.line_user_id && typeof cu.line_user_id === 'object' ? cu.line_user_id : cu;
               if (!user) return null;
-              const source = user && typeof user === 'object' && (user as any).line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
+              const source = user && typeof user === 'object' && (user as any).line_user_id ? t('registered_via_line') : t('created_by_admin');
               const name = user && typeof user === 'object' ? (user.display_name || (user.first_name ? `${user.first_name} ${user.last_name}` : null)) : null;
-              return name ? `${name} ${source}` : null;
+              return name ? `${name} (${source})` : null;
             }).filter(Boolean).join(', ');
             return { 
               ...status, 
@@ -49,7 +50,7 @@ export const Dashboard: React.FC = () => {
               lat: 0,
               lng: 0,
               speed: 0,
-              address: "Data unavailable",
+              address: t('data_unavailable'),
               lastUpdate: new Date().toISOString(),
               status: 'offline' as const,
               driverName: car.owner_name
@@ -164,6 +165,16 @@ export const Dashboard: React.FC = () => {
             return String(carId);
           }));
 
+          // Create active jobs map
+          const jobsMap = new Map();
+          myActiveReports.forEach(r => {
+            const carId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
+            const carNum = typeof r.car_id === 'object' ? (r.car_id as any).car_number : null;
+            if (carId) jobsMap.set(String(carId), r);
+            if (carNum) jobsMap.set(String(carNum), r);
+          });
+          setActiveJobsByCar(jobsMap);
+
           // Find these cars in carsData
           jobCars = carsData.filter(car => activeCarIds.has(String(car.id)));
         } catch (e) {
@@ -201,7 +212,7 @@ export const Dashboard: React.FC = () => {
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
       if (err.response?.status !== 401) {
-        setError(err.response?.data?.errors?.[0]?.message || err.message || 'Failed to connect to the server');
+        setError(err.response?.data?.errors?.[0]?.message || err.message || t('failed_connect_server'));
       }
     } finally {
       setLoading(false);
@@ -271,23 +282,46 @@ export const Dashboard: React.FC = () => {
     setSelectedVehicle(vehicle);
   }, []);
 
+  const formatCaseNumber = (report: any) => {
+    if (!report) return '';
+    if (report.case_number) return report.case_number;
+    
+    // Fallback for existing reports
+    const date = new Date(report.work_date || report.date_created || Date.now());
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const dateStr = `${dd}${mm}${yyyy}`;
+    const sequence = String(report.id).padStart(4, '0');
+    
+    // Consistent "random" part based on ID
+    const random = Math.floor((Math.abs(Math.sin(Number(report.id)) * 10000) % 9000) + 1000);
+    return `TH${dateStr}${sequence}${random}`;
+  };
+
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-6">
+      {/* Dashboard Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('dashboard')}</h2>
-          <p className="text-slate-500">{t('real_time_monitoring')}</p>
         </div>
+        
         <div className="flex items-center gap-3">
-          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-medium text-slate-600">
-            <Clock className="w-4 h-4" />
-            {t('last_update')}: {carStatuses.length > 0 
-              ? format(new Date(Math.max(...carStatuses.map(s => new Date(s.lastUpdate).getTime()))), 'HH:mm:ss')
-              : format(new Date(), 'HH:mm:ss')}
+          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-medium text-slate-600 shadow-sm">
+            <Clock className="w-4 h-4 text-slate-400" />
+            <span className="text-xs text-slate-400 mr-1">{t('last_update')}:</span>
+            <span className="font-semibold">
+              {carStatuses.length > 0 
+                ? format(new Date(Math.max(...carStatuses.map(s => new Date(s.lastUpdate).getTime()))), 'HH:mm:ss')
+                : format(new Date(), 'HH:mm:ss')}
+            </span>
           </div>
-          <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2 text-sm font-bold text-primary">
+          
+          <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2 text-sm font-bold text-primary shadow-sm">
             <Sparkles className="w-4 h-4 animate-pulse" />
-            {t('next_update')}: {formatCountdown(countdown)}
+            <span className="text-xs text-blue-400 mr-1">{t('next_update')}:</span>
+            <span>{formatCountdown(countdown)}</span>
           </div>
         </div>
       </div>
@@ -310,22 +344,73 @@ export const Dashboard: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Map Section */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-[500px] lg:h-[600px]">
-          <VehicleMap 
-            vehicles={carStatuses} 
-            selectedVehicle={selectedVehicle}
-            onSelectVehicle={setSelectedVehicle}
-            center={selectedVehicle ? { lat: selectedVehicle.lat, lng: selectedVehicle.lng } : undefined}
-            zoom={selectedVehicle ? 15 : 12}
-          />
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-[500px] lg:h-[600px] relative">
+            <VehicleMap 
+              vehicles={carStatuses} 
+              selectedVehicle={selectedVehicle}
+              onSelectVehicle={setSelectedVehicle}
+              center={selectedVehicle ? { lat: selectedVehicle.lat, lng: selectedVehicle.lng } : undefined}
+              zoom={selectedVehicle ? 15 : 12}
+            />
+            
+            {/* Map Overlay Info */}
+            {selectedVehicle && (() => {
+              const activeJob = activeJobsByCar.get(selectedVehicle.carNumber);
+              return (
+                <div className="absolute bottom-4 left-4 right-4 lg:left-auto lg:w-72 bg-white p-4 rounded-xl border border-slate-200 shadow-lg z-[1000]">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900">{selectedVehicle.carNumber}</h4>
+                      <p className="text-xs text-slate-500">{selectedVehicle.driverName || t('no_driver')}</p>
+                    </div>
+                    <div className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
+                      selectedVehicle.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedVehicle.status === 'online' ? t('online') : t('offline')}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    {activeJob && (
+                      <div className="flex items-center gap-2 text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg mb-2">
+                        <Hash className="w-3 h-3" />
+                        <span>{t('case_number')}: {formatCaseNumber(activeJob)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Navigation className="w-3 h-3 text-slate-400" />
+                      <span className="truncate">{selectedVehicle.address || t('locating')}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Activity className="w-3 h-3 text-slate-400" />
+                      <span>{selectedVehicle.speed} km/h</span>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setSelectedVehicle(null)}
+                    className="mt-3 w-full py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-lg hover:bg-slate-200 transition-colors"
+                  >
+                    {t('close')}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
         </div>
-      </div>
 
-      {/* Vehicle List */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[500px] lg:h-[600px]">
+        {/* Vehicle List Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px] lg:h-[600px] overflow-hidden">
           <div className="p-6 border-b border-slate-100">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">{t('vehicles')}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">{t('vehicles')}</h3>
+              <div className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded uppercase">
+                {filteredStatuses.length} {t('units')}
+              </div>
+            </div>
+            
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
@@ -333,12 +418,12 @@ export const Dashboard: React.FC = () => {
                 placeholder={t('search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
             {loading ? (
               <div className="p-8 text-center space-y-4">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -349,67 +434,60 @@ export const Dashboard: React.FC = () => {
                 {t('no_data')}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="divide-y divide-slate-100">
+                <div className="grid grid-cols-12 px-6 py-2 bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+                  <span className="col-span-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('vehicle')}</span>
+                  <span className="col-span-5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('status')}</span>
+                  <span className="col-span-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 text-right">{t('update')}</span>
+                </div>
+                
                 {filteredStatuses.map((v) => {
                   const carInfo = carMap.get(v.carNumber);
+                  const isSelected = selectedVehicle?.carNumber === v.carNumber;
+                  
                   return (
                     <div
                       key={v.carNumber}
-                      className={`w-full p-4 rounded-2xl transition-all border ${
-                        selectedVehicle?.carNumber === v.carNumber 
-                          ? "bg-blue-50 border-primary ring-1 ring-primary" 
-                          : "bg-white border-transparent hover:bg-slate-50"
+                      onClick={() => handleZoomToVehicle(v)}
+                      className={`grid grid-cols-12 items-center px-6 py-4 transition-all cursor-pointer hover:bg-slate-50 ${
+                        isSelected ? "bg-blue-50 border-l-4 border-primary" : "bg-white"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 text-base">{v.carNumber}</span>
-                            {carInfo?.vehicle_type && (
-                              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">
-                                {carInfo.vehicle_type}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-slate-400 uppercase font-semibold">
-                            {t('driver')}: {v.driverName || 'N/A'}
-                          </p>
-                          {v.driverPhone && (
-                            <p className="text-[10px] text-slate-500 font-medium">
-                              {v.driverPhone}
-                            </p>
-                          )}
-                        </div>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                          v.status === 'online' ? "bg-blue-100 text-primary" : "bg-slate-100 text-slate-600"
-                        }`}>
-                          {v.status === 'online' ? t('online') : t('offline')}
+                      <div className="col-span-4 flex flex-col pr-2">
+                        <span className={`text-sm font-bold tracking-tight ${isSelected ? 'text-primary' : 'text-slate-900'}`}>
+                          {v.carNumber}
+                        </span>
+                        {activeJobsByCar.get(v.carNumber) && (
+                          <span className="text-[9px] font-bold text-primary truncate">
+                            #{formatCaseNumber(activeJobsByCar.get(v.carNumber))}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-medium text-slate-400 uppercase truncate">
+                          {carInfo?.vehicle_type || t('general')}
                         </span>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 mb-4 text-[11px]">
-                        <div className="bg-slate-100/50 p-2 rounded-lg">
-                          <p className="text-slate-400 uppercase font-bold text-[9px]">Latitude</p>
-                          <p className="text-slate-700 font-mono">{v.lat.toFixed(4)}</p>
+                      <div className="col-span-5 flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            v.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                          }`} />
+                          <span className={`text-[10px] font-bold uppercase ${
+                            v.status === 'online' ? 'text-emerald-600' : 'text-slate-400'
+                          }`}>
+                            {v.status === 'online' ? t('online') : t('offline')}
+                          </span>
                         </div>
-                        <div className="bg-slate-100/50 p-2 rounded-lg">
-                          <p className="text-slate-400 uppercase font-bold text-[9px]">Longitude</p>
-                          <p className="text-slate-700 font-mono">{v.lng.toFixed(4)}</p>
+                        <div className="text-[10px] text-slate-500">
+                          {v.speed} km/h
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                          <Clock className="w-3 h-3" />
-                          <span>{format(new Date(v.lastUpdate), 'HH:mm:ss')}</span>
-                        </div>
-                        <button 
-                          onClick={() => handleZoomToVehicle(v)}
-                          className="flex items-center gap-1.5 bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors"
-                        >
-                          <MapPin className="w-3 h-3" />
-                          {t('vehicles')}
-                        </button>
+                      
+                      <div className="col-span-3 flex flex-col items-end">
+                        <span className="text-[10px] font-medium text-slate-400">
+                          {format(new Date(v.lastUpdate), 'HH:mm:ss')}
+                        </span>
+                        <ChevronRight className={`w-3 h-3 mt-1 ${isSelected ? 'text-primary' : 'text-slate-200'}`} />
                       </div>
                     </div>
                   );

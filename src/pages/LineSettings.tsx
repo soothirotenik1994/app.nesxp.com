@@ -125,10 +125,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
         }
       ];
 
-      await axios.post('/api/line/send', {
-        to: testLineId,
-        messages: messages
-      });
+      await lineService.sendPushMessage(testLineId, messages);
       setTestStatus({ type: 'success', message: 'LINE text message sent successfully!' });
     } catch (error: any) {
       console.error('Failed to test LINE:', error);
@@ -242,10 +239,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
         }
       ];
 
-      await axios.post('/api/line/send', {
-        to: testLineId,
-        messages: messages
-      });
+      await lineService.sendPushMessage(testLineId, messages);
       setTestStatus({ type: 'success', message: 'LINE template test sent successfully!' });
     } catch (error: any) {
       console.error('Failed to test template:', error);
@@ -263,7 +257,6 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{t('line_settings')}</h1>
-            <p className="text-slate-500">{t('line_config_desc')}</p>
           </div>
         </div>
       )}

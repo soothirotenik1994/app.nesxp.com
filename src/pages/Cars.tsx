@@ -395,7 +395,6 @@ export const Cars: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('vehicle_inventory')}</h2>
-          <p className="text-slate-500">{t('manage_vehicles')}</p>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
@@ -404,7 +403,7 @@ export const Cars: React.FC = () => {
               className="bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-slate-200 transition-colors flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
-              ยี่ห้อรถ
+              {t('vehicle_brand')}
             </button>
             <button 
               onClick={() => handleOpenModal()}
@@ -497,7 +496,7 @@ export const Cars: React.FC = () => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">ยี่ห้อรถ</h3>
+              <h3 className="text-xl font-bold text-slate-900">{t('vehicle_brand')}</h3>
               <button onClick={() => setIsBrandModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="w-6 h-6 text-slate-400" />
               </button>
@@ -520,7 +519,7 @@ export const Cars: React.FC = () => {
                 }
               }} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">เพิ่มยี่ห้อรถใหม่</label>
+                  <label className="text-sm font-semibold text-slate-700">{t('add_new_brand')}</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
@@ -542,10 +541,10 @@ export const Cars: React.FC = () => {
 
               {/* Brands List */}
               <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">รายการยี่ห้อรถ</h4>
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">{t('brand_list')}</h4>
                 <div className="space-y-2">
                   {carBrands.length === 0 ? (
-                    <p className="text-sm text-slate-400 italic">ไม่มีข้อมูล</p>
+                    <p className="text-sm text-slate-400 italic">{t('no_data')}</p>
                   ) : (
                     carBrands.map(brand => (
                       <div key={brand.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 group">
@@ -569,8 +568,8 @@ export const Cars: React.FC = () => {
 
       <ConfirmModal 
         isOpen={!!deleteBrandId}
-        title="ยืนยันการลบยี่ห้อรถ"
-        message="คุณต้องการลบยี่ห้อรถนี้ใช่หรือไม่? การลบอาจไม่สำเร็จหากมียี่ห้อนี้ถูกใช้งานอยู่ในรถบางคัน"
+        title={t('confirm_delete_brand')}
+        message={t('confirm_delete_brand_msg')}
         onConfirm={async () => {
           if (!deleteBrandId) return;
           try {
@@ -579,12 +578,12 @@ export const Cars: React.FC = () => {
             fetchCars();
           } catch (err: any) {
             console.error('Error deleting brand:', err);
-            setActionError('ไม่สามารถลบยี่ห้อนี้ได้ เนื่องจากอาจมีการใช้งานอยู่');
+            setActionError(t('delete_brand_error'));
             setDeleteBrandId(null);
           }
         }}
         onCancel={() => setDeleteBrandId(null)}
-        confirmText="ลบ"
+        confirmText={t('delete')}
       />
 
       {isModalOpen && (
@@ -600,7 +599,7 @@ export const Cars: React.FC = () => {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('car_image') || 'รูปภาพรถ'}</label>
+                <label className="text-sm font-semibold text-slate-700">{t('car_image')}</label>
                 <div className="space-y-3">
                   {formData.car_image ? (
                     <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group">
@@ -634,14 +633,14 @@ export const Cars: React.FC = () => {
                       {uploadingImage ? (
                         <div className="flex flex-col items-center gap-2">
                           <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                          <span className="text-xs font-bold text-slate-400">กำลังอัพโหลด...</span>
+                          <span className="text-xs font-bold text-slate-400">{t('uploading')}</span>
                         </div>
                       ) : (
                         <>
                           <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
                             <Plus className="w-6 h-6 text-slate-400 group-hover:text-primary" />
                           </div>
-                          <span className="text-sm font-bold text-slate-500">{t('upload_photo') || 'อัพโหลดรูปภาพ'}</span>
+                          <span className="text-sm font-bold text-slate-500">{t('upload_photo')}</span>
                           <span className="text-[10px] text-slate-400 mt-1">PNG, JPG สูงสุด 10MB</span>
                         </>
                       )}
@@ -657,24 +656,24 @@ export const Cars: React.FC = () => {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('status') || 'สถานะรถ'}</label>
+                <label className="text-sm font-semibold text-slate-700">{t('status')}</label>
                 <select 
                   value={formData.status}
                   onChange={(e) => setFormData(prev => ({...prev, status: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="active">ใช้งานได้</option>
-                  <option value="inactive">ระงับการใช้งาน</option>
+                  <option value="active">{t('active')}</option>
+                  <option value="inactive">{t('inactive')}</option>
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">ยี่ห้อรถ</label>
+                <label className="text-sm font-semibold text-slate-700">{t('vehicle_brand')}</label>
                 <select 
                   value={formData.brand_id}
                   onChange={(e) => setFormData(prev => ({...prev, brand_id: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">เลือกยี่ห้อรถ</option>
+                  <option value="">{t('select_brand')}</option>
                   {carBrands.map(brand => (
                     <option key={brand.id} value={brand.id}>
                       {brand.name}
@@ -683,28 +682,28 @@ export const Cars: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">เลขทะเบียนรถ</label>
+                <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
                   <input 
                   type="text" 
                   required
                   value={formData.car_number}
                   onChange={(e) => setFormData(prev => ({...prev, car_number: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="3ฒธ2714"
+                  placeholder={t('car_number')}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">ประเภทรถ</label>
+                <label className="text-sm font-semibold text-slate-700">{t('vehicle_type')}</label>
                 <input 
                   type="text" 
                   value={formData.vehicle_type}
                   onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="4 ล้อตู้ทึบ"
+                  placeholder={t('vehicle_type')}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">ชื่อคนขับ</label>
+                <label className="text-sm font-semibold text-slate-700">{t('driver_name')}</label>
                 <select 
                   value={allMembers.find(m => (m.first_name + ' ' + m.last_name).trim() === formData.owner_name)?.id || ''}
                   onChange={(e) => {
@@ -725,7 +724,7 @@ export const Cars: React.FC = () => {
                   }}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                 >
-                  <option value="">เลือกคนขับ</option>
+                  <option value="">{t('select_driver')}</option>
                   {allMembers
                     .filter(m => (m.role || 'driver') === 'driver')
                     .map(member => (
@@ -736,23 +735,23 @@ export const Cars: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">เบอร์โทรศัพท์</label>
+                <label className="text-sm font-semibold text-slate-700">{t('phone')}</label>
                 <input 
                   type="tel" 
                   value={formData.driver_phone}
                   onChange={(e) => setFormData(prev => ({...prev, driver_phone: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="081-234-5678"
+                  placeholder={t('phone')}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">รายละเอียด</label>
+                <label className="text-sm font-semibold text-slate-700">{t('description')}</label>
                 <textarea 
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder="Toyota Hilux White..."
+                  placeholder={t('description')}
                 />
               </div>
               <div className="pt-4 flex gap-3">
@@ -761,7 +760,7 @@ export const Cars: React.FC = () => {
                   onClick={() => setIsModalOpen(false)}
                   className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
                 >
-                  {t('cancel') || 'ยกเลิก'}
+                  {t('cancel')}
                 </button>
                 <button 
                   type="submit"
@@ -773,7 +772,7 @@ export const Cars: React.FC = () => {
                   ) : (
                     <>
                       <Save className="w-5 h-5" />
-                      {t('save') || 'บันทึก'}
+                      {editingCar ? t('save_changes') : t('add_vehicle')}
                     </>
                   )}
                 </button>

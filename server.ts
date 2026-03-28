@@ -53,6 +53,67 @@ async function startServer() {
     }
   };
 
+  // Proxy for Directus to avoid CORS
+  app.all("/api/directus/*", async (req, res) => {
+    try {
+      const directusPath = req.path.replace('/api/directus/', '');
+      const method = req.method;
+      const directusBaseUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const url = `${directusBaseUrl}/${directusPath}`;
+      
+      console.log(`Proxying Directus ${method} request to: ${url}`);
+      
+      // Filter out headers that might cause issues
+      const headers: any = { ...req.headers };
+      delete headers.host;
+      delete headers.origin;
+      delete headers.referer;
+      
+      // Add Authorization if not present and we have a static key
+      if (!headers.authorization && process.env.VITE_DIRECTUS_STATIC_TOKEN) {
+        headers.authorization = `Bearer ${process.env.VITE_DIRECTUS_STATIC_TOKEN}`;
+      }
+
+      const response = await axios({
+        method,
+        url,
+        data: req.body,
+        params: req.query,
+        headers,
+        responseType: 'stream',
+        validateStatus: () => true,
+      });
+      
+      res.status(response.status);
+      
+      // Forward relevant headers from Directus
+      const headersToForward = [
+        'content-type',
+        'content-length',
+        'content-disposition',
+        'cache-control',
+        'etag',
+        'last-modified'
+      ];
+      
+      headersToForward.forEach(header => {
+        if (response.headers[header]) {
+          res.setHeader(header, response.headers[header]);
+        }
+      });
+      
+      response.data.pipe(res);
+    } catch (error: any) {
+      console.error("Directus Proxy error:", error.message);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: "Failed to proxy request to Directus",
+          details: error.message
+        });
+      }
+    }
+  });
+
   // Proxy for GPS API to avoid CORS
   app.get("/api/proxy/gps/:carNumber", async (req, res) => {
     try {

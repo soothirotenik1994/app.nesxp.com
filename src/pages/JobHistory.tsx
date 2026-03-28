@@ -110,6 +110,22 @@ export const JobHistory: React.FC = () => {
     return time.split(':').slice(0, 2).join(':');
   };
 
+  const formatCaseNumber = (report: WorkReport) => {
+    if (report.case_number) return report.case_number;
+    
+    // Fallback for existing reports
+    const date = new Date(report.work_date || report.date_created || Date.now());
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const dateStr = `${dd}${mm}${yyyy}`;
+    const sequence = String(report.id).padStart(4, '0');
+    
+    // Consistent "random" part based on ID
+    const random = Math.floor((Math.abs(Math.sin(Number(report.id)) * 10000) % 9000) + 1000);
+    return `TH${dateStr}${sequence}${random}`;
+  };
+
   const generateReportText = (report: WorkReport) => {
     const carNum = (report.car_id && typeof report.car_id === 'object') ? (report.car_id as any).car_number : report.car_id;
     const driver = (report.driver_id && typeof report.driver_id === 'object') ? report.driver_id : null;
@@ -119,8 +135,7 @@ export const JobHistory: React.FC = () => {
     const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     const isCustomer = userRole.toLowerCase() === 'customer';
     
-    return `🆔 ID : ${report.id || '-'}
-🆔 ${t('case_number')} : ${report.case_number || '-'}
+    return `🆔 ${t('case_number')} : ${formatCaseNumber(report)}
 📅 ${t('report_date')} : ${workDate}
 📁 ${t('customer_name')} : ${report.customer_name}
 
@@ -199,8 +214,7 @@ ${!isCustomer ? `
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
       return {
-        'ID': r.id || '-',
-        'Case Number': r.case_number || '-',
+        'Case Number': formatCaseNumber(r),
         'Status': t(`status_${r.status || 'pending'}`),
         'Date': workDate,
         'Customer Name': r.customer_name || '-',
@@ -234,7 +248,6 @@ ${!isCustomer ? `
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('job_history')}</h2>
-          <p className="text-slate-500">{t('job_history_desc')}</p>
         </div>
       </div>
 
@@ -297,7 +310,7 @@ ${!isCustomer ? `
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number') || 'Case No.'}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('case_number')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('status')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('date')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
@@ -330,8 +343,8 @@ ${!isCustomer ? `
                     <tr key={report.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-bold text-slate-700">
-                            {report.id || '-'}
+                          <span className="font-mono text-xs font-bold text-slate-700">
+                            {formatCaseNumber(report)}
                           </span>
                         </div>
                       </td>
@@ -354,11 +367,6 @@ ${!isCustomer ? `
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {report.case_number && (
-                          <div className="text-[10px] font-bold text-primary mb-0.5">
-                            ID: {report.case_number}
-                          </div>
-                        )}
                         <div className="font-bold text-slate-900 text-sm">
                           {report.customer_name}
                         </div>
@@ -467,7 +475,9 @@ ${!isCustomer ? `
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">{t('job_report')}</h3>
+              <h3 className="text-xl font-bold text-slate-900">
+                {t('job_report')} {selectedReport && `- ${formatCaseNumber(selectedReport)}`}
+              </h3>
               <button 
                 onClick={() => setSelectedReport(null)}
                 className="p-2 hover:bg-slate-100 rounded-xl transition-colors"

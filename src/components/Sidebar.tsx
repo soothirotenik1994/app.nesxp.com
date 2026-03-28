@@ -19,7 +19,8 @@ import {
   Truck,
   MapPin,
   Settings,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -68,7 +69,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
-    { name: 'LINE Broadcast', path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
+    { name: t('admin_notifications'), path: '/admin/notifications', icon: Bell, key: 'admin_notifications' },
+    { name: t('line_broadcast'), path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
     { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
   ].filter(item => isVisible(item.key));
 
@@ -126,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Logistics</div>
+            <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('logistics')}</div>
             {logisticsItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (

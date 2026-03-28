@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Car, Users, Activity, Signal } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface StatsProps {
   totalVehicles: number;
@@ -54,16 +55,26 @@ export const DashboardStats: React.FC<StatsProps> = ({
   return (
     <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${showOnlyTotal ? 'md:grid-cols-1 lg:grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
       {stats.map((stat) => (
-        <div key={stat.name} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div 
+          key={stat.name} 
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+        >
           <div className="flex items-center justify-between mb-4">
-            <div className={`${stat.color} p-3 rounded-xl`}>
-              <stat.icon className="w-6 h-6 text-white" />
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {stat.name}
             </div>
-            <span className={`text-2xl font-bold ${stat.textColor}`}>
-              {stat.value}
-            </span>
+            <div className={`${stat.color} p-2 rounded-xl`}>
+              <stat.icon className="w-5 h-5 text-white" />
+            </div>
           </div>
-          <p className="text-slate-500 font-medium text-sm">{stat.name}</p>
+          <div className="flex items-baseline gap-2">
+            <div className="text-3xl font-bold text-slate-900">
+              {stat.value.toLocaleString()}
+            </div>
+            <div className="text-xs font-medium text-slate-400">
+              {t('units') || 'Units'}
+            </div>
+          </div>
         </div>
       ))}
     </div>
