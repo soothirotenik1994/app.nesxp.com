@@ -7,7 +7,6 @@ import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
 import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { CustomerDashboard } from './CustomerDashboard';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -19,9 +18,6 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
-
-  const userRole = localStorage.getItem('user_role')?.toLowerCase();
-  const isCustomer = userRole === 'customer';
 
   const fetchGpsData = async (carsData: Car[]) => {
     const BATCH_SIZE = 3;
@@ -274,10 +270,6 @@ export const Dashboard: React.FC = () => {
   const handleZoomToVehicle = useCallback((vehicle: CarStatus) => {
     setSelectedVehicle(vehicle);
   }, []);
-
-  if (isCustomer) {
-    return <CustomerDashboard />;
-  }
 
   return (
     <div className="space-y-6 lg:space-y-8">
