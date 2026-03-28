@@ -246,7 +246,7 @@ const resources = {
       "map_error": "Map Error",
       "map_load_error": "Failed to load Map API",
       "login_title": "Nationwide Express Service",
-      "login_subtitle": "Transportation Management and Vehicle Tracking System",
+      "login_subtitle": "Sign in to access the system",
       "login_error": "Invalid email or password. Please try again.",
       "username": "Username",
       "password": "Password",
@@ -278,7 +278,7 @@ const resources = {
       "admin_login": "Administrator",
       "driver_login": "Driver",
       "login_with_line": "Login with LINE",
-      "vehicle_tracking_management": "Transportation Management and Vehicle Tracking System",
+      "vehicle_tracking_management": "Vehicle Tracking Management",
       "admin_user": "Admin User",
       "super_admin": "Super Admin",
       "error_fetching_data": "Error fetching data",
@@ -320,11 +320,7 @@ const resources = {
       "contact_name": "Contact Name",
       "contact_phone": "Contact Phone",
       "arrival_before_departure_error": "Arrival time cannot be before departure time",
-      "export_excel": "Export Excel",
-      "secure_system_footer": "Transportation Management and Vehicle Tracking System",
-      "all_rights_reserved": "All rights reserved.",
-      "permission_error_directus": "Permission Error: Please enable \"Public\" Read access for \"line_users\" in Directus Settings.",
-      "network_error": "Network Error: Cannot connect to database server."
+      "export_excel": "Export Excel"
     }
   },
   th: {
@@ -570,7 +566,7 @@ const resources = {
       "map_error": "ข้อผิดพลาดของแผนที่",
       "map_load_error": "ไม่สามารถโหลดแผนที่ได้",
       "login_title": "Nationwide Express Service",
-      "login_subtitle": "ระบบบริหารจัดการการขนส่ง และ การติดตามรถ",
+      "login_subtitle": "เข้าสู่ระบบเพื่อใช้งาน",
       "login_error": "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง",
       "username": "ชื่อผู้ใช้",
       "password": "รหัสผ่าน",
@@ -602,7 +598,7 @@ const resources = {
       "admin_login": "ผู้ดูแลระบบ",
       "driver_login": "คนขับรถ",
       "login_with_line": "เข้าสู่ระบบด้วย LINE",
-      "vehicle_tracking_management": "ระบบบริหารจัดการการขนส่ง และ การติดตามรถ",
+      "vehicle_tracking_management": "ระบบจัดการติดตามยานพาหนะ",
       "admin_user": "ผู้ดูแลระบบ",
       "super_admin": "ผู้ดูแลระบบสูงสุด",
       "error_fetching_data": "เกิดข้อผิดพลาดในการดึงข้อมูล",
@@ -644,11 +640,7 @@ const resources = {
       "contact_name": "ผู้ติดต่อ",
       "contact_phone": "เบอร์โทรศัพท์",
       "arrival_before_departure_error": "เวลาถึงต้องไม่น้อยกว่าเวลาออกเดินทาง",
-      "export_excel": "ส่งออก Excel",
-      "secure_system_footer": "ระบบบริหารจัดการการขนส่ง และ การติดตามรถ",
-      "all_rights_reserved": "สงวนลิขสิทธิ์",
-      "permission_error_directus": "ข้อผิดพลาดเกี่ยวกับสิทธิ์: โปรดเปิดสิทธิ์การอ่านแบบสาธารณะ (Public Read) สำหรับ \"line_users\" ในการตั้งค่า Directus",
-      "network_error": "ข้อผิดพลาดของเครือข่าย: ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ฐานข้อมูลได้"
+      "export_excel": "ส่งออก Excel"
     }
   }
 };

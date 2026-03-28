@@ -19,9 +19,7 @@ import {
   Truck,
   MapPin,
   Settings,
-  MessageSquare,
-  TrendingUp,
-  ChevronRight
+  MessageSquare
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -63,16 +61,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
   const logisticsItems = [
     { name: t('dashboard'), path: '/', icon: LayoutDashboard, key: 'dashboard' },
-    { name: 'Real-time Tracking', path: '/', icon: MapPin, key: 'tracking' },
-    { name: 'Shipment Schedule', path: '/jobs/calendar', icon: Calendar, key: 'calendar' },
-    { name: 'Shipment History', path: '/jobs/history', icon: History, key: 'history' },
-    { name: 'Fleet Analytics', path: '/reports', icon: TrendingUp, key: 'analytics' },
-  ].filter(item => isAdmin ? isVisible(item.key) : true);
+    { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar, key: 'calendar' },
+    { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList, key: 'all_jobs' },
+    { name: t('job_history'), path: '/jobs/history', icon: History, key: 'history' },
+  ].filter(item => isAdmin ? isVisible(item.key) : true); // Non-admins see all logistics for now
   
-  const bottomItems = [
-    { name: 'Settings', path: '/settings/system', icon: Settings, key: 'settings' },
-    { name: 'Support', path: '/', icon: MessageSquare, key: 'support' },
-  ];
+  const settingsItems = [
+    { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
+    { name: 'LINE Broadcast', path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
+    { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
+  ].filter(item => isVisible(item.key));
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -85,10 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     navigate('/login');
   };
 
-  const websiteName = localStorage.getItem('website_name') || 'Lucid Curator';
+  const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
   const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
-
-  const isCustomer = userRole.toLowerCase() === 'customer';
 
   return (
     <>
@@ -101,26 +97,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       )}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[9999] w-72 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        isCustomer ? "bg-white border-r border-slate-100" : "bg-primary text-white",
+        "fixed inset-y-0 left-0 z-[9999] w-64 bg-primary text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="p-8 flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className={cn("text-xl font-bold tracking-tight leading-none", isCustomer ? "text-slate-900" : "text-white")}>{websiteName}</span>
-              <span className={cn("text-[10px] font-bold uppercase mt-1 tracking-widest", isCustomer ? "text-slate-400" : "text-white/50")}>
-                Editorial Logistics
-              </span>
+          <div className="p-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden">
+                <img 
+                  src={websiteLogo} 
+                  alt={websiteName} 
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold tracking-tight leading-none">{websiteName}</span>
+                <span className="text-[10px] font-medium text-white/50 uppercase mt-1 tracking-widest">
+                  {userRole}
+                </span>
+              </div>
             </div>
-            <button className={cn("lg:hidden", isCustomer ? "text-slate-400" : "text-white")} onClick={() => setIsOpen(false)}>
+            <button className="lg:hidden" onClick={() => setIsOpen(false)}>
               <X className="w-6 h-6" />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Logistics</div>
             {logisticsItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
@@ -128,31 +134,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                   key={item.name}
                   to={item.path}
                   className={cn(
-                    "flex items-center gap-4 px-6 py-4 rounded-2xl transition-all relative group",
-                    isCustomer ? (
-                      isActive 
-                        ? "bg-slate-50 text-primary font-bold" 
-                        : "text-slate-400 hover:text-slate-600"
-                    ) : (
-                      isActive 
-                        ? "bg-white/20 text-white border border-white/30" 
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    )
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    isActive 
+                      ? "bg-white/20 text-white border border-white/30" 
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
-                  {isCustomer && isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-primary rounded-r-full shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                  )}
-                  <item.icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", isActive ? "text-primary" : "text-slate-400")} />
-                  <span className="text-sm">{item.name}</span>
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.name}</span>
                 </Link>
               );
             })}
 
             {isAdmin && menuItems.length > 0 && (
               <>
-                <div className={cn("px-6 py-4 text-[10px] font-bold uppercase tracking-widest mt-6", isCustomer ? "text-slate-300" : "text-white/40")}>Management</div>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('management')}</div>
                 {menuItems.map((item) => {
                   const isActive = location.pathname === item.path;
                   return (
@@ -160,21 +157,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                       key={item.name}
                       to={item.path}
                       className={cn(
-                        "flex items-center gap-4 px-6 py-4 rounded-2xl transition-all",
-                        isCustomer ? (
-                          isActive 
-                            ? "bg-slate-50 text-primary font-bold" 
-                            : "text-slate-400 hover:text-slate-600"
-                        ) : (
-                          isActive 
-                            ? "bg-white/20 text-white border border-white/30" 
-                            : "text-white/70 hover:bg-white/10 hover:text-white"
-                        )
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        isActive 
+                          ? "bg-white/20 text-white border border-white/30" 
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
                       <item.icon className="w-5 h-5" />
-                      <span className="text-sm">{item.name}</span>
+                      <span className="font-medium">{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </>
+            )}
+
+            {isAdmin && settingsItems.length > 0 && (
+              <>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('system_settings')}</div>
+                {settingsItems.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        isActive 
+                          ? "bg-white/20 text-white border border-white/30" 
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      )}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.name}</span>
                     </Link>
                   );
                 })}
@@ -183,36 +199,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           </nav>
 
           {/* Footer */}
-          <div className={cn("p-6 space-y-2", isCustomer ? "bg-white" : "border-t border-white/10")}>
-            {isCustomer && (
-              <button className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold shadow-xl shadow-slate-200 hover:bg-slate-900 transition-all mb-8">
-                New Shipment
-              </button>
-            )}
-            
-            {bottomItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={cn(
-                  "flex items-center gap-4 px-6 py-4 rounded-2xl transition-all",
-                  isCustomer ? "text-slate-400 hover:text-slate-600" : "text-white/70 hover:bg-white/10 hover:text-white"
-                )}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="text-sm">{item.name}</span>
-              </Link>
-            ))}
-
+          <div className="p-4 border-t border-white/10 space-y-2">
             <button 
               onClick={handleLogout}
-              className={cn(
-                "flex items-center gap-4 px-6 py-4 w-full rounded-2xl transition-all mt-4",
-                isCustomer ? "text-red-400 hover:bg-red-50" : "text-white/70 hover:bg-white/10 hover:text-white"
-              )}
+              className="flex items-center gap-3 px-4 py-3 w-full text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-colors"
             >
               <LogOut className="w-5 h-5" />
-              <span className="text-sm font-bold">{t('logout')}</span>
+              <span className="font-medium">{t('logout')}</span>
             </button>
           </div>
         </div>

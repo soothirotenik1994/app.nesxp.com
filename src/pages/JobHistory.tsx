@@ -137,8 +137,8 @@ export const JobHistory: React.FC = () => {
 👉 ${t('arrival_time')} : ${formatTimeDisplay(report.arrival_time)}
 ${!isCustomer ? `
 🍄 ${t('mileage_start')} : ${report.mileage_start}
-🍄 ${t('mileage_end')} : ${report.mileage_end}` : ''}
-
+🍄 ${t('mileage_end')} : ${report.mileage_end}
+` : ''}
 📌 ${t('notes')} : ${report.notes || '-'}`;
   };
 
@@ -482,33 +482,99 @@ ${!isCustomer ? `
                 </pre>
               </div>
 
-              {selectedReport.photos && selectedReport.photos.length > 0 && (
+              {((selectedReport.pickup_photos && selectedReport.pickup_photos.length > 0) || 
+                (selectedReport.delivery_photos && selectedReport.delivery_photos.length > 0) ||
+                (selectedReport.photos && selectedReport.photos.length > 0)) && (
                 <div className="space-y-6">
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest">{t('photos')}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedReport.photos.map((photoId: any) => {
-                        const meta = selectedReport.photo_metadata?.find((m: any) => m.file_id === photoId);
-                        return (
-                          <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
-                            <img 
-                              src={directusApi.getFileUrl(photoId, { key: 'system-large-contain' })} 
-                              alt="Job" 
-                              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              referrerPolicy="no-referrer"
-                              onClick={() => setFullscreenImage(directusApi.getFileUrl(photoId))}
-                            />
-                            {meta && (
-                              <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">
-                                {meta.timestamp && <div>{meta.timestamp}</div>}
-                                {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                  {selectedReport.pickup_photos && selectedReport.pickup_photos.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-primary" />
+                        ภาพตอนขึ้นของ (Pickup)
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedReport.pickup_photos.map((photoId: any) => {
+                          const meta = selectedReport.photo_metadata?.find((m: any) => m.file_id === photoId);
+                          return (
+                            <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                              <img 
+                                src={directusApi.getFileUrl(photoId, { key: 'system-large-contain' })} 
+                                alt="Pickup" 
+                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                referrerPolicy="no-referrer"
+                                onClick={() => setFullscreenImage(directusApi.getFileUrl(photoId))}
+                              />
+                              {meta && (
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">
+                                  {meta.timestamp && <div>{meta.timestamp}</div>}
+                                  {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {selectedReport.delivery_photos && selectedReport.delivery_photos.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-emerald-600" />
+                        ภาพตอนส่งของ (Delivery)
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedReport.delivery_photos.map((photoId: any) => {
+                          const meta = selectedReport.photo_metadata?.find((m: any) => m.file_id === photoId);
+                          return (
+                            <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                              <img 
+                                src={directusApi.getFileUrl(photoId, { key: 'system-large-contain' })} 
+                                alt="Delivery" 
+                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                referrerPolicy="no-referrer"
+                                onClick={() => setFullscreenImage(directusApi.getFileUrl(photoId))}
+                              />
+                              {meta && (
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">
+                                  {meta.timestamp && <div>{meta.timestamp}</div>}
+                                  {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedReport.photos && selectedReport.photos.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest">{t('photos')}</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedReport.photos.map((photoId: any) => {
+                          const meta = selectedReport.photo_metadata?.find((m: any) => m.file_id === photoId);
+                          return (
+                            <div key={photoId} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                              <img 
+                                src={directusApi.getFileUrl(photoId, { key: 'system-large-contain' })} 
+                                alt="Job" 
+                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                referrerPolicy="no-referrer"
+                                onClick={() => setFullscreenImage(directusApi.getFileUrl(photoId))}
+                              />
+                              {meta && (
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-black/60 text-[10px] text-white leading-tight">
+                                  {meta.timestamp && <div>{meta.timestamp}</div>}
+                                  {meta.latitude && <div>GPS: {meta.latitude.toFixed(4)}, {meta.longitude.toFixed(4)}</div>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
