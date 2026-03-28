@@ -28,6 +28,7 @@ async function startServer() {
 
   let sessionId: string | null = null;
   let lastLoginTime = 0;
+  let lineLimitReached = false;
   const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
   const getSessionId = async () => {
@@ -106,6 +107,11 @@ async function startServer() {
   // API health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // LINE Status Check
+  app.get("/api/line/status", (req, res) => {
+    res.json({ lineLimitReached });
   });
   
   // Proxy for LINE Login code exchange
@@ -217,6 +223,10 @@ async function startServer() {
       const errorData = error.response?.data || error.message;
       console.error("LINE error details:", errorData);
       
+      if (errorData && typeof errorData === 'object' && errorData.message === 'You have reached your monthly limit.') {
+        lineLimitReached = true;
+      }
+
       // Provide more helpful error messages for common LINE errors
       let helpfulMessage = "Failed to send LINE message";
       if (error.response?.status === 401) {

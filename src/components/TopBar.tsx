@@ -5,6 +5,7 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { useNavigate, Link } from 'react-router-dom';
 import { setAuthToken } from '../api/directus';
 import { ProfileModal } from './ProfileModal';
+import { NotificationMailbox } from './NotificationMailbox';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -64,6 +65,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
             <span className="hidden sm:inline">{t('new_job_assignment')}</span>
           </Link>
         )}
+        <NotificationMailbox />
         <LanguageSwitcher />
         
         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>

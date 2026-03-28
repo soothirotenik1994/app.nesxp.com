@@ -18,6 +18,22 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
+  const [lineLimitReached, setLineLimitReached] = useState(false);
+
+  useEffect(() => {
+    const checkLineStatus = async () => {
+      try {
+        const response = await fetch('/api/line/status');
+        const data = await response.json();
+        setLineLimitReached(data.lineLimitReached);
+      } catch (err) {
+        console.error('Failed to check LINE status:', err);
+      }
+    };
+    checkLineStatus();
+    const interval = setInterval(checkLineStatus, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchGpsData = async (carsData: Car[]) => {
     const BATCH_SIZE = 3;
@@ -306,6 +322,13 @@ export const Dashboard: React.FC = () => {
           >
             {t('try_again')}
           </button>
+        </div>
+      )}
+
+      {lineLimitReached && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-6 py-4 rounded-2xl flex items-center gap-3">
+          <AlertCircle className="w-5 h-5" />
+          <span className="font-medium">แจ้งเตือน: คุณใช้งาน LINE API ครบโควต้าประจำเดือนแล้ว</span>
         </div>
       )}
 
