@@ -544,6 +544,35 @@ export const directusApi = {
     return response.data.data;
   },
 
+  getUnreadNotifications: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/items/admin_notifications', {
+        params: {
+          filter: {
+            is_read: { _eq: false }
+          },
+          sort: '-created_at'
+        }
+      });
+      return response.data.data || [];
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('Unauthorized to fetch notifications');
+        return [];
+      }
+      console.error('Error fetching unread notifications:', error);
+      return [];
+    }
+  },
+
+  markNotificationAsRead: async (id: string): Promise<void> => {
+    try {
+      await api.patch(`/items/admin_notifications/${id}`, { is_read: true });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  },
+
   logout: () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('member_id');

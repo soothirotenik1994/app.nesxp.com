@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Menu, User, LogOut, PlusCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, User, LogOut, PlusCircle, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useNavigate, Link } from 'react-router-dom';
-import { setAuthToken } from '../api/directus';
+import { setAuthToken, directusApi } from '../api/directus';
 import { ProfileModal } from './ProfileModal';
 
 interface TopBarProps {
@@ -19,9 +19,29 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
     role: localStorage.getItem('user_role') || t('super_admin'),
     picture: localStorage.getItem('user_picture') || ''
   });
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   
   const isAdmin = localStorage.getItem('user_role')?.toLowerCase() === 'administrator' || localStorage.getItem('user_role')?.toLowerCase() === 'admin';
   
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const fetchNotifications = async () => {
+      const unread = await directusApi.getUnreadNotifications();
+      setNotifications(unread);
+    };
+    
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [isAdmin]);
+
+  const handleMarkAsRead = async (id: string) => {
+    await directusApi.markNotificationAsRead(id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   const handleLogout = () => {
     // Clear all auth-related items from localStorage
     const itemsToRemove = [
@@ -64,6 +84,35 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
             <span className="hidden sm:inline">{t('new_job_assignment')}</span>
           </Link>
         )}
+        
+        {isAdmin && (
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 relative"
+            >
+              <Bell className="w-6 h-6" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-lg z-[1001] p-2 max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-slate-500 p-2">No unread notifications</p>
+                ) : (
+                  notifications.map(n => (
+                    <div key={n.id} className="p-2 border-b last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => handleMarkAsRead(n.id)}>
+                      <p className="text-sm text-slate-800">{n.message}</p>
+                      <p className="text-xs text-slate-400">{new Date(n.created_at).toLocaleString()}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <LanguageSwitcher />
         
         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>

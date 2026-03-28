@@ -274,17 +274,44 @@ async function startServer() {
       const errorData = error.response?.data || error.message;
       console.error("LINE broadcast error details:", errorData);
       
+      // Notify Admin via Directus mailbox for all broadcast errors
+      try {
+        await axios.post(`${process.env.DIRECTUS_URL || 'https://data.nesxp.com'}/items/admin_notifications`, {
+          message: `LINE broadcast error: ${errorData?.message || errorData || 'Unknown error'}`,
+          type: 'error',
+          is_read: false
+        }, {
+          headers: {
+            'Authorization': `Bearer ${process.env.DIRECTUS_ADMIN_TOKEN || 'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn'}`
+          }
+        });
+        console.log('Admin notified via Directus mailbox');
+      } catch (notifyError) {
+        console.error('Failed to notify admin via Directus:', notifyError);
+      }
+      
       // Provide more helpful error messages for common LINE errors
       let helpfulMessage = "Failed to broadcast LINE message";
+      let statusCode = 500;
+      
       if (error.response?.status === 401) {
         helpfulMessage = "Invalid LINE Channel Access Token.";
       } else if (error.response?.status === 400) {
         helpfulMessage = `LINE API Error: ${JSON.stringify(errorData)}`;
+      } else if (error.response?.status === 429) {
+        helpfulMessage = "LINE API Rate limit exceeded.";
+        statusCode = 429;
+      } else if (errorData?.message === 'You have reached your monthly limit.') {
+        helpfulMessage = "You have reached your monthly LINE broadcast limit.";
+        statusCode = 403;
+      } else if (errorData?.message) {
+        helpfulMessage = `LINE API Error: ${errorData.message}`;
       }
-
-      res.status(500).json({ 
-        error: helpfulMessage, 
-        details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
+      
+      res.status(statusCode).json({ 
+        success: false, 
+        message: helpfulMessage,
+        details: errorData
       });
     }
   });
