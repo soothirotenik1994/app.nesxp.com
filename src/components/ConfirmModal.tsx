@@ -35,9 +35,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <AlertTriangle className="w-8 h-8" />
           </div>
           <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
-          <p className="text-slate-500 text-sm leading-relaxed">
+          <div className="text-slate-500 text-sm leading-relaxed">
             {message}
-          </p>
+          </div>
         </div>
         <div className="p-6 bg-slate-50 flex gap-3">
           <button

@@ -83,7 +83,7 @@ export const CustomerDashboard: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Find specific vehicles, drivers or IDs..."
+              placeholder="Find specific vehicles, members or IDs..."
               className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 transition-all"
             />
           </div>
@@ -180,7 +180,7 @@ export const CustomerDashboard: React.FC = () => {
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marek" alt="Driver" className="w-full h-full object-cover" />
               </div>
               <div className="flex-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Driver</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Member</div>
                 <div className="text-sm font-bold text-slate-900">Marek Kowalski</div>
               </div>
               <button className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors">

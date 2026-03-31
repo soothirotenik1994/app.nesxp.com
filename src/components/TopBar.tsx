@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Menu, User, LogOut, PlusCircle, Bell, Trash2, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { useNavigate, Link } from 'react-router-dom';
 import { setAuthToken } from '../api/directus';
 import { ProfileModal } from './ProfileModal';
@@ -158,7 +157,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
             </div>
           </>
         )}
-        <LanguageSwitcher />
         
         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
 

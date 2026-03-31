@@ -40,8 +40,8 @@ export const Dashboard: React.FC = () => {
             }).filter(Boolean).join(', ');
             return { 
               ...status, 
-              driverName: assignedNames || car.owner_name,
-              driverPhone: car.driver_phone
+              memberName: assignedNames || car.owner_name,
+              memberPhone: car.member_phone
             };
           } catch (err) {
             console.warn(`Could not fetch status for ${car.car_number}`);
@@ -53,7 +53,7 @@ export const Dashboard: React.FC = () => {
               address: t('data_unavailable'),
               lastUpdate: new Date().toISOString(),
               status: 'offline' as const,
-              driverName: car.owner_name
+              memberName: car.owner_name
             };
           }
         })
@@ -152,9 +152,9 @@ export const Dashboard: React.FC = () => {
                 });
               }
               return memberIds.includes(String(memberId));
-            } else if (userRole === 'driver') {
-              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-              return String(driverId) === String(memberId);
+            } else if (userRole === 'member') {
+              const rMemberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+              return String(rMemberId) === String(memberId);
             }
             return false;
           });
@@ -362,7 +362,7 @@ export const Dashboard: React.FC = () => {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h4 className="font-bold text-slate-900">{selectedVehicle.carNumber}</h4>
-                      <p className="text-xs text-slate-500">{selectedVehicle.driverName || t('no_driver')}</p>
+                      <p className="text-xs text-slate-500">{selectedVehicle.memberName || t('no_member')}</p>
                     </div>
                     <div className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
                       selectedVehicle.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'

@@ -120,7 +120,7 @@ const MemberRow = React.memo(({
           <span className={clsx(
             "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
             member.status === 'inactive' ? "bg-red-100 text-red-700" :
-            member.role === 'driver' ? "bg-blue-100 text-blue-700" :
+            member.role === 'member' ? "bg-blue-100 text-blue-700" :
             member.role === 'general' ? "bg-slate-100 text-slate-700" :
             "bg-emerald-100 text-emerald-700"
           )}>
@@ -143,7 +143,7 @@ const MemberRow = React.memo(({
                 <span 
                   key={car.id}
                   className="bg-blue-50 text-primary border border-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex flex-col gap-0.5"
-                  title={`${t('driver_name')}: ${car.owner_name || 'N/A'}`}
+                  title={`${t('member_name')}: ${car.owner_name || 'N/A'}`}
                 >
                   <div className="flex items-center gap-1">
                     <CarIcon className="w-3 h-3" />
@@ -241,7 +241,7 @@ export const Members: React.FC = () => {
     phone: '',
     line_user_id: '',
     password: '',
-    role: 'general' as 'driver' | 'customer' | 'general' | 'inactive',
+    role: 'general' as 'member' | 'customer' | 'general' | 'inactive',
     status: 'active' as 'active' | 'inactive' | 'pending',
     picture_url: ''
   });
@@ -330,8 +330,7 @@ export const Members: React.FC = () => {
     e.preventDefault();
     setSubmitting(true);
     setActionError(null);
-    try {
-      const payload: any = { ...formData };
+    const payload: any = { ...formData };
       
       // If line_user_id is empty, set it to null to avoid uniqueness constraint issues with empty strings
       if (!payload.line_user_id) {
@@ -342,6 +341,7 @@ export const Members: React.FC = () => {
         delete payload.password;
       }
 
+    try {
       if (editingMember) {
         // If status is set to 'inactive', set status to 'inactive', otherwise 'active'
         if (payload.status === 'inactive') {
@@ -361,21 +361,12 @@ export const Members: React.FC = () => {
           }
         }
 
-        // If changing from driver to another role, clear driver assignments
-        if (editingMember.role === 'driver' && payload.role !== 'driver') {
-          const driverName = `${editingMember.first_name} ${editingMember.last_name}`.trim();
-          const [cars, permissions] = await Promise.all([
-            directusApi.getCars(),
-            directusApi.getCarPermissions(editingMember.id)
-          ]);
-          
-          const carsToUpdate = cars.filter(c => c.owner_name === driverName);
+        // If changing from member to another role, clear member assignments
+        if (editingMember.role === 'member' && payload.role !== 'member') {
+          const memberName = `${editingMember.first_name} ${editingMember.last_name}`.trim();
+          const carsToUpdate = allCars.filter(c => c.owner_name === memberName);
           for (const car of carsToUpdate) {
-            await directusApi.updateCar(car.id, { owner_name: '', driver_phone: '' });
-          }
-          
-          for (const permission of permissions) {
-            await directusApi.deleteCarPermission(permission.id);
+            await directusApi.updateCar(car.id, { owner_name: '', member_phone: '' });
           }
         }
 
@@ -387,10 +378,10 @@ export const Members: React.FC = () => {
       }
       setIsModalOpen(false);
       fetchMembers();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error saving member:', err);
-      const errorData = err.response?.data;
-      const errorMsg = (Array.isArray(errorData?.errors) && errorData.errors[0]?.message) || err.message || 'Failed to save member';
+      const errorData = (err as any).response?.data;
+      const errorMsg = (Array.isArray(errorData?.errors) && errorData.errors[0]?.message) || (err as any).message || 'Failed to save member';
       setActionError(errorMsg);
     } finally {
       setSubmitting(false);
@@ -747,7 +738,7 @@ export const Members: React.FC = () => {
                     onChange={(e) => setFormData({...formData, role: e.target.value as any})}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
-                    <option value="driver">{t('driver_role')}</option>
+                    <option value="member">{t('member_role')}</option>
                     <option value="customer">{t('customer_role')}</option>
                     <option value="general">{t('general_role')}</option>
                   </select>

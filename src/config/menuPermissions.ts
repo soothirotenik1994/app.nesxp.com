@@ -1,6 +1,7 @@
 export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
   'Administrator': {
     reports: true,
+    members: true,
     drivers: true,
     vehicles: true,
     locations: true,
@@ -17,6 +18,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
   },
   'Admin': {
     reports: true,
+    members: true,
     drivers: true,
     vehicles: true,
     locations: true,

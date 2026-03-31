@@ -33,6 +33,7 @@ export const lineService = {
         } catch (fallbackErr) {
           console.error('Failed to create fallback notification in Directus:', fallbackErr);
         }
+        return false; // Return false instead of throwing
       }
       
       throw error;
@@ -70,6 +71,7 @@ export const lineService = {
         } catch (fallbackErr) {
           console.error('Failed to create fallback notification in Directus:', fallbackErr);
         }
+        return false; // Return false instead of throwing
       }
       
       throw error;

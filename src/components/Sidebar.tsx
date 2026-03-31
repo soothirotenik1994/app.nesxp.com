@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
   const menuItems = [
     { name: t('reports'), path: '/reports', icon: ShieldCheck, key: 'reports' },
-    { name: t('drivers'), path: '/members', icon: Users, key: 'drivers' },
+    { name: t('members'), path: '/members', icon: Users, key: 'members' },
     { name: t('vehicles'), path: '/cars', icon: Car, key: 'vehicles' },
     { name: t('customer_locations'), path: '/locations', icon: MapPin, key: 'locations' },
     { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText, key: 'new_job' },

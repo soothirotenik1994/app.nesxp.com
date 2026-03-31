@@ -87,8 +87,8 @@ export const MyJobs: React.FC = () => {
           } else {
             // Driver sees only their own
             myReports = allReports.filter(r => {
-              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-              return String(driverId) === String(currentMember.id);
+              const memberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+              return String(memberId) === String(currentMember.id);
             });
           }
         } else {
@@ -144,7 +144,7 @@ export const MyJobs: React.FC = () => {
 
   const handleExportExcel = () => {
     const dataToExport = filteredReports.map(r => {
-      const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
+      const member = typeof r.member_id === 'object' ? r.member_id : null;
       const car = typeof r.car_id === 'object' ? r.car_id : null;
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
@@ -159,7 +159,7 @@ export const MyJobs: React.FC = () => {
         'Destination': r.destination || '-',
         'Vehicle Number': car?.car_number || '-',
         'Vehicle Type': car?.vehicle_type || '-',
-        'Driver Name': driver ? `${driver.first_name} ${driver.last_name}` : '-',
+        'Driver Name': member ? `${member.first_name} ${member.last_name}` : '-',
         'Driver Phone': r.phone || '-',
         'Standby Time': formatTimeDisplay(r.standby_time),
         'Departure Time': formatTimeDisplay(r.departure_time),
@@ -359,7 +359,7 @@ export const MyJobs: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {paginatedReports.map((report) => {
                     const car = typeof report.car_id === 'object' ? report.car_id : null;
-                    const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
+                    const member = typeof report.member_id === 'object' ? report.member_id : null;
                     
                     return (
                       <tr 
@@ -443,7 +443,7 @@ export const MyJobs: React.FC = () => {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                               <User className="w-3.5 h-3.5 text-slate-400" />
-                              {driver ? `${driver.first_name} ${driver.last_name}` : '-'}
+                              {member ? `${member.first_name} ${member.last_name}` : '-'}
                             </div>
                           </td>
                         )}

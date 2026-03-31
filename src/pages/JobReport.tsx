@@ -120,7 +120,7 @@ export const JobReport: React.FC = () => {
     destination_lng: undefined as number | undefined,
     vehicle_type: '',
     car_id: '',
-    driver_id: '',
+    member_id: '',
     customer_id: '',
     phone: '',
     standby_time: '',
@@ -141,14 +141,14 @@ export const JobReport: React.FC = () => {
 
   const [allReports, setAllReports] = useState<any[]>([]);
 
-  const busyDriversMap = useMemo(() => {
+  const busyMembersMap = useMemo(() => {
     const map = new Set<string>();
     allReports.forEach(r => {
       const status = r.status;
       if (!['completed', 'cancelled'].includes(status)) {
-        const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-        if (driverId && String(r.id) !== String(id)) {
-          map.add(String(driverId));
+        const memberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+        if (memberId && String(r.id) !== String(id)) {
+          map.add(String(memberId));
         }
       }
     });
@@ -180,9 +180,9 @@ export const JobReport: React.FC = () => {
     return map;
   }, [allReports]);
 
-  const isDriverBusy = useCallback((driverId: string) => {
-    return busyDriversMap.has(String(driverId));
-  }, [busyDriversMap]);
+  const isMemberBusy = useCallback((memberId: string) => {
+    return busyMembersMap.has(String(memberId));
+  }, [busyMembersMap]);
 
   const getLastMileage = useCallback((carId: string) => {
     return lastMileageMap.get(String(carId)) || 0;
@@ -250,7 +250,7 @@ export const JobReport: React.FC = () => {
     }
     
     // Drivers see all cars
-    if (userRole === 'driver') {
+    if (userRole === 'member') {
       return cars;
     }
     
@@ -382,6 +382,7 @@ export const JobReport: React.FC = () => {
         }
 
         setCars(carsData);
+        console.log('DEBUG: membersData:', membersData);
         setMembers(membersData);
         setCustomers(customersData);
         console.log(`JobReport: Loaded ${membersData.length} members, ${customersData.length} customers, ${carsData.length} cars`);
@@ -428,7 +429,7 @@ export const JobReport: React.FC = () => {
             destination_lng: report.destination_lng,
             vehicle_type: report.vehicle_type || report.car_id?.vehicle_type || '',
             car_id: report.car_id?.id || report.car_id || '',
-            driver_id: report.driver_id?.id || report.driver_id || '',
+            member_id: report.member_id?.id || report.member_id || '',
             customer_id: report.customer_id?.id || report.customer_id || '',
             phone: report.phone || '',
             standby_time: formatTimeForInput(report.standby_time),
@@ -471,7 +472,7 @@ export const JobReport: React.FC = () => {
           const newCaseNumber = generateCaseNumber();
           
           if (!isAdmin) {
-            // Pre-fill driver_id for new reports if user is a driver
+            // Pre-fill member_id for new reports if user is a member
             const memberId = localStorage.getItem('member_id');
             const userPhone = localStorage.getItem('user_phone');
             if (memberId) {
@@ -480,7 +481,7 @@ export const JobReport: React.FC = () => {
               setFormData(prev => ({
                 ...prev,
                 case_number: newCaseNumber,
-                driver_id: memberId,
+                member_id: memberId,
                 phone: memberPhone || prev.phone
               }));
             } else {
@@ -499,20 +500,20 @@ export const JobReport: React.FC = () => {
     fetchData();
   }, [id, isAdmin]);
 
-  // Auto-fill phone when driver changes
+  // Auto-fill phone when member changes
   useEffect(() => {
-    if (formData.driver_id && members.length > 0) {
-      const member = members.find(m => String(m.id) === String(formData.driver_id));
+    if (formData.member_id && members.length > 0) {
+      const member = members.find(m => String(m.id) === String(formData.member_id));
       if (member) {
         const memberPhone = member.phone || (member as any).Phone || (member as any).phone_number || '';
-        // Only auto-fill if phone is currently empty or if we just changed the driver
+        // Only auto-fill if phone is currently empty or if we just changed the member
         // To keep it simple, we'll update it if a phone exists for the member
         if (memberPhone && (formData.phone === '' || formData.phone === '08X-XXX-XXXX')) {
           setFormData(prev => ({ ...prev, phone: memberPhone }));
         }
       }
     }
-  }, [formData.driver_id, members]);
+  }, [formData.member_id, members]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pickup' | 'delivery' | 'document') => {
     const files = Array.from(e.target.files || []);
@@ -610,7 +611,7 @@ export const JobReport: React.FC = () => {
     try {
       const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id);
       const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
-      const currentDriverId = typeof formData.driver_id === 'object' && formData.driver_id ? (formData.driver_id as any).id : formData.driver_id;
+      const currentMemberId = typeof formData.member_id === 'object' && formData.member_id ? (formData.member_id as any).id : formData.member_id;
       const currentReportId = jobId || id;
 
       console.log(`Starting customer notification for status: ${status}, customer_id: ${currentCustomerId}, report_id: ${currentReportId}`);
@@ -673,7 +674,7 @@ export const JobReport: React.FC = () => {
       }
 
       const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
-      const driver = members.find(m => String(m.id) === String(currentDriverId));
+      const driver = members.find(m => String(m.id) === String(currentMemberId));
       
       const statusText = status === 'pending' ? t('status_pending_msg') : (status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg'));
       const headerColor = '#2c5494'; // NES Blue
@@ -923,7 +924,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "🏁 ปลายทาง",
+                          text: `🏁 ${t('destination')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -944,7 +945,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "🚚 รถ",
+                          text: `🚚 ${t('car_number')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -964,14 +965,14 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: `👤 ${t('driver')}`,
+                          text: `👤 ${t('member')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
                         },
                         {
                           type: "text",
-                          text: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
+                          text: String(member ? `${member.first_name} ${member.last_name}` : '-'),
                           size: "sm",
                           color: "#111111",
                           flex: 5
@@ -984,14 +985,14 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: `📞 ${t('driver_phone')}`,
+                          text: `📞 ${t('member_phone')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
                         },
                         {
                           type: "text",
-                          text: String(driver?.phone || '-'),
+                          text: String(member?.phone || '-'),
                           size: "sm",
                           color: "#111111",
                           flex: 5
@@ -1061,7 +1062,7 @@ export const JobReport: React.FC = () => {
     
     // Basic validation for new reports
     if (!id) {
-      if (!formData.car_id || !formData.driver_id || !formData.customer_name || !formData.origin || !formData.destination) {
+      if (!formData.car_id || !formData.member_id || !formData.customer_name || !formData.origin || !formData.destination) {
         setStatusConfig({
           type: 'error',
           title: t('incomplete_info'),
@@ -1079,7 +1080,7 @@ export const JobReport: React.FC = () => {
       // Extract IDs properly
       const currentCustomerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
       const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
-      const currentDriverId = typeof formData.driver_id === 'object' && formData.driver_id ? (formData.driver_id as any).id : formData.driver_id;
+      const currentMemberId = typeof formData.member_id === 'object' && formData.member_id ? (formData.member_id as any).id : formData.member_id;
 
       const getSafeId = (val: any) => {
         if (!val) return '';
@@ -1087,7 +1088,7 @@ export const JobReport: React.FC = () => {
         return String(val);
       };
 
-      console.log('handleSubmit: Extracted IDs:', { currentCustomerId, currentCarId, currentDriverId });
+      console.log('handleSubmit: Extracted IDs:', { currentCustomerId, currentCarId, currentMemberId });
       
       if (!currentCustomerId) {
         console.warn('handleSubmit: currentCustomerId is empty! Customer notifications might fail.');
@@ -1207,7 +1208,7 @@ export const JobReport: React.FC = () => {
         if (formData.destination) reportData.destination = formData.destination;
         if (formData.phone) reportData.phone = formData.phone;
         if (formData.car_id && formData.car_id !== '') reportData.car_id = formData.car_id;
-        if (formData.driver_id && formData.driver_id !== '') reportData.driver_id = formData.driver_id;
+        if (formData.member_id && formData.member_id !== '') reportData.member_id = formData.member_id;
         if (formData.vehicle_type) reportData.vehicle_type = formData.vehicle_type;
         reportData.status = formData.status;
         if (formData.case_number) reportData.case_number = formData.case_number;
@@ -1236,7 +1237,7 @@ export const JobReport: React.FC = () => {
 
         // Auto-link new car to new customer if changed or if it's a new assignment
         if (currentCustomerId && currentCarId) {
-          await assignCarToCustomer(currentCustomerId, currentCarId, currentDriverId);
+          await assignCarToCustomer(currentCustomerId, currentCarId, currentMemberId);
         }
 
         // Send notifications if status changed to completed
@@ -1272,14 +1273,14 @@ export const JobReport: React.FC = () => {
 
         // 1. Assign car to customer's members AND the driver
         if (currentCustomerId && currentCarId) {
-          console.log('Assigning car to customer and driver:', { currentCustomerId, currentCarId, currentDriverId });
-          await assignCarToCustomer(currentCustomerId, currentCarId, currentDriverId);
+          console.log('Assigning car to customer and driver:', { currentCustomerId, currentCarId, currentMemberId });
+          await assignCarToCustomer(currentCustomerId, currentCarId, currentMemberId);
         }
         
         // 2. Send LINE notification to driver for NEW job
         try {
           const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
-          const driver = members.find(m => String(m.id) === String(currentDriverId));
+          const driver = members.find(m => String(m.id) === String(currentMemberId));
           const lineIdRaw = driver?.line_user_id;
           let lineId = null;
           if (typeof lineIdRaw === 'object' && lineIdRaw !== null) {
@@ -1620,9 +1621,9 @@ export const JobReport: React.FC = () => {
 
   const sendDriverStatusNotification = async (status: 'completed') => {
     try {
-      console.log(`Starting driver notification for status: ${status}, driver_id: ${formData.driver_id}`);
-      const driver = members.find(m => String(m.id) === String(formData.driver_id));
-      const driverLineIdRaw = driver?.line_user_id;
+      console.log(`Starting member notification for status: ${status}, member_id: ${formData.member_id}`);
+      const member = members.find(m => String(m.id) === String(formData.member_id));
+      const driverLineIdRaw = member?.line_user_id;
       let driverLineId = null;
       if (typeof driverLineIdRaw === 'object' && driverLineIdRaw !== null) {
         driverLineId = (driverLineIdRaw as any).line_user_id || (driverLineIdRaw as any).id;
@@ -1633,8 +1634,8 @@ export const JobReport: React.FC = () => {
       console.log(`Driver LINE ID extraction:`, { raw: driverLineIdRaw, extracted: driverLineId });
       
       if (!driverLineId) {
-        console.log('Driver LINE ID not found, skipping notification. Driver ID:', formData.driver_id);
-        console.log('Driver details:', driver);
+        console.log('Member LINE ID not found, skipping notification. Member ID:', formData.member_id);
+        console.log('Member details:', member);
         return;
       }
 
@@ -1875,11 +1876,11 @@ export const JobReport: React.FC = () => {
         });
       }
 
-      // Add driver to unassign list
-      const driverIdRaw = typeof formData.driver_id === 'object' ? (formData.driver_id as any).id : formData.driver_id;
-      const driverId = resolveMemberId(String(driverIdRaw));
-      if (driverId && !memberIds.includes(driverId)) {
-        memberIds.push(driverId);
+      // Add member to unassign list
+      const memberIdRaw = typeof formData.member_id === 'object' ? (formData.member_id as any).id : formData.member_id;
+      const memberId = resolveMemberId(String(memberIdRaw));
+      if (memberId && !memberIds.includes(memberId)) {
+        memberIds.push(memberId);
       }
 
       if (memberIds.length === 0) {
@@ -2045,25 +2046,31 @@ export const JobReport: React.FC = () => {
   const handleCancelJob = async () => {
     if (!id) return;
     
+    if (!cancelReasonInput.trim()) {
+      setStatusConfig({
+        type: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        message: t('enter_cancel_reason')
+      });
+      setShowStatusModal(true);
+      return;
+    }
+
     // If job is already accepted, it needs admin approval
     if (formData.status === 'accepted' && !isAdmin) {
-      if (!cancelReasonInput.trim()) {
-        setStatusConfig({
-          type: 'error',
-          title: 'เกิดข้อผิดพลาด',
-          message: t('enter_cancel_reason')
-        });
-        setShowStatusModal(true);
-        return;
-      }
-
       setSubmitting(true);
       try {
         await directusApi.updateWorkReport(id, { 
           status: 'cancel_pending',
-          cancel_reason: cancelReasonInput
+          cancel_reason: cancelReasonInput,
+          notes: (formData.notes ? formData.notes + '\n' : '') + `เหตุผลการยกเลิก: ${cancelReasonInput}`
         });
-        setFormData(prev => ({ ...prev, status: 'cancel_pending', cancel_reason: cancelReasonInput }));
+        setFormData(prev => ({ 
+          ...prev, 
+          status: 'cancel_pending', 
+          cancel_reason: cancelReasonInput,
+          notes: (prev.notes ? prev.notes + '\n' : '') + `เหตุผลการยกเลิก: ${cancelReasonInput}`
+        }));
         setStatusConfig({
           type: 'success',
           title: t('request_cancel'),
@@ -2089,8 +2096,17 @@ export const JobReport: React.FC = () => {
     setSubmitting(true);
     try {
       await unassignCarFromCustomer();
-      await directusApi.updateWorkReport(id, { status: 'cancelled' });
-      setFormData(prev => ({ ...prev, status: 'cancelled' }));
+      await directusApi.updateWorkReport(id, { 
+        status: 'cancelled',
+        cancel_reason: cancelReasonInput,
+        notes: (formData.notes ? formData.notes + '\n' : '') + `เหตุผลการยกเลิก: ${cancelReasonInput}`
+      });
+      setFormData(prev => ({ 
+        ...prev, 
+        status: 'cancelled', 
+        cancel_reason: cancelReasonInput,
+        notes: (prev.notes ? prev.notes + '\n' : '') + `เหตุผลการยกเลิก: ${cancelReasonInput}`
+      }));
       setStatusConfig({
         type: 'success',
         title: t('job_cancelled'),
@@ -2101,8 +2117,8 @@ export const JobReport: React.FC = () => {
       console.error('Error cancelling job:', error);
       setStatusConfig({
         type: 'error',
-        title: t('error'),
-        message: error.message || t('error_cancelling_job')
+        title: 'เกิดข้อผิดพลาด',
+        message: error.message || 'ไม่สามารถยกเลิกงานได้'
       });
       setShowStatusModal(true);
     } finally {
@@ -2164,9 +2180,9 @@ export const JobReport: React.FC = () => {
 
   const generateReportText = () => {
     const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-    const selectedMember = members.find(m => String(m.id) === String(formData.driver_id));
+    const selectedMember = members.find(m => String(m.id) === String(formData.member_id));
     const accountSource = selectedMember?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
-    const memberRoleLabel = selectedMember?.role === 'customer' ? t('customer_role') : t('driver_role');
+    const memberRoleLabel = selectedMember?.role === 'customer' ? t('customer_role') : t('member_role');
     
     const formatDisplayDT = (dt: string) => dt ? dt.replace('T', ' ') : '-';
     
@@ -2181,7 +2197,7 @@ export const JobReport: React.FC = () => {
 
 🚚 ${t('car_number')} : ${selectedCar?.car_number || formData.car_id}
 
-👷 ${memberRoleLabel} : ${selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name} ${accountSource}` : formData.driver_id}
+👷 ${memberRoleLabel} : ${selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name} ${accountSource}` : formData.member_id}
 📞 ${t('phone')} : ${formData.phone}
 
 👉 ${t('standby_time')} : ${formatDisplayDT(formData.standby_time)}
@@ -2197,7 +2213,7 @@ export const JobReport: React.FC = () => {
   const isCustomer = userRole.toLowerCase() === 'customer';
   const isEditable = (!id || isAdmin || formData.status === 'accepted') && !isCustomer;
   const isPendingCancel = formData.status === 'cancel_pending';
-  const selectedMember = members.find(m => String(m.id) === String(formData.driver_id));
+  const selectedMember = members.find(m => String(m.id) === String(formData.member_id));
   const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
 
   const InfoRow: React.FC<{ icon: React.ReactNode, label: string, value: string | React.ReactNode, className?: string }> = ({ icon, label, value, className }) => (
@@ -2470,6 +2486,19 @@ export const JobReport: React.FC = () => {
                 </button>
               )}
 
+              {/* Cancel Job */}
+              {formData.status !== 'cancelled' && formData.status !== 'completed' && formData.status !== 'cancel_pending' && (
+                <button 
+                  type="button"
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
+                >
+                  <X className="w-4 h-4" />
+                  {t('cancel_job')}
+                </button>
+              )}
+
               {/* Open New Job */}
               {isAdmin && (formData.status === 'completed' || formData.status === 'cancelled') && (
                 <button 
@@ -2484,7 +2513,7 @@ export const JobReport: React.FC = () => {
               )}
 
               {/* Delete */}
-              {isAdmin && id && (
+              {isAdmin && id && formData.status !== 'cancelled' && (
                 <button 
                   type="button"
                   onClick={handleDeleteJob}
@@ -2859,7 +2888,7 @@ export const JobReport: React.FC = () => {
                     if (driverMember) {
                       setFormData(prev => ({
                         ...prev, 
-                        driver_id: driverMember.id,
+                        member_id: driverMember.id,
                         phone: driverMember.phone || prev.phone
                       }));
                     }
@@ -2911,19 +2940,19 @@ export const JobReport: React.FC = () => {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <User className="w-4 h-4" /> {t('driver_name')}
+                <User className="w-4 h-4" /> {t('driver_name') || 'ชื่อพนักงานคนขับ'}
               </label>
               <select 
                 required
-                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== formData.driver_id}
-                value={formData.driver_id}
+                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== formData.member_id}
+                value={formData.member_id || ''}
                 onChange={e => {
                   const selectedId = e.target.value;
                   const member = members.find(m => String(m.id) === String(selectedId));
                   const memberPhone = member?.phone || (member as any)?.Phone || (member as any)?.phone_number || '';
                   setFormData(prev => ({
                     ...prev, 
-                    driver_id: selectedId,
+                    member_id: selectedId,
                     phone: memberPhone
                   }));
                 }}
@@ -2932,10 +2961,10 @@ export const JobReport: React.FC = () => {
                   (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               >
-                <option value="">{t('select_driver')}</option>
-                {members.filter(m => m.role === 'driver').map(member => {
-                  const busy = isDriverBusy(member.id);
-                  const statusText = busy ? ` (${t('busy')})` : ` (${t('available')})`;
+                <option value="">{t('select_member') || 'เลือกพนักงานคนขับ'}</option>
+                {members.map(member => {
+                  const busy = isMemberBusy(member.id);
+                  const statusText = busy ? ` (${t('busy') || 'ไม่ว่าง'})` : ` (${t('available') || 'ว่าง'})`;
                   return (
                     <option key={member.id} value={member.id} className={busy ? "text-red-500" : "text-green-500"}>
                       {member.first_name} {member.last_name} {statusText}
@@ -3225,29 +3254,27 @@ export const JobReport: React.FC = () => {
 
       <ConfirmModal 
         isOpen={showCancelConfirm}
-        title={formData.status === 'accepted' && !isAdmin ? t('request_cancel') : t('cancel_job')}
+        title={t('cancel_job')}
         message={
           <div className="space-y-4">
-            <p>{t('confirm_cancel_job')}</p>
-            {formData.status === 'accepted' && !isAdmin && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  {t('cancel_reason')}
-                </label>
-                <textarea
-                  value={cancelReasonInput}
-                  onChange={(e) => setCancelReasonInput(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none"
-                  rows={3}
-                  placeholder={t('enter_cancel_reason')}
-                />
-              </div>
-            )}
+            <div>{t('confirm_cancel_job')}</div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {t('cancel_reason')}
+              </label>
+              <textarea
+                value={cancelReasonInput}
+                onChange={(e) => setCancelReasonInput(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none"
+                rows={3}
+                placeholder={t('enter_cancel_reason')}
+              />
+            </div>
           </div>
         }
         onConfirm={handleCancelJob}
         onCancel={() => setShowCancelConfirm(false)}
-        confirmText={formData.status === 'accepted' && !isAdmin ? t('request_cancel') : t('cancel_job')}
+        confirmText={t('cancel_job')}
       />
 
       <ConfirmModal 

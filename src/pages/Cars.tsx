@@ -126,9 +126,9 @@ const CarCard = React.memo(({
           </div>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('phone')}</p>
-            {car.driver_phone ? (
-              <a href={`tel:${car.driver_phone}`} className="text-sm text-primary font-bold hover:underline">
-                {car.driver_phone}
+            {car.member_phone ? (
+              <a href={`tel:${car.member_phone}`} className="text-sm text-primary font-bold hover:underline">
+                {car.member_phone}
               </a>
             ) : (
               <p className="text-sm text-slate-300 italic">{t('no_data')}</p>
@@ -184,7 +184,7 @@ export const Cars: React.FC = () => {
     vehicle_type: '',
     description: '',
     owner_name: '',
-    driver_phone: '',
+    member_phone: '',
     car_image: '',
     status: 'active',
     brand_id: ''
@@ -248,7 +248,7 @@ export const Cars: React.FC = () => {
         vehicle_type: car.vehicle_type || '',
         description: car.description || '',
         owner_name: car.owner_name || '',
-        driver_phone: car.driver_phone || '',
+        member_phone: car.member_phone || '',
         car_image: carImageId || '',
         status: (car as any).status || 'active',
         brand_id: (car.brand_id && typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || ''
@@ -260,7 +260,7 @@ export const Cars: React.FC = () => {
         vehicle_type: '',
         description: '',
         owner_name: '',
-        driver_phone: '',
+        member_phone: '',
         car_image: '',
         status: 'active',
         brand_id: ''
@@ -712,13 +712,13 @@ export const Cars: React.FC = () => {
                       setFormData(prev => ({
                         ...prev, 
                         owner_name: `${selectedMember.first_name} ${selectedMember.last_name}`.trim(),
-                        driver_phone: selectedMember.phone || ''
+                        member_phone: selectedMember.phone || ''
                       }));
                     } else {
                       setFormData(prev => ({
                         ...prev, 
                         owner_name: '',
-                        driver_phone: ''
+                        member_phone: ''
                       }));
                     }
                   }}
@@ -738,8 +738,8 @@ export const Cars: React.FC = () => {
                 <label className="text-sm font-semibold text-slate-700">{t('phone')}</label>
                 <input 
                   type="tel" 
-                  value={formData.driver_phone}
-                  onChange={(e) => setFormData(prev => ({...prev, driver_phone: e.target.value}))}
+                  value={formData.member_phone}
+                  onChange={(e) => setFormData(prev => ({...prev, member_phone: e.target.value}))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                   placeholder={t('phone')}
                 />

@@ -99,7 +99,7 @@ export const AssignCars: React.FC = () => {
         const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.display_name || '';
         await directusApi.updateCar(carId, {
           owner_name: fullName,
-          driver_phone: member.phone || ''
+          member_phone: member.phone || ''
         });
       }
 
@@ -139,7 +139,7 @@ export const AssignCars: React.FC = () => {
         if (car.owner_name === fullName) {
           await directusApi.updateCar(carId, {
             owner_name: '',
-            driver_phone: ''
+            member_phone: ''
           });
         }
       }

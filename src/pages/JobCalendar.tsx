@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import thLocale from '@fullcalendar/core/locales/th';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { WorkReport, Car } from '../types';
@@ -69,13 +70,13 @@ export const JobCalendar: React.FC = () => {
                 })
               );
             } else {
-              // Filter jobs for driver
+              // Filter jobs for member
               filteredJobs = allJobs.filter(r => {
-                const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-                return String(driverId) === String(currentMember.id);
+                const memberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+                return String(memberId) === String(currentMember.id);
               });
 
-              // Filter cars for driver (those they are assigned to)
+              // Filter cars for member (those they are assigned to)
               filteredCars = carsData.filter(car => 
                 car.car_users?.some((cu: any) => {
                   const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
@@ -179,6 +180,8 @@ export const JobCalendar: React.FC = () => {
                 hour12: false
               }}
               locale={i18n.language === 'th' ? 'th' : 'en'}
+              locales={[thLocale]}
+              titleFormat={i18n.language === 'th' ? { year: 'numeric', month: 'long' } : { year: 'numeric', month: 'long' }}
               dayMaxEvents={true}
               nowIndicator={true}
               buttonText={{

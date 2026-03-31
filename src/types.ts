@@ -17,7 +17,7 @@ export interface Member {
   phone: string;
   email: string;
   password?: string;
-  role?: 'driver' | 'customer' | 'general';
+  role?: 'member' | 'customer' | 'general';
   status?: 'active' | 'inactive' | 'pending';
   created_at: string;
   date_created?: string;
@@ -35,7 +35,7 @@ export interface Car {
   brand_id?: string | CarBrand;
   description: string;
   owner_name?: string;
-  driver_phone?: string;
+  member_phone?: string;
   car_image?: string | { id: string };
   car_users?: {
     line_user_id: Member;
@@ -61,8 +61,8 @@ export interface CarPermission {
 
 export interface CarStatus {
   carNumber: string;
-  driverName?: string;
-  driverPhone?: string;
+  memberName?: string;
+  memberPhone?: string;
   lat: number;
   lng: number;
   speed: number;
@@ -121,7 +121,7 @@ export interface WorkReport {
   destination_lng?: number;
   vehicle_type?: string;
   car_id: string | Car;
-  driver_id: string | Member;
+  member_id: string | Member;
   customer_id?: string | CustomerLocation;
   phone: string;
   standby_time: string;

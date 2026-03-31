@@ -22,7 +22,8 @@ import {
   Download,
   Camera
 } from 'lucide-react';
-import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { formatDate } from '../lib/dateUtils';
 import * as XLSX from 'xlsx';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { clsx } from 'clsx';
@@ -82,8 +83,8 @@ export const JobHistory: React.FC = () => {
             });
           } else {
             myReports = allReports.filter(r => {
-              const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-              return String(driverId) === String(currentMember.id);
+              const memberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+              return String(memberId) === String(currentMember.id);
             });
           }
         }
@@ -128,9 +129,9 @@ export const JobHistory: React.FC = () => {
 
   const generateReportText = (report: WorkReport) => {
     const carNum = (report.car_id && typeof report.car_id === 'object') ? (report.car_id as any).car_number : report.car_id;
-    const driver = (report.driver_id && typeof report.driver_id === 'object') ? report.driver_id : null;
-    const accountSource = driver?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
-    const driverName = driver ? `${driver.first_name} ${driver.last_name} ${accountSource}` : report.driver_id;
+    const member = (report.member_id && typeof report.member_id === 'object') ? report.member_id : null;
+    const accountSource = member?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
+    const memberName = member ? `${member.first_name} ${member.last_name} ${accountSource}` : report.member_id;
     
     const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     const isCustomer = userRole.toLowerCase() === 'customer';
@@ -144,7 +145,7 @@ export const JobHistory: React.FC = () => {
 
 🚚 ${t('car_number')} : ${carNum}
 
-👷 ${t('driver_name')} : ${driverName}
+👷 ${t('member_name')} : ${memberName}
 📞 ${t('phone')} : ${report.phone}
 
 👉 ${t('standby_time')} : ${formatTimeDisplay(report.standby_time)}
@@ -209,7 +210,7 @@ ${!isCustomer ? `
 
   const handleExportExcel = useCallback(() => {
     const dataToExport = filteredReports.map(r => {
-      const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
+      const member = typeof r.member_id === 'object' ? r.member_id : null;
       const car = typeof r.car_id === 'object' ? r.car_id : null;
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
@@ -224,8 +225,8 @@ ${!isCustomer ? `
         'Destination': r.destination || '-',
         'Vehicle Number': car?.car_number || '-',
         'Vehicle Type': car?.vehicle_type || '-',
-        'Driver Name': driver ? `${driver.first_name} ${driver.last_name}` : '-',
-        'Driver Phone': r.phone || '-',
+        'Member Name': member ? `${member.first_name} ${member.last_name}` : '-',
+        'Member Phone': r.phone || '-',
         'Standby Time': formatTimeDisplay(r.standby_time),
         'Departure Time': formatTimeDisplay(r.departure_time),
         'Arrival Time': formatTimeDisplay(r.arrival_time),
@@ -239,7 +240,7 @@ ${!isCustomer ? `
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Job History");
     
-    const fileName = `Job_History_${format(new Date(), 'yyyy-MM-dd_HHmm')}.xlsx`;
+    const fileName = `Job_History_${formatDate(new Date(), 'dd/MM/yyyy_HHmm')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   }, [filteredReports, t]);
 
@@ -316,7 +317,7 @@ ${!isCustomer ? `
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('route')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('vehicle')}</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('member')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
               </tr>
             </thead>
@@ -336,7 +337,7 @@ ${!isCustomer ? `
                 </tr>
               ) : (
                 paginatedReports.map((report) => {
-                  const driver = typeof report.driver_id === 'object' ? report.driver_id : null;
+                  const member = typeof report.member_id === 'object' ? report.member_id : null;
                   const car = typeof report.car_id === 'object' ? report.car_id : null;
                   
                   return (
@@ -363,7 +364,7 @@ ${!isCustomer ? `
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <Calendar className="w-3.5 h-3.5" />
-                          {format(new Date(report.work_date || report.date_created || Date.now()), 'MMM dd, yyyy')}
+                          {formatDate(new Date(report.work_date || report.date_created || Date.now()), 'dd/MM/yyyy')}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -414,7 +415,7 @@ ${!isCustomer ? `
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-medium text-slate-700">
-                          {driver ? `${driver.first_name} ${driver.last_name}` : 'N/A'}
+                          {member ? `${member.first_name} ${member.last_name}` : 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
