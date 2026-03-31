@@ -357,7 +357,6 @@ export const Dashboard: React.FC = () => {
             
             {/* Map Overlay Info */}
             {selectedVehicle && (() => {
-              const activeJob = activeJobsByCar.get(selectedVehicle.carNumber);
               return (
                 <div className="absolute bottom-4 left-4 right-4 lg:left-auto lg:w-72 bg-white p-4 rounded-xl border border-slate-200 shadow-lg z-[1000]">
                   <div className="flex items-start justify-between mb-2">
@@ -373,12 +372,6 @@ export const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="space-y-1.5">
-                    {activeJob && (
-                      <div className="flex items-center gap-2 text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg mb-2">
-                        <Hash className="w-3 h-3" />
-                        <span>{t('case_number')}: {formatCaseNumber(activeJob)}</span>
-                      </div>
-                    )}
                     <div className="flex items-center gap-2 text-xs text-slate-600">
                       <Navigation className="w-3 h-3 text-slate-400" />
                       <span className="truncate">{selectedVehicle.address || t('locating')}</span>
@@ -457,11 +450,6 @@ export const Dashboard: React.FC = () => {
                         <span className={`text-sm font-bold tracking-tight ${isSelected ? 'text-primary' : 'text-slate-900'}`}>
                           {v.carNumber}
                         </span>
-                        {activeJobsByCar.get(v.carNumber) && (
-                          <span className="text-[9px] font-bold text-primary truncate">
-                            #{formatCaseNumber(activeJobsByCar.get(v.carNumber))}
-                          </span>
-                        )}
                         <span className="text-[9px] font-medium text-slate-400 uppercase truncate">
                           {carInfo?.vehicle_type || t('general')}
                         </span>

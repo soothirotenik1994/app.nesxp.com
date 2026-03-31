@@ -177,7 +177,7 @@ ${!isCustomer ? `
       const origin = String(r.origin || '').toLowerCase();
       const dest = String(r.destination || '').toLowerCase();
       const car = (r.car_id && typeof r.car_id === 'object') ? String((r.car_id as any).car_number || '').toLowerCase() : '';
-      const caseNum = String(r.id || '').toLowerCase();
+      const caseNum = String(r.case_number || r.id || '').toLowerCase();
       
       return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
     }).sort((a, b) => {

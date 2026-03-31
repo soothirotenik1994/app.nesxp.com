@@ -675,10 +675,10 @@ export const JobReport: React.FC = () => {
       const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
       const driver = members.find(m => String(m.id) === String(currentDriverId));
       
-      const statusText = status === 'pending' ? 'ได้รับงานใหม่แล้ว' : (status === 'accepted' ? 'กำลังส่งสินค้า' : 'จัดส่งสินค้าสำเร็จ');
+      const statusText = status === 'pending' ? t('status_pending_msg') : (status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg'));
       const headerColor = '#2c5494'; // NES Blue
       const statusColor = status === 'completed' ? '#27ae60' : '#e54d42'; // Green for success, Red for others
-      const displayId = currentReportId;
+      const displayId = formData.case_number || currentReportId;
 
       // Send notification to each member
       console.log(`Found ${memberIds.length} members to notify:`, memberIds);
@@ -741,7 +741,7 @@ export const JobReport: React.FC = () => {
               contents: [
                 {
                   type: "text",
-                  text: "แจ้งเตือนการส่งสินค้า",
+                  text: t('job_status_notification'),
                   weight: "bold",
                   size: "xl",
                   color: statusColor,
@@ -759,14 +759,14 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "ต้นทาง",
+                          text: t('origin'),
                           size: "xxs",
                           color: status === 'pending' || status === 'accepted' || status === 'completed' ? "#2c5494" : "#aaaaaa",
                           weight: status === 'pending' || status === 'accepted' || status === 'completed' ? "bold" : "regular"
                         },
                         {
                           type: "text",
-                          text: "กำลังส่งสินค้า",
+                          text: t('in_transit'),
                           size: "xxs",
                           color: status === 'accepted' || status === 'completed' ? "#2c5494" : "#aaaaaa",
                           align: "center",
@@ -774,7 +774,7 @@ export const JobReport: React.FC = () => {
                         },
                         {
                           type: "text",
-                          text: "ปลายทาง",
+                          text: t('destination'),
                           size: "xxs",
                           color: status === 'completed' ? "#2c5494" : "#aaaaaa",
                           align: "end",
@@ -840,14 +840,14 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "🆔 เลขที่เคส",
+                          text: `🆔 ${t('case_number')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
                         },
                         {
                           type: "text",
-                          text: String(displayId || 'N/A'),
+                          text: String(formData.case_number || 'N/A'),
                           size: "sm",
                           color: "#111111",
                           flex: 5
@@ -860,7 +860,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "🏢 บริษัท",
+                          text: `🏢 ${t('customer_name')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -881,7 +881,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "📦 สถานะ",
+                          text: `📦 ${t('status')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -902,7 +902,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "📍 ต้นทาง",
+                          text: `📍 ${t('origin')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -964,7 +964,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "👤 คนขับ",
+                          text: `👤 ${t('driver')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -984,7 +984,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "📞 เบอร์คนขับ",
+                          text: `📞 ${t('driver_phone')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -1004,7 +1004,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "📅 วันที่",
+                          text: `📅 ${t('date')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -1035,7 +1035,7 @@ export const JobReport: React.FC = () => {
                   color: "#e54d42",
                   action: {
                     type: "uri",
-                    label: "เข้าสู่ระบบ",
+                    label: t('login'),
                     uri: "https://app.nesxp.com/"
                   }
                 }
@@ -1044,7 +1044,8 @@ export const JobReport: React.FC = () => {
             }
           };
 
-          await sendLineNotification(customerLineId, [{ type: "flex", altText: `แจ้งเตือนการส่งสินค้า: ${statusText}`, contents: flexContents }], `แจ้งเตือนการส่งสินค้า: ${statusText}`);
+          const notificationTitle = `${t('job_status_notification')}: ${statusText}`;
+          await sendLineNotification(customerLineId, [{ type: "flex", altText: notificationTitle, contents: flexContents }], notificationTitle);
         } catch (memberErr) {
           console.error(`Failed to send LINE notification to member ${memberId}:`, memberErr);
         }
@@ -1269,27 +1270,6 @@ export const JobReport: React.FC = () => {
         const result = await directusApi.createWorkReport(reportData);
         console.log('Creation successful:', result);
 
-        // Generate case number: TH + DDMMYYYY + Sequence(4) + Random(4)
-        const generateCaseNumber = (id: number) => {
-          const date = new Date();
-          const dd = String(date.getDate()).padStart(2, '0');
-          const mm = String(date.getMonth() + 1).padStart(2, '0');
-          const yyyy = date.getFullYear();
-          const dateStr = `${dd}${mm}${yyyy}`;
-          const sequence = String(id).padStart(4, '0');
-          const random = Math.floor(1000 + Math.random() * 9000);
-          return `TH${dateStr}${sequence}${random}`;
-        };
-
-        const newCaseNumber = generateCaseNumber(result.id);
-        try {
-          await directusApi.updateWorkReport(result.id, { case_number: newCaseNumber });
-          result.case_number = newCaseNumber; // Update local object for notifications
-          console.log('Case number generated and saved:', newCaseNumber);
-        } catch (updateErr) {
-          console.error('Failed to update case number:', updateErr);
-        }
-        
         // 1. Assign car to customer's members AND the driver
         if (currentCustomerId && currentCarId) {
           console.log('Assigning car to customer and driver:', { currentCustomerId, currentCarId, currentDriverId });
@@ -1317,11 +1297,11 @@ export const JobReport: React.FC = () => {
             const messages = [
               {
                 type: "text",
-                text: `🔔 มีงานใหม่มอบหมายให้คุณ\n\n🆔 เคส: ${result.id || 'N/A'}\n🏢 ลูกค้า: ${formData.customer_name}\n👤 ผู้ติดต่อ: ${formData.customer_contact_name || '-'}\n📞 เบอร์ติดต่อ: ${formData.customer_contact_phone || '-'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}\n🚚 รถ: ${selectedCar?.car_number || ''}\n📅 วันที่: ${formData.work_date}`
+                text: `🔔 มีงานใหม่มอบหมายให้คุณ\n\n🆔 เคส: ${formData.case_number || 'N/A'}\n🏢 ลูกค้า: ${formData.customer_name}\n👤 ผู้ติดต่อ: ${formData.customer_contact_name || '-'}\n📞 เบอร์ติดต่อ: ${formData.customer_contact_phone || '-'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}\n🚚 รถ: ${selectedCar?.car_number || ''}\n📅 วันที่: ${formData.work_date}`
               },
               {
                 type: "flex",
-                altText: "รายละเอียดงานใหม่",
+                altText: t('new_job_details'),
                 contents: {
                   type: "bubble",
                   header: {
@@ -1344,7 +1324,7 @@ export const JobReport: React.FC = () => {
                     contents: [
                       {
                         type: "text",
-                        text: "มีงานใหม่มอบหมายให้คุณ",
+                        text: t('new_job_assigned'),
                         weight: "bold",
                         size: "xl",
                         margin: "md",
@@ -1367,14 +1347,14 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "🆔 เลขที่เคส",
+                                text: `🆔 ${t('case_number')}`,
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
                               },
                               {
                                 type: "text",
-                                text: String(result.id || 'N/A'),
+                                text: String(formData.case_number || 'N/A'),
                                 size: "sm",
                                 color: "#111111",
                                 flex: 3
@@ -1387,7 +1367,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "ทะเบียนรถ",
+                                text: t('car_number'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1407,7 +1387,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "ลูกค้า",
+                                text: t('customer_name'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1428,7 +1408,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "ผู้ติดต่อ",
+                                text: t('contact_name'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1449,7 +1429,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "เบอร์ติดต่อ",
+                                text: t('contact_phone'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1470,7 +1450,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "ต้นทาง",
+                                text: t('origin'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1491,7 +1471,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "ปลายทาง",
+                                text: t('destination'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1512,7 +1492,7 @@ export const JobReport: React.FC = () => {
                             contents: [
                               {
                                 type: "text",
-                                text: "วันที่",
+                                text: t('date'),
                                 size: "sm",
                                 color: "#8c8c8c",
                                 flex: 1
@@ -1562,8 +1542,8 @@ export const JobReport: React.FC = () => {
                         color: "#e54d42",
                         action: {
                           type: "uri",
-                          label: "เข้าสู่ระบบ",
-                          uri: "https://app.nesxp.com/"
+                          label: t('login'),
+                          uri: `${window.location.origin}/login`
                         }
                       }
                     ],
@@ -1638,39 +1618,6 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const handleReportProblem = async (type: 'delay' | 'accident') => {
-    try {
-      setSubmitting(true);
-      const driver = members.find(m => String(m.id) === String(formData.driver_id));
-      const driverName = driver ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
-      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-      
-      const message = `⚠️ รายงานปัญหาจากคนขับ\n\n👤 คนขับ: ${driverName}\n🚚 รถ: ${selectedCar?.car_number || 'N/A'}\n🆔 เคส: ${id || 'N/A'}\n🚩 ปัญหา: ${type === 'delay' ? 'ล่าช้า (Delay)' : 'อุบัติเหตุ (Accident)'}\n📍 ต้นทาง: ${formData.origin}\n🏁 ปลายทาง: ${formData.destination}`;
-      
-      const adminGroupId = import.meta.env.VITE_LINE_ADMIN_GROUP_ID || 'ADMIN_GROUP_ID_HERE';
-      
-      // Send to Admin Group (via lineService if configured, or just log for now)
-      // In a real app, you'd have an admin group chat ID
-      await lineService.sendPushMessage(adminGroupId, [{
-        type: "text",
-        text: message
-      }]);
-
-      setStatusConfig({
-        type: 'success',
-        title: t('problem_report'),
-        message: t('save_success'),
-        action: () => setShowStatusModal(false)
-      });
-      setShowStatusModal(true);
-    } catch (err) {
-      console.error('Error reporting problem:', err);
-      setError('Failed to send report');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const sendDriverStatusNotification = async (status: 'completed') => {
     try {
       console.log(`Starting driver notification for status: ${status}, driver_id: ${formData.driver_id}`);
@@ -1692,7 +1639,7 @@ export const JobReport: React.FC = () => {
       }
 
       const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
-      const statusText = 'จัดส่งงานสำเร็จแล้ว';
+      const statusText = t('job_completed_msg');
       const headerColor = '#2c5494'; // NES Blue
       const statusColor = '#e54d42'; // NES Red
 
@@ -1739,33 +1686,13 @@ export const JobReport: React.FC = () => {
                   margin: "lg",
                   spacing: "sm",
                   contents: [
-                    {
+                                 {
                       type: "box",
                       layout: "horizontal",
                       contents: [
                         {
                           type: "text",
-                          text: "🆔 เลขที่เคส",
-                          size: "sm",
-                          color: "#2c5494",
-                          flex: 2
-                        },
-                        {
-                          type: "text",
-                          text: String(id || 'N/A'),
-                          size: "sm",
-                          color: "#111111",
-                          flex: 5
-                        }
-                      ]
-                    },
-                    {
-                      type: "box",
-                      layout: "horizontal",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "🚚 รถ",
+                          text: `🚚 ${t('car_number')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -1785,7 +1712,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: "🏁 ปลายทาง",
+                          text: `🏁 ${t('destination')}`,
                           size: "sm",
                           color: "#2c5494",
                           flex: 2
@@ -2243,7 +2170,8 @@ export const JobReport: React.FC = () => {
     
     const formatDisplayDT = (dt: string) => dt ? dt.replace('T', ' ') : '-';
     
-    return `📅 ${t('report_date')} : ${formData.work_date}
+    return `🆔 ${t('case_number')} : ${formData.case_number || '-'}
+📅 ${t('report_date')} : ${formData.work_date}
 📁 ${t('customer_name')} : ${formData.customer_name}
 👤 ${t('contact_name')} : ${formData.customer_contact_name || '-'}
 📞 ${t('contact_phone')} : ${formData.customer_contact_phone || '-'}
@@ -2517,44 +2445,32 @@ export const JobReport: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto pb-12">
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-slate-900">{id ? t('update_job_details') : t('new_job_assignment_title')}</h2>
-            {formData.case_number && (
-              <span className="px-3 py-1 bg-blue-50 text-primary text-xs font-black rounded-full border border-blue-100 shadow-sm">
-                {formData.case_number}
-              </span>
-            )}
+      <div className="mb-8 flex flex-col gap-4">
+        <h2 className="text-2xl font-bold text-slate-900">
+          {id ? t('update_job_details') : t('new_job_assignment_title')}
+        </h2>
+        {formData.case_number && (
+          <div className="text-sm text-slate-500 font-medium">
+            {t('case_number')}: {formData.case_number}
           </div>
-        </div>
+        )}
         {id && (
-          <div className="flex flex-wrap items-center gap-3">
-            {formData.status === 'pending' && (
-              <button 
-                type="button"
-                onClick={handleAcceptJob}
-                disabled={submitting}
-                className="px-10 py-5 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all flex items-center gap-3 shadow-2xl shadow-emerald-200 text-xl transform hover:scale-105 active:scale-95"
-              >
-                <CheckCircle2 className="w-8 h-8" />
-                {t('accept_job') || 'รับงาน'}
-              </button>
-            )}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Accept Job */}
+              {formData.status === 'pending' && (
+                <button 
+                  type="button"
+                  onClick={handleAcceptJob}
+                  disabled={submitting}
+                  className="px-8 py-3 bg-[#007A3E] text-white rounded-full font-bold hover:bg-[#00602F] transition-all flex items-center gap-2 shadow-md"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  {t('accept_job') || 'รับงาน'}
+                </button>
+              )}
 
-            {isAdmin && formData.status === 'accepted' && (
-              <button 
-                type="button"
-                onClick={handleCompleteJob}
-                disabled={submitting}
-                className="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                {t('complete_job')}
-              </button>
-            )}
-
-            <div className="flex items-center gap-2 ml-auto">
+              {/* Open New Job */}
               {isAdmin && (formData.status === 'completed' || formData.status === 'cancelled') && (
                 <button 
                   type="button"
@@ -2566,45 +2482,8 @@ export const JobReport: React.FC = () => {
                   {t('reopen_job')}
                 </button>
               )}
-              
-              {formData.status === 'cancel_pending' && isAdmin && (
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={handleApproveCancel}
-                    disabled={submitting}
-                    className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-100"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    {t('approve_cancel')}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleRejectCancel}
-                    disabled={submitting}
-                    className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
-                  >
-                    <X className="w-4 h-4" />
-                    {t('reject_cancel')}
-                  </button>
-                </div>
-              )}
 
-              {(formData.status === 'pending' || formData.status === 'accepted' || (isAdmin && formData.status === 'completed')) && (
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setCancelReasonInput('');
-                    setShowCancelConfirm(true);
-                  }}
-                  disabled={submitting || (formData.status as any) === 'cancel_pending'}
-                  className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center gap-2 border border-slate-300 disabled:opacity-50"
-                >
-                  <X className="w-4 h-4" />
-                  {formData.status === 'accepted' && !isAdmin ? t('request_cancel') : t('cancel_job')}
-                </button>
-              )}
-
+              {/* Delete */}
               {isAdmin && id && (
                 <button 
                   type="button"
@@ -2616,38 +2495,17 @@ export const JobReport: React.FC = () => {
                   {t('delete_job')}
                 </button>
               )}
+
+              {/* Revert */}
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="px-4 py-2 bg-slate-200 text-slate-800 rounded-xl font-bold hover:bg-slate-300 transition-all flex items-center gap-2"
+              >
+                {t('back') || 'ย้อนกลับ'}
+              </button>
+
             </div>
-
-            {id && !isAdmin && formData.status === 'accepted' && (
-              <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                <button 
-                  type="button"
-                  onClick={() => handleReportProblem('delay')}
-                  disabled={submitting}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-amber-100 text-amber-700 rounded-xl font-bold hover:bg-amber-200 transition-all flex items-center justify-center gap-2"
-                >
-                  <Clock className="w-4 h-4" />
-                  {t('delay')}
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => handleReportProblem('accident')}
-                  disabled={submitting}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-all flex items-center justify-center gap-2"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  {t('accident')}
-                </button>
-              </div>
-            )}
-
-            <button 
-              type="button"
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
-            >
-              {t('back')}
-            </button>
           </div>
         )}
       </div>
@@ -3279,7 +3137,7 @@ export const JobReport: React.FC = () => {
               onClick={handleCompleteJob}
               className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
             >
-              จัดส่งสำเร็จ
+              {t('job_completed_msg')}
             </button>
           )}
 
@@ -3296,7 +3154,7 @@ export const JobReport: React.FC = () => {
             ) : (
               <>
                 <Save className="w-5 h-5" />
-                บันทึกข้อมูล
+                {t('save_report')}
               </>
             )}
           </button>

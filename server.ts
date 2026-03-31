@@ -235,6 +235,7 @@ async function startServer() {
     try {
       const { to, message, messages } = req.body;
       const settings = await getLineSettingsFromDirectus();
+      console.log('Backend: LINE settings retrieved:', settings ? 'success' : 'failed');
       const accessToken = settings?.channel_access_token;
 
       console.log('Backend: Received request to send LINE message', { to, hasToken: !!accessToken });
