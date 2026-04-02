@@ -107,7 +107,8 @@ export const Reports: React.FC = () => {
       .filter(m => m.role === 'driver')
       .map(member => {
         const userReports = reports.filter(r => {
-          const driverId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
+          const driverId = (typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id) || 
+                           (typeof r.member_id === 'object' ? r.member_id?.id : r.member_id);
           return (String(driverId) === String(member.id)) || (String(r.user_created) === String(member.id));
         });
       
@@ -146,29 +147,30 @@ export const Reports: React.FC = () => {
 
   const handleExportExcel = useCallback(() => {
     const dataToExport = filteredData.map(r => {
-      const driver = typeof r.driver_id === 'object' ? r.driver_id : null;
+      const driver = (typeof r.driver_id === 'object' ? r.driver_id : null) || 
+                     (typeof r.member_id === 'object' ? r.member_id : null);
       const car = typeof r.car_id === 'object' ? r.car_id : null;
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
       return {
-        'Case Number': formatCaseNumber(r),
-        'Status': t(`status_${r.status || 'pending'}`),
-        'Date': workDate,
-        'Customer Name': r.customer_name || '-',
-        'Contact Name': r.customer_contact_name || '-',
-        'Contact Phone': r.customer_contact_phone || '-',
-        'Origin': r.origin || '-',
-        'Destination': r.destination || '-',
-        'Vehicle Number': car?.car_number || '-',
-        'Vehicle Type': car?.vehicle_type || '-',
-        'Driver Name': driver ? `${driver.first_name} ${driver.last_name}` : '-',
-        'Driver Phone': r.phone || '-',
-        'Standby Time': r.standby_time || '-',
-        'Departure Time': r.departure_time || '-',
-        'Arrival Time': r.arrival_time || '-',
-        'Mileage Start': r.mileage_start || '-',
-        'Mileage End': r.mileage_end || '-',
-        'Notes': r.notes || '-'
+        [t('case_number')]: formatCaseNumber(r),
+        [t('status')]: t(`status_${r.status || 'pending'}`),
+        [t('date')]: workDate,
+        [t('customer_name')]: r.customer_name || '-',
+        [t('contact_name')]: r.customer_contact_name || '-',
+        [t('contact_phone')]: r.customer_contact_phone || '-',
+        [t('origin')]: r.origin || '-',
+        [t('destination')]: r.destination || '-',
+        [t('vehicle_number')]: car?.car_number || '-',
+        [t('vehicle_type')]: car?.vehicle_type || '-',
+        [t('driver_name')]: driver ? (driver.display_name || `${driver.first_name} ${driver.last_name}`) : '-',
+        [t('driver_phone')]: r.phone || '-',
+        [t('standby_time')]: r.standby_time || '-',
+        [t('departure_time')]: r.departure_time || '-',
+        [t('arrival_time')]: r.arrival_time || '-',
+        [t('mileage_start')]: r.mileage_start || '-',
+        [t('mileage_end')]: r.mileage_end || '-',
+        [t('notes')]: r.notes || '-'
       };
     });
 
@@ -220,10 +222,14 @@ export const Reports: React.FC = () => {
   // 3. Top Drivers
   const topDrivers = useMemo(() => {
     const driverStats = filteredData.reduce((acc: any, r) => {
-      if (r.driver_id) {
-        const name = typeof r.driver_id === 'object' 
-          ? (r.driver_id.display_name || `${r.driver_id.first_name} ${r.driver_id.last_name}`)
-          : r.driver_id;
+      const driver = (typeof r.driver_id === 'object' ? r.driver_id : null) || 
+                     (typeof r.member_id === 'object' ? r.member_id : null);
+      
+      if (driver) {
+        const name = driver.display_name || `${driver.first_name} ${driver.last_name}`;
+        acc[name] = (acc[name] || 0) + 1;
+      } else if (r.driver_id || r.member_id) {
+        const name = r.driver_id || r.member_id;
         acc[name] = (acc[name] || 0) + 1;
       }
       return acc;
@@ -275,7 +281,7 @@ export const Reports: React.FC = () => {
               onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
               className="text-sm outline-none bg-transparent"
             />
-            <span className="mx-2 text-slate-300">to</span>
+            <span className="mx-2 text-slate-300">{t('to')}</span>
             <input 
               type="date" 
               value={dateRange.end}
@@ -359,11 +365,11 @@ export const Reports: React.FC = () => {
             <div className="flex items-center gap-4 text-xs font-medium">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>This Month</span>
+                <span>{t('this_month')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-slate-300" />
-                <span>Last Month</span>
+                <span>{t('last_month')}</span>
               </div>
             </div>
           </div>
@@ -421,7 +427,7 @@ export const Reports: React.FC = () => {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900">{t('activity_log')}</h3>
-              <p className="text-xs text-slate-500">Monitoring data entry diligence</p>
+              <p className="text-xs text-slate-500">{t('monitoring_diligence')}</p>
             </div>
           </div>
         </div>
@@ -432,7 +438,7 @@ export const Reports: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('user_activity')}</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">{t('updates_count')}</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('last_active')}</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Diligence Score</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('diligence_score')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">

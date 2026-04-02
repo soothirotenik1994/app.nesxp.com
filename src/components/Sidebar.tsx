@@ -82,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     localStorage.removeItem('user_email');
     localStorage.removeItem('is_admin');
     localStorage.removeItem('view_mode');
+    localStorage.removeItem('is_switched_account');
     navigate('/login');
   };
 

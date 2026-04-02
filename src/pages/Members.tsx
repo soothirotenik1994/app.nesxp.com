@@ -17,7 +17,8 @@ const MemberRow = React.memo(({
   allPermissions, 
   onEdit, 
   onDelete,
-  onNavigatePermissions
+  onNavigatePermissions,
+  onSwitchAccount
 }: { 
   member: Member, 
   visibleColumns: string[], 
@@ -25,7 +26,8 @@ const MemberRow = React.memo(({
   allPermissions: any[], 
   onEdit: (member: Member) => void, 
   onDelete: (id: string) => void,
-  onNavigatePermissions: (id: string) => void
+  onNavigatePermissions: (id: string) => void,
+  onSwitchAccount: (member: Member) => void
 }) => {
   const { t } = useTranslation();
 
@@ -83,7 +85,7 @@ const MemberRow = React.memo(({
                 )}
               </div>
               {member.display_name && (member.first_name || member.last_name) && (
-                <p className="text-xs text-primary font-medium">LINE: {member.display_name}</p>
+                <p className="text-xs text-primary font-medium">{t('line_label')}{member.display_name}</p>
               )}
             </div>
           </div>
@@ -120,11 +122,11 @@ const MemberRow = React.memo(({
           <span className={clsx(
             "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
             member.status === 'inactive' ? "bg-red-100 text-red-700" :
-            member.role === 'member' ? "bg-blue-100 text-blue-700" :
+            member.role === 'member' || member.role === 'driver' ? "bg-blue-100 text-blue-700" :
             member.role === 'general' ? "bg-slate-100 text-slate-700" :
             "bg-emerald-100 text-emerald-700"
           )}>
-            {member.status === 'inactive' ? (t('disabled') || 'ระงับการใช้งาน') : member.role === 'general' ? 'ทั่วไป' : t(`${member.role || 'customer'}_role`)}
+            {member.status === 'inactive' ? t('disabled') : member.role === 'general' ? t('general_role') : t(`${member.role || 'customer'}_role`)}
           </span>
         </td>
       )}
@@ -165,6 +167,13 @@ const MemberRow = React.memo(({
       {visibleColumns.includes('actions') && (
         <td className="px-6 py-4 text-right">
           <div className="flex items-center justify-end gap-2">
+            <button 
+              onClick={() => onSwitchAccount(member)}
+              className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors"
+              title={t('switch_account') || 'สลับบัญชี'}
+            >
+              <UserCheck className="w-5 h-5" />
+            </button>
             {member.role === 'customer' && (
               <button 
                 onClick={() => onNavigatePermissions(member.id)}
@@ -207,6 +216,7 @@ export const Members: React.FC = () => {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [switchAccountMember, setSwitchAccountMember] = useState<Member | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -241,11 +251,32 @@ export const Members: React.FC = () => {
     phone: '',
     line_user_id: '',
     password: '',
-    role: 'general' as 'member' | 'customer' | 'general' | 'inactive',
+    role: 'general' as 'member' | 'customer' | 'general' | 'driver' | 'inactive',
     status: 'active' as 'active' | 'inactive' | 'pending',
     picture_url: ''
   });
   const navigate = useNavigate();
+
+  const handleSwitchAccountClick = useCallback((member: Member) => {
+    setSwitchAccountMember(member);
+  }, []);
+
+  const confirmSwitchAccount = useCallback(() => {
+    if (switchAccountMember) {
+      localStorage.setItem('user_role', switchAccountMember.role || 'customer');
+      localStorage.setItem('is_admin', 'false');
+      localStorage.setItem('is_switched_account', 'true');
+      localStorage.setItem('user_name', `${switchAccountMember.first_name || ''} ${switchAccountMember.last_name || ''}`.trim() || switchAccountMember.display_name || '');
+      localStorage.setItem('user_email', switchAccountMember.email || '');
+      localStorage.setItem('member_id', switchAccountMember.id);
+      if (switchAccountMember.picture_url) {
+        localStorage.setItem('user_picture', directusApi.getFileUrl(switchAccountMember.picture_url));
+      } else {
+        localStorage.removeItem('user_picture');
+      }
+      window.location.href = '/';
+    }
+  }, [switchAccountMember]);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -267,7 +298,7 @@ export const Members: React.FC = () => {
         if (detail.toLowerCase().includes('permission') || detail.toLowerCase().includes('forbidden')) {
           setError(`${t('permission_error')}: ${t('check_directus_permissions', { collection: 'line_users' })}`);
         } else {
-          setError(detail || 'Failed to load members');
+          setError(detail || t('failed_load_members'));
         }
       }
     } finally {
@@ -320,7 +351,7 @@ export const Members: React.FC = () => {
       setFormData(prev => ({ ...prev, picture_url: fileId }));
     } catch (err) {
       console.error('Error uploading profile picture:', err);
-      setActionError('Failed to upload profile picture');
+      setActionError(t('failed_upload_photo'));
     } finally {
       setSubmitting(false);
     }
@@ -354,7 +385,7 @@ export const Members: React.FC = () => {
           try {
             await lineService.sendPushMessage(editingMember.line_user_id, [{
               type: 'text',
-              text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
+              text: t('account_approved_msg')
             }]);
           } catch (e) {
             console.error('Failed to send approval notification:', e);
@@ -381,7 +412,7 @@ export const Members: React.FC = () => {
     } catch (err) {
       console.error('Error saving member:', err);
       const errorData = (err as any).response?.data;
-      const errorMsg = (Array.isArray(errorData?.errors) && errorData.errors[0]?.message) || (err as any).message || 'Failed to save member';
+      const errorMsg = (Array.isArray(errorData?.errors) && errorData.errors[0]?.message) || (err as any).message || t('failed_save_member');
       setActionError(errorMsg);
     } finally {
       setSubmitting(false);
@@ -413,7 +444,7 @@ export const Members: React.FC = () => {
         try {
           await lineService.sendPushMessage(member.line_user_id, [{
             type: 'text',
-            text: 'บัญชีของคุณได้รับการอนุมัติแล้ว คุณสามารถเข้าใช้งานระบบได้แล้วครับ'
+            text: t('account_approved_msg')
           }]);
         } catch (e) {
           console.error('Failed to send approval notification:', e);
@@ -423,7 +454,7 @@ export const Members: React.FC = () => {
       fetchMembers();
     } catch (err: any) {
       console.error('Error toggling member status:', err);
-      setActionError('Failed to update status');
+      setActionError(t('failed_update_status'));
     }
   };
 
@@ -497,10 +528,10 @@ export const Members: React.FC = () => {
                     ? "bg-primary text-white border-primary shadow-lg shadow-blue-100" 
                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                 )}
-                title={t('display_settings') || 'แสดงผล'}
+                title={t('display_settings')}
               >
                 <Settings2 className="w-5 h-5" />
-                <span className="hidden sm:inline text-sm font-semibold">{t('display_settings') || 'แสดงผล'}</span>
+                <span className="hidden sm:inline text-sm font-semibold">{t('display_settings')}</span>
               </button>
 
               {showColumnSettings && (
@@ -511,7 +542,7 @@ export const Members: React.FC = () => {
                   />
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-[61] animate-in fade-in zoom-in duration-200">
                     <div className="px-4 py-2 border-b border-slate-50 mb-1">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('show_hide_columns') || 'เลือกข้อมูลที่ต้องการแสดง'}</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('show_hide_columns')}</p>
                     </div>
                     {columns.map(col => (
                       <button
@@ -535,7 +566,7 @@ export const Members: React.FC = () => {
                         onClick={() => setVisibleColumns(columns.map(c => c.id))}
                         className="w-full px-3 py-2 text-xs font-bold text-primary hover:bg-blue-50 rounded-lg transition-colors text-left"
                       >
-                        {t('reset_columns') || 'รีเซ็ตคอลัมน์'}
+                        {t('reset_columns_btn')}
                       </button>
                     </div>
                   </div>
@@ -592,6 +623,7 @@ export const Members: React.FC = () => {
                     onEdit={handleEdit}
                     onDelete={handleDeleteClick}
                     onNavigatePermissions={handleNavigatePermissions}
+                    onSwitchAccount={handleSwitchAccountClick}
                   />
                 ))
               )}
@@ -622,6 +654,15 @@ export const Members: React.FC = () => {
         confirmText={t('delete')}
       />
 
+      <ConfirmModal 
+        isOpen={!!switchAccountMember}
+        title={t('switch_account') || 'สลับบัญชี'}
+        message={t('confirm_switch_account', { name: switchAccountMember?.first_name || switchAccountMember?.display_name || '' }) || `คุณต้องการสลับบัญชีไปเป็น ${switchAccountMember?.first_name || switchAccountMember?.display_name} ใช่หรือไม่?`}
+        onConfirm={confirmSwitchAccount}
+        onCancel={() => setSwitchAccountMember(null)}
+        confirmText={t('confirm') || 'ยืนยัน'}
+      />
+
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -635,7 +676,7 @@ export const Members: React.FC = () => {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('profile_picture') || 'รูปโปรไฟล์'}</label>
+                <label className="text-sm font-semibold text-slate-700">{t('profile_picture')}</label>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
                     {formData.picture_url ? (
@@ -738,7 +779,7 @@ export const Members: React.FC = () => {
                     onChange={(e) => setFormData({...formData, role: e.target.value as any})}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
                   >
-                    <option value="member">{t('member_role')}</option>
+                    <option value="driver">{t('driver_role')}</option>
                     <option value="customer">{t('customer_role')}</option>
                     <option value="general">{t('general_role')}</option>
                   </select>

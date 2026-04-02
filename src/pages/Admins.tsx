@@ -220,10 +220,10 @@ export const Admins: React.FC = () => {
                   ? "bg-emerald-50 border-emerald-200 text-emerald-600" 
                   : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
               )}
-              title={t('display_settings') || 'แสดงผล'}
+              title={t('display_settings')}
             >
               <Settings2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('display_settings') || 'แสดงผล'}</span>
+              <span className="hidden sm:inline">{t('display_settings')}</span>
             </button>
 
             {showColumnSettings && (
@@ -234,12 +234,12 @@ export const Admins: React.FC = () => {
                 />
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-20 animate-in fade-in zoom-in duration-100 origin-top-right">
                   <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('display_columns') || 'เลือกข้อมูลที่ต้องการแสดง'}</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('display_columns')}</span>
                     <button 
                       onClick={resetColumns}
                       className="text-[10px] font-bold text-emerald-600 hover:underline"
                     >
-                      {t('reset_columns') || 'รีเซ็ต'}
+                      {t('reset_columns')}
                     </button>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto py-1">
@@ -322,7 +322,7 @@ export const Admins: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-sm font-bold text-slate-900">{admin.first_name} {admin.last_name}</p>
-                            <p className="text-xs text-slate-500">ID: {admin.id.substring(0, 8)}...</p>
+                            <p className="text-xs text-slate-500">{t('id_label')}{admin.id.substring(0, 8)}...</p>
                           </div>
                         </div>
                       </td>

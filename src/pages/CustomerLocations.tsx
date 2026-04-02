@@ -356,6 +356,12 @@ export const CustomerLocations: React.FC = () => {
                         </div>
                       );
                     })()}
+                    {loc.address && (
+                      <div className="flex items-start gap-2">
+                        <Map className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                        <p className="text-xs text-slate-500 line-clamp-2">{loc.address}</p>
+                      </div>
+                    )}
                     {(loc.contact_name || loc.contact_phone) && (
                       <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
                         <User className="w-3.5 h-3.5 text-primary" />
@@ -363,12 +369,6 @@ export const CustomerLocations: React.FC = () => {
                           <p className="text-[10px] font-bold text-primary uppercase leading-none mb-1">{t('contact_person')}</p>
                           <p className="text-xs text-slate-700 font-medium">{loc.contact_name || '-'} {loc.contact_phone ? `(${loc.contact_phone})` : ''}</p>
                         </div>
-                      </div>
-                    )}
-                    {loc.address && (
-                      <div className="flex items-start gap-2">
-                        <Map className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
-                        <p className="text-xs text-slate-500 line-clamp-2">{loc.address}</p>
                       </div>
                     )}
                   </div>
@@ -382,7 +382,7 @@ export const CustomerLocations: React.FC = () => {
       <ConfirmModal 
         isOpen={!!deleteId}
         title={t('confirm_delete')}
-        message={t('confirm_delete')}
+        message={t('confirm_delete_message')}
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
         confirmText={t('delete')}
@@ -454,49 +454,6 @@ export const CustomerLocations: React.FC = () => {
                     onChange={(e) => setFormData({...formData, branch: e.target.value})}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                     placeholder={t('branch')}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-semibold text-slate-700">{t('contact_name')}</label>
-                    {formData.member_ids.length > 0 && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const firstMember = members.find(m => String(m.id) === String(formData.member_ids[0]));
-                          if (firstMember) {
-                            setFormData({
-                              ...formData,
-                              contact_name: firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`,
-                              contact_phone: firstMember.phone || ''
-                            });
-                          }
-                        }}
-                        className="text-[10px] font-bold text-primary hover:underline"
-                      >
-                        {t('use_member_info')}
-                      </button>
-                    )}
-                  </div>
-                  <input 
-                    type="text" 
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={t('contact_name')}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">{t('contact_phone')}</label>
-                  <input 
-                    type="text" 
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={t('contact_phone')}
                   />
                 </div>
               </div>
@@ -592,6 +549,49 @@ export const CustomerLocations: React.FC = () => {
                     })
                   }}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-semibold text-slate-700">{t('contact_name')}</label>
+                    {formData.member_ids.length > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const firstMember = members.find(m => String(m.id) === String(formData.member_ids[0]));
+                          if (firstMember) {
+                            setFormData({
+                              ...formData,
+                              contact_name: firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`,
+                              contact_phone: firstMember.phone || ''
+                            });
+                          }
+                        }}
+                        className="text-[10px] font-bold text-primary hover:underline"
+                      >
+                        {t('use_member_info')}
+                      </button>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    value={formData.contact_name}
+                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('contact_name')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('contact_phone')}</label>
+                  <input 
+                    type="text" 
+                    value={formData.contact_phone}
+                    onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('contact_phone')}
+                  />
+                </div>
               </div>
 
               <div className="pt-4 flex flex-col sm:flex-row gap-3">

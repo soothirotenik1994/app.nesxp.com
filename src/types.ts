@@ -17,7 +17,7 @@ export interface Member {
   phone: string;
   email: string;
   password?: string;
-  role?: 'member' | 'customer' | 'general';
+  role?: 'member' | 'customer' | 'general' | 'driver';
   status?: 'active' | 'inactive' | 'pending';
   created_at: string;
   date_created?: string;
@@ -122,6 +122,7 @@ export interface WorkReport {
   vehicle_type?: string;
   car_id: string | Car;
   member_id: string | Member;
+  driver_id?: string | Member;
   customer_id?: string | CustomerLocation;
   phone: string;
   standby_time: string;

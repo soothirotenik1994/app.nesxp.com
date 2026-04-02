@@ -13,16 +13,23 @@ export const LineBroadcast: React.FC = () => {
   const [broadcastType, setBroadcastType] = useState<'all' | 'selected'>('all');
   const [messageText, setMessageText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageId, setImageId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
 
+  const getLineId = (m: Member): string | null => {
+    const raw = m.line_user_id;
+    if (!raw) return null;
+    return typeof raw === 'object' && raw !== null ? (raw as any).line_user_id || (raw as any).id : raw;
+  };
+
   useEffect(() => {
     const fetchMembers = async () => {
       try {
         const data = await directusApi.getMembers();
-        setMembers(data.filter(m => m.line_user_id));
+        setMembers(data.filter(m => getLineId(m)));
       } catch (error) {
         console.error('Failed to fetch members:', error);
       }
@@ -35,6 +42,7 @@ export const LineBroadcast: React.FC = () => {
     if (!file) return;
     try {
       const fileId = await directusApi.uploadFile(file);
+      setImageId(fileId);
       setImageUrl(directusApi.getFileUrl(fileId));
     } catch (err) {
       console.error('Error uploading image:', err);
@@ -48,18 +56,22 @@ export const LineBroadcast: React.FC = () => {
 
     try {
       const targets = broadcastType === 'all' 
-        ? members.map(m => m.line_user_id!)
+        ? members.map(m => getLineId(m)!).filter(Boolean)
         : selectedMembers;
 
       if (targets.length === 0) {
         throw new Error('No recipients selected');
       }
 
+      if (isScheduled && !scheduledAt) {
+        throw new Error('Please select a schedule time');
+      }
+
       const broadcastData = {
-        message: messageText,
-        image: imageUrl,
-        recipients: JSON.stringify(targets),
-        scheduled_at: isScheduled ? scheduledAt : new Date().toISOString(),
+        message: messageText || null,
+        image: imageId || null,
+        recipients: targets,
+        scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : new Date().toISOString(),
         status: isScheduled ? 'scheduled' : 'sent'
       };
 
@@ -91,12 +103,20 @@ export const LineBroadcast: React.FC = () => {
       setStatus({ type: 'success', message: `Broadcast ${isScheduled ? 'scheduled' : 'sent'} successfully!` });
       setMessageText('');
       setImageUrl('');
+      setImageId(null);
       setSelectedMembers([]);
       setScheduledAt('');
       setIsScheduled(false);
     } catch (error: any) {
       console.error('Broadcast failed:', error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message;
+      let errorMessage = error.message;
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        errorMessage = error.response.data.errors.map((e: any) => e.message).join(', ');
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.details) {
+        errorMessage = typeof error.response.data.details === 'string' ? error.response.data.details : JSON.stringify(error.response.data.details);
+      }
       setStatus({ type: 'error', message: `Failed: ${errorMessage}` });
     } finally {
       setIsSending(false);
@@ -118,12 +138,16 @@ export const LineBroadcast: React.FC = () => {
           </div>
           {broadcastType === 'selected' && (
             <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl p-2">
-              {members.map(m => (
-                <label key={m.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg">
-                  <input type="checkbox" checked={selectedMembers.includes(m.line_user_id!)} onChange={(e) => setSelectedMembers(prev => e.target.checked ? [...prev, m.line_user_id!] : prev.filter(id => id !== m.line_user_id))} />
-                  {m.first_name} {m.last_name}
-                </label>
-              ))}
+              {members.map(m => {
+                const lineId = getLineId(m);
+                if (!lineId) return null;
+                return (
+                  <label key={m.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg">
+                    <input type="checkbox" checked={selectedMembers.includes(lineId)} onChange={(e) => setSelectedMembers(prev => e.target.checked ? [...prev, lineId] : prev.filter(id => id !== lineId))} />
+                    {m.first_name} {m.last_name}
+                  </label>
+                );
+              })}
             </div>
           )}
         </div>

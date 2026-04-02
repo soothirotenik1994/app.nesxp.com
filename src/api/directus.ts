@@ -53,6 +53,7 @@ api.interceptors.response.use(
       localStorage.removeItem('user_email');
       localStorage.removeItem('user_picture');
       localStorage.removeItem('menu_permissions');
+      localStorage.removeItem('is_switched_account');
       
       setAuthToken(null);
       
@@ -289,7 +290,7 @@ export const directusApi = {
   getWorkReports: async (): Promise<any[]> => {
     const response = await api.get('/items/work_reports', {
       params: {
-        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+        fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
         sort: '-date_created',
         limit: -1
       }
@@ -300,7 +301,7 @@ export const directusApi = {
   getWorkReport: async (id: string): Promise<any> => {
     const response = await api.get(`/items/work_reports/${id}`, {
       params: {
-        fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
+        fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
       }
     });
     return response.data.data;
@@ -562,7 +563,7 @@ export const directusApi = {
           filter: {
             case_number: { _eq: caseNumber }
           },
-          fields: '*,car_id.*,driver_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
           limit: 1
         }
       });
@@ -608,6 +609,7 @@ export const directusApi = {
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_picture');
     localStorage.removeItem('menu_permissions');
+    localStorage.removeItem('is_switched_account');
     setAuthToken(null);
   }
 };

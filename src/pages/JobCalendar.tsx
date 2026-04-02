@@ -106,7 +106,7 @@ export const JobCalendar: React.FC = () => {
 
           return {
             id: job.id,
-            title: `${job.case_number ? `[${job.case_number}] ` : ''}${carNumber} - ${job.customer_name}`,
+            title: `${carNumber}${job.case_number ? ` [${job.case_number}]` : ''} - ${job.customer_name}`,
             start: start,
             end: end,
             extendedProps: {
@@ -172,6 +172,17 @@ export const JobCalendar: React.FC = () => {
               }}
               events={events}
               eventClick={handleEventClick}
+              eventContent={(eventInfo) => (
+                <div className="flex flex-col w-full overflow-hidden leading-tight">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold truncate">{eventInfo.event.extendedProps.carNumber}</span>
+                    <span className="text-[9px] opacity-80 whitespace-nowrap">{eventInfo.timeText}</span>
+                  </div>
+                  <div className="truncate text-[10px] opacity-90">
+                    {eventInfo.event.extendedProps.job.customer_name}
+                  </div>
+                </div>
+              )}
               height="auto"
               eventTimeFormat={{
                 hour: '2-digit',

@@ -83,7 +83,8 @@ export const JobHistory: React.FC = () => {
             });
           } else {
             myReports = allReports.filter(r => {
-              const memberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
+              const memberId = (typeof r.member_id === 'object' ? r.member_id?.id : r.member_id) || 
+                               (typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id);
               return String(memberId) === String(currentMember.id);
             });
           }
@@ -129,9 +130,10 @@ export const JobHistory: React.FC = () => {
 
   const generateReportText = (report: WorkReport) => {
     const carNum = (report.car_id && typeof report.car_id === 'object') ? (report.car_id as any).car_number : report.car_id;
-    const member = (report.member_id && typeof report.member_id === 'object') ? report.member_id : null;
-    const accountSource = member?.line_user_id ? '(สมัครผ่าน LINE)' : '(Admin สร้าง)';
-    const memberName = member ? `${member.first_name} ${member.last_name} ${accountSource}` : report.member_id;
+    const member = (report.member_id && typeof report.member_id === 'object') ? report.member_id : 
+                   (report.driver_id && typeof report.driver_id === 'object') ? report.driver_id : null;
+    const accountSource = member?.line_user_id ? t('registered_line') : t('created_admin');
+    const memberName = member ? `${member.first_name} ${member.last_name} ${accountSource}` : (report.member_id || report.driver_id);
     
     const workDate = (report.work_date || report.date_created || '').split('T')[0].split(' ')[0];
     const isCustomer = userRole.toLowerCase() === 'customer';
@@ -210,29 +212,30 @@ ${!isCustomer ? `
 
   const handleExportExcel = useCallback(() => {
     const dataToExport = filteredReports.map(r => {
-      const member = typeof r.member_id === 'object' ? r.member_id : null;
+      const member = (typeof r.member_id === 'object' ? r.member_id : null) || 
+                     (typeof r.driver_id === 'object' ? r.driver_id : null);
       const car = typeof r.car_id === 'object' ? r.car_id : null;
       const workDate = (r.work_date || r.date_created || '').split('T')[0].split(' ')[0];
       
       return {
-        'Case Number': formatCaseNumber(r),
-        'Status': t(`status_${r.status || 'pending'}`),
-        'Date': workDate,
-        'Customer Name': r.customer_name || '-',
-        'Contact Name': r.customer_contact_name || '-',
-        'Contact Phone': r.customer_contact_phone || '-',
-        'Origin': r.origin || '-',
-        'Destination': r.destination || '-',
-        'Vehicle Number': car?.car_number || '-',
-        'Vehicle Type': car?.vehicle_type || '-',
-        'Member Name': member ? `${member.first_name} ${member.last_name}` : '-',
-        'Member Phone': r.phone || '-',
-        'Standby Time': formatTimeDisplay(r.standby_time),
-        'Departure Time': formatTimeDisplay(r.departure_time),
-        'Arrival Time': formatTimeDisplay(r.arrival_time),
-        'Mileage Start': r.mileage_start || '-',
-        'Mileage End': r.mileage_end || '-',
-        'Notes': r.notes || '-'
+        [t('case_number')]: formatCaseNumber(r),
+        [t('status')]: t(`status_${r.status || 'pending'}`),
+        [t('date')]: workDate,
+        [t('customer_name')]: r.customer_name || '-',
+        [t('contact_name')]: r.customer_contact_name || '-',
+        [t('contact_phone')]: r.customer_contact_phone || '-',
+        [t('origin')]: r.origin || '-',
+        [t('destination')]: r.destination || '-',
+        [t('vehicle_number')]: car?.car_number || '-',
+        [t('vehicle_type')]: car?.vehicle_type || '-',
+        [t('member_name')]: member ? `${member.first_name} ${member.last_name}` : '-',
+        [t('member_phone')]: r.phone || '-',
+        [t('standby_time')]: formatTimeDisplay(r.standby_time),
+        [t('departure_time')]: formatTimeDisplay(r.departure_time),
+        [t('arrival_time')]: formatTimeDisplay(r.arrival_time),
+        [t('mileage_start')]: r.mileage_start || '-',
+        [t('mileage_end')]: r.mileage_end || '-',
+        [t('notes')]: r.notes || '-'
       };
     });
 
@@ -317,7 +320,7 @@ ${!isCustomer ? `
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('route')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('vehicle')}</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('member')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
               </tr>
             </thead>
@@ -337,7 +340,8 @@ ${!isCustomer ? `
                 </tr>
               ) : (
                 paginatedReports.map((report) => {
-                  const member = typeof report.member_id === 'object' ? report.member_id : null;
+                  const member = (report.member_id && typeof report.member_id === 'object' ? report.member_id : null) || 
+                                 (report.driver_id && typeof report.driver_id === 'object' ? report.driver_id : null);
                   const car = typeof report.car_id === 'object' ? report.car_id : null;
                   
                   return (
@@ -414,8 +418,9 @@ ${!isCustomer ? `
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-xs font-medium text-slate-700">
-                          {member ? `${member.first_name} ${member.last_name}` : 'N/A'}
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          {member ? `${member.first_name} ${member.last_name}` : '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -501,7 +506,7 @@ ${!isCustomer ? `
                     <div className="space-y-3">
                       <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <Camera className="w-4 h-4 text-primary" />
-                        ภาพตอนขึ้นของ (Pickup)
+                        {t('pickup_photos')}
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
                         {selectedReport.pickup_photos.map((photoId: any) => {
@@ -532,7 +537,7 @@ ${!isCustomer ? `
                     <div className="space-y-3">
                       <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
                         <Camera className="w-4 h-4 text-emerald-600" />
-                        ภาพตอนส่งของ (Delivery)
+                        {t('delivery_photos')}
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
                         {selectedReport.delivery_photos.map((photoId: any) => {

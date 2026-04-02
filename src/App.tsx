@@ -30,22 +30,26 @@ export default function App() {
       setAuthToken(token);
       
       // Refresh user info
-      directusApi.getCurrentUser().then(user => {
-        const role = user.role?.name || 'Driver';
-        const isAdmin = role.toLowerCase() === 'administrator' || role.toLowerCase() === 'admin';
-        localStorage.setItem('user_role', role);
-        localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
-        localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
-        localStorage.setItem('user_email', user.email);
-        
-        // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
-        localStorage.removeItem('menu_permissions');
-      }).catch(err => {
-        // Only log if it's not a 401 (which is handled by the interceptor)
-        if (err.response?.status !== 401) {
-          console.error('Error refreshing user info:', err);
-        }
-      });
+      const isSwitchedAccount = localStorage.getItem('is_switched_account') === 'true';
+      
+      if (!isSwitchedAccount) {
+        directusApi.getCurrentUser().then(user => {
+          const role = user.role?.name || 'Driver';
+          const isAdmin = role.toLowerCase() === 'administrator' || role.toLowerCase() === 'admin';
+          localStorage.setItem('user_role', role);
+          localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
+          localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
+          localStorage.setItem('user_email', user.email);
+          
+          // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
+          localStorage.removeItem('menu_permissions');
+        }).catch(err => {
+          // Only log if it's not a 401 (which is handled by the interceptor)
+          if (err.response?.status !== 401) {
+            console.error('Error refreshing user info:', err);
+          }
+        });
+      }
     }
 
     // Update document title

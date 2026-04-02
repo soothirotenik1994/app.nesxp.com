@@ -115,7 +115,7 @@ const CarCard = React.memo(({
         </div>
         
         <div className="mb-2">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('brand') || 'ยี่ห้อรถ'}</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t('brand')}</p>
           <p className="text-sm text-slate-700 font-bold">{brandName}</p>
         </div>
 
@@ -187,7 +187,10 @@ export const Cars: React.FC = () => {
     member_phone: '',
     car_image: '',
     status: 'active',
-    brand_id: ''
+    brand_id: '',
+    current_mileage: '' as string | number,
+    next_maintenance_date: '',
+    next_maintenance_mileage: '' as string | number
   });
 
   const userRole = localStorage.getItem('user_role');
@@ -251,7 +254,10 @@ export const Cars: React.FC = () => {
         member_phone: car.member_phone || '',
         car_image: carImageId || '',
         status: (car as any).status || 'active',
-        brand_id: (car.brand_id && typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || ''
+        brand_id: (car.brand_id && typeof car.brand_id === 'object' ? (car.brand_id as any).id : car.brand_id) || '',
+        current_mileage: car.current_mileage || '',
+        next_maintenance_date: car.next_maintenance_date || '',
+        next_maintenance_mileage: car.next_maintenance_mileage || ''
       });
     } else {
       setEditingCar(null);
@@ -263,7 +269,10 @@ export const Cars: React.FC = () => {
         member_phone: '',
         car_image: '',
         status: 'active',
-        brand_id: ''
+        brand_id: '',
+        current_mileage: '',
+        next_maintenance_date: '',
+        next_maintenance_mileage: ''
       });
     }
     setIsModalOpen(true);
@@ -307,7 +316,10 @@ export const Cars: React.FC = () => {
         ...formData,
         car_image: formData.car_image || null,
         status: formData.status as 'active' | 'inactive',
-        brand_id: formData.brand_id || null
+        brand_id: formData.brand_id || null,
+        next_maintenance_date: formData.next_maintenance_date ? new Date(formData.next_maintenance_date).toISOString() : null,
+        next_maintenance_mileage: formData.next_maintenance_mileage ? parseInt(String(formData.next_maintenance_mileage)) : undefined,
+        current_mileage: formData.current_mileage ? parseInt(String(formData.current_mileage)) : undefined
       };
       
       console.log('Submission data (processed):', submissionData);
@@ -399,13 +411,6 @@ export const Cars: React.FC = () => {
         {isAdmin && (
           <div className="flex gap-2">
             <button 
-              onClick={() => setIsBrandModalOpen(true)}
-              className="bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-slate-200 transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              {t('vehicle_brand')}
-            </button>
-            <button 
               onClick={() => handleOpenModal()}
               className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
             >
@@ -491,6 +496,243 @@ export const Cars: React.FC = () => {
         onCancel={() => setDeleteId(null)}
         confirmText={t('delete')}
       />
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-900">
+                {editingCar ? t('edit_vehicle') : t('add_vehicle')}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('car_image')}</label>
+                <div className="space-y-3">
+                  {formData.car_image ? (
+                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group">
+                      <img 
+                        src={directusApi.getFileUrl(formData.car_image)} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <label className="p-2 bg-white rounded-full text-slate-600 hover:text-primary cursor-pointer transition-colors">
+                          <Plus className="w-5 h-5" />
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                          />
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="p-2 bg-white rounded-full text-slate-600 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="w-full aspect-video flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 hover:border-primary/30 transition-all group">
+                      {uploadingImage ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                          <span className="text-xs font-bold text-slate-400">{t('uploading')}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                            <Plus className="w-6 h-6 text-slate-400 group-hover:text-primary" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-500">{t('upload_photo')}</span>
+                          <span className="text-[10px] text-slate-400 mt-1">{t('max_file_size')}</span>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-semibold text-slate-700">{t('vehicle_brand')}</label>
+                  <button 
+                    type="button"
+                    onClick={() => setIsBrandModalOpen(true)}
+                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    {t('manage_brands')}
+                  </button>
+                </div>
+                <select 
+                  value={formData.brand_id}
+                  onChange={(e) => setFormData(prev => ({...prev, brand_id: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">{t('select_brand')}</option>
+                  {carBrands.map(brand => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('status')}</label>
+                <select 
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({...prev, status: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="active">{t('active')}</option>
+                  <option value="inactive">{t('inactive')}</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
+                  <input 
+                  type="text" 
+                  required
+                  value={formData.car_number}
+                  onChange={(e) => setFormData(prev => ({...prev, car_number: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder={t('car_number')}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('vehicle_type')}</label>
+                <input 
+                  type="text" 
+                  value={formData.vehicle_type}
+                  onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder={t('vehicle_type')}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('driver_name')}</label>
+                <select 
+                  value={allMembers.find(m => (m.first_name + ' ' + m.last_name).trim() === formData.owner_name)?.id || ''}
+                  onChange={(e) => {
+                    const selectedMember = allMembers.find(m => String(m.id) === e.target.value);
+                    if (selectedMember) {
+                      setFormData(prev => ({
+                        ...prev, 
+                        owner_name: `${selectedMember.first_name} ${selectedMember.last_name}`.trim(),
+                        member_phone: selectedMember.phone || ''
+                      }));
+                    } else {
+                      setFormData(prev => ({
+                        ...prev, 
+                        owner_name: '',
+                        member_phone: ''
+                      }));
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
+                >
+                  <option value="">{t('select_driver')}</option>
+                  {allMembers
+                    .filter(m => m.role === 'member' || m.role === 'driver')
+                    .map(member => (
+                      <option key={member.id} value={member.id}>
+                        {member.first_name} {member.last_name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('phone')}</label>
+                <input 
+                  type="tel" 
+                  value={formData.member_phone}
+                  onChange={(e) => setFormData(prev => ({...prev, member_phone: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder={t('phone')}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('current_mileage')}</label>
+                <input 
+                  type="number" 
+                  value={formData.current_mileage}
+                  onChange={(e) => setFormData(prev => ({...prev, current_mileage: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  placeholder={t('current_mileage')}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('next_maintenance_date')}</label>
+                  <input 
+                    type="date" 
+                    value={formData.next_maintenance_date}
+                    onChange={(e) => setFormData(prev => ({...prev, next_maintenance_date: e.target.value}))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('next_maintenance_mileage')}</label>
+                  <input 
+                    type="number" 
+                    value={formData.next_maintenance_mileage}
+                    onChange={(e) => setFormData(prev => ({...prev, next_maintenance_mileage: e.target.value}))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={t('next_maintenance_mileage')}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('description')}</label>
+                <textarea 
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none"
+                  placeholder={t('description')}
+                />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {t('cancel')}
+                </button>
+                <button 
+                  type="submit"
+                  disabled={submitting || uploadingImage}
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {(submitting || uploadingImage) ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      {editingCar ? t('save_changes') : t('add_vehicle')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {isBrandModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -585,202 +827,6 @@ export const Cars: React.FC = () => {
         onCancel={() => setDeleteBrandId(null)}
         confirmText={t('delete')}
       />
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">
-                {editingCar ? t('edit_vehicle') || 'แก้ไขรถ' : t('add_vehicle') || 'เพิ่มรถ'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                <X className="w-6 h-6 text-slate-400" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('car_image')}</label>
-                <div className="space-y-3">
-                  {formData.car_image ? (
-                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group">
-                      <img 
-                        src={directusApi.getFileUrl(formData.car_image)} 
-                        alt="" 
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <label className="p-2 bg-white rounded-full text-slate-600 hover:text-primary cursor-pointer transition-colors">
-                          <Plus className="w-5 h-5" />
-                          <input 
-                            type="file" 
-                            className="hidden" 
-                            accept="image/*"
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                        <button 
-                          type="button"
-                          onClick={handleRemoveImage}
-                          className="p-2 bg-white rounded-full text-slate-600 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="w-full aspect-video flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 hover:border-primary/30 transition-all group">
-                      {uploadingImage ? (
-                        <div className="flex flex-col items-center gap-2">
-                          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                          <span className="text-xs font-bold text-slate-400">{t('uploading')}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                            <Plus className="w-6 h-6 text-slate-400 group-hover:text-primary" />
-                          </div>
-                          <span className="text-sm font-bold text-slate-500">{t('upload_photo')}</span>
-                          <span className="text-[10px] text-slate-400 mt-1">PNG, JPG สูงสุด 10MB</span>
-                        </>
-                      )}
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={uploadingImage}
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('status')}</label>
-                <select 
-                  value={formData.status}
-                  onChange={(e) => setFormData(prev => ({...prev, status: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="active">{t('active')}</option>
-                  <option value="inactive">{t('inactive')}</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('vehicle_brand')}</label>
-                <select 
-                  value={formData.brand_id}
-                  onChange={(e) => setFormData(prev => ({...prev, brand_id: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">{t('select_brand')}</option>
-                  {carBrands.map(brand => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('car_number')}</label>
-                  <input 
-                  type="text" 
-                  required
-                  value={formData.car_number}
-                  onChange={(e) => setFormData(prev => ({...prev, car_number: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder={t('car_number')}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('vehicle_type')}</label>
-                <input 
-                  type="text" 
-                  value={formData.vehicle_type}
-                  onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder={t('vehicle_type')}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('driver_name')}</label>
-                <select 
-                  value={allMembers.find(m => (m.first_name + ' ' + m.last_name).trim() === formData.owner_name)?.id || ''}
-                  onChange={(e) => {
-                    const selectedMember = allMembers.find(m => String(m.id) === e.target.value);
-                    if (selectedMember) {
-                      setFormData(prev => ({
-                        ...prev, 
-                        owner_name: `${selectedMember.first_name} ${selectedMember.last_name}`.trim(),
-                        member_phone: selectedMember.phone || ''
-                      }));
-                    } else {
-                      setFormData(prev => ({
-                        ...prev, 
-                        owner_name: '',
-                        member_phone: ''
-                      }));
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none"
-                >
-                  <option value="">{t('select_driver')}</option>
-                  {allMembers
-                    .filter(m => (m.role || 'driver') === 'driver')
-                    .map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.first_name} {member.last_name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('phone')}</label>
-                <input 
-                  type="tel" 
-                  value={formData.member_phone}
-                  onChange={(e) => setFormData(prev => ({...prev, member_phone: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  placeholder={t('phone')}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">{t('description')}</label>
-                <textarea 
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder={t('description')}
-                />
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
-                >
-                  {t('cancel')}
-                </button>
-                <button 
-                  type="submit"
-                  disabled={submitting || uploadingImage}
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-100 disabled:opacity-70 flex items-center justify-center gap-2"
-                >
-                  {(submitting || uploadingImage) ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="w-5 h-5" />
-                      {editingCar ? t('save_changes') : t('add_vehicle')}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

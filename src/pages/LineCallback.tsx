@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { directusApi, setAuthToken } from '../api/directus';
 
 export const LineCallback: React.FC = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState('Processing LINE login...');
+  const [status, setStatus] = useState(t('authenticating'));
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -32,7 +34,7 @@ export const LineCallback: React.FC = () => {
       }
 
       try {
-        setStatus('Exchanging code for token...');
+        setStatus(t('loading'));
         console.log('LineCallback: Exchanging code for token...');
         
         // Get config from backend
@@ -47,7 +49,7 @@ export const LineCallback: React.FC = () => {
 
         const { id_token, access_token } = tokenResponse.data;
 
-        setStatus('Fetching LINE profile...');
+        setStatus(t('loading'));
         // Get user profile from LINE
         const profileResponse = await axios.get('https://api.line.me/v2/profile', {
           headers: { Authorization: `Bearer ${access_token}` }
@@ -60,14 +62,14 @@ export const LineCallback: React.FC = () => {
         let directusPictureId = lineProfile.pictureUrl;
         if (lineProfile.pictureUrl) {
           try {
-            setStatus('Storing profile picture...');
+            setStatus(t('uploading'));
             directusPictureId = await directusApi.importFileFromUrl(lineProfile.pictureUrl);
           } catch (picErr) {
             console.warn('Failed to import profile picture to Directus:', picErr);
           }
         }
 
-        setStatus('Finding member profile...');
+        setStatus(t('loading'));
         // Search for member in Directus by line_user_id
         const members = await directusApi.getMembers();
         let member = members.find(m => m.line_user_id === lineUserId);
@@ -98,7 +100,7 @@ export const LineCallback: React.FC = () => {
             member = members.find(m => m.email === email);
             if (member) {
               // Link LINE account to existing member
-              setStatus('Linking LINE account...');
+              setStatus(t('loading'));
               member = await directusApi.updateMember(member.id, {
                 line_user_id: lineUserId,
                 picture_url: directusPictureId,
@@ -109,7 +111,7 @@ export const LineCallback: React.FC = () => {
 
           // If still not found, auto-register as customer
           if (!member) {
-            setStatus('Registering as customer...');
+            setStatus(t('loading'));
             member = await directusApi.createMember({
               line_user_id: lineUserId,
               email: email,
@@ -126,20 +128,20 @@ export const LineCallback: React.FC = () => {
         // Check if member exists and has a valid role
         if (!member) {
           console.error('LineCallback: Member not found in system');
-          setError('ขออภัย ไม่พบข้อมูลผู้ใช้งานในระบบ กรุณาติดต่อผู้ดูแลระบบเพื่อลงทะเบียน');
+          setError(t('user_not_found_msg'));
           return;
         }
 
         // Check if member is active
         if (member.status === 'inactive') {
           console.error('LineCallback: Member account is disabled');
-          setError('ขออภัย บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+          setError(t('account_disabled'));
           return;
         }
 
         if (member.status === 'pending') {
           console.error('LineCallback: Member account is pending approval');
-          setError('บัญชีของคุณอยู่ระหว่างการตรวจสอบโดยแอดมิน กรุณารอสักครู่');
+          setError(t('account_pending_msg'));
           return;
         }
 
@@ -163,7 +165,7 @@ export const LineCallback: React.FC = () => {
           }).catch(() => {});
         }
 
-        setStatus('Logging in...');
+        setStatus(t('loading'));
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_name', member.display_name || `${member.first_name} ${member.last_name}`);
         localStorage.setItem('user_email', member.email || '');
@@ -184,7 +186,7 @@ export const LineCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, t]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -194,19 +196,19 @@ export const LineCallback: React.FC = () => {
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Login Failed</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">{t('login_failed')}</h2>
             <p className="text-slate-500 mb-6">{error}</p>
             <button
               onClick={() => navigate('/login')}
               className="w-full bg-slate-900 text-white py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors"
             >
-              Back to Login
+              {t('back_to_login')}
             </button>
           </>
         ) : (
           <>
             <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Authenticating</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">{t('authenticating')}</h2>
             <p className="text-slate-500">{status}</p>
           </>
         )}
@@ -214,3 +216,4 @@ export const LineCallback: React.FC = () => {
     </div>
   );
 };
+

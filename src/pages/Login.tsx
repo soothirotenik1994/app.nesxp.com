@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck } from 'lucide-react';
+import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck, Navigation } from 'lucide-react';
 import axios from 'axios';
 import { directusApi, setAuthToken } from '../api/directus';
+import { gpsApi } from '../api/gps';
 import clsx from 'clsx';
+import { VehicleMap } from '../components/VehicleMap';
+import { CarStatus } from '../types';
 
 const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const { t } = useTranslation();
@@ -30,8 +33,8 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
             <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
               <div className={clsx(
                 "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-100" : "bg-white text-slate-300 border-2 border-slate-100",
-                isCurrent && "ring-4 ring-emerald-50"
+                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-primary/20" : "bg-white text-slate-300 border-2 border-slate-100",
+                isCurrent && "ring-4 ring-primary/10"
               )}>
                 {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
               </div>
@@ -66,6 +69,7 @@ export const Login: React.FC = () => {
   const [caseNumber, setCaseNumber] = useState('');
   const [trackingPhone, setTrackingPhone] = useState('');
   const [trackingResult, setTrackingResult] = useState<any>(null);
+  const [carStatus, setCarStatus] = useState<CarStatus | null>(null);
   const [showTrackingResult, setShowTrackingResult] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -141,7 +145,7 @@ export const Login: React.FC = () => {
         
         if (member) {
           if (member.status === 'inactive') {
-            setError(t('account_disabled') || 'บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+            setError(t('account_disabled'));
             setLoading(false);
             return;
           }
@@ -185,6 +189,16 @@ export const Login: React.FC = () => {
         const job = await directusApi.trackJob(caseNumber, trackingPhone);
         if (job) {
           setTrackingResult(job);
+          // Fetch car status
+          if (job.car_id?.car_number) {
+            try {
+              const status = await gpsApi.getCarStatus(job.car_id.car_number);
+              setCarStatus(status);
+            } catch (e) {
+              console.error('Failed to fetch car status', e);
+              setCarStatus(null);
+            }
+          }
           setShowTrackingResult(true);
         } else {
           setError(t('no_job_found'));
@@ -235,7 +249,7 @@ export const Login: React.FC = () => {
               onClick={() => { setMode('login'); setError(''); }}
               className={clsx(
                 "flex-1 py-4 text-sm font-bold transition-all",
-                mode === 'login' ? "text-emerald-600 border-b-2 border-emerald-500" : "text-slate-400 hover:text-slate-600"
+                mode === 'login' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
               )}
             >
               {t('sign_in')}
@@ -244,7 +258,7 @@ export const Login: React.FC = () => {
               onClick={() => { setMode('tracking'); setError(''); }}
               className={clsx(
                 "flex-1 py-4 text-sm font-bold transition-all",
-                mode === 'tracking' ? "text-emerald-600 border-b-2 border-emerald-500" : "text-slate-400 hover:text-slate-600"
+                mode === 'tracking' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
               )}
             >
               {t('tracking')}
@@ -312,7 +326,7 @@ export const Login: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-slate-900 text-white py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="w-full bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -398,7 +412,7 @@ export const Login: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="w-full bg-secondary text-white py-3 rounded-xl font-semibold hover:bg-secondary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -419,12 +433,12 @@ export const Login: React.FC = () => {
       {showTrackingResult && trackingResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-emerald-600 text-white">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-secondary text-white">
               <div className="flex items-center gap-3">
                 <Package className="w-6 h-6" />
                 <div>
                   <h2 className="text-xl font-bold">{t('tracking_result')}</h2>
-                  <p className="text-emerald-100 text-xs">{trackingResult.case_number}</p>
+                  <p className="text-white/80 text-xs">{trackingResult.case_number}</p>
                 </div>
               </div>
               <button 
@@ -462,6 +476,15 @@ export const Login: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
+                      <Navigation className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('current_location')}</p>
+                      <p className="text-slate-900 font-semibold">{carStatus?.address || t('loading_location')}</p>
+                    </div>
+                  </div>
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
                       <Truck className="w-5 h-5 text-orange-600" />
@@ -504,6 +527,20 @@ export const Login: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div className="mt-8">
+                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  {t('vehicle_location')}
+                </h3>
+                <div className="h-64 rounded-2xl overflow-hidden border border-slate-200">
+                  <VehicleMap 
+                    vehicles={carStatus ? [carStatus] : []}
+                    center={carStatus ? { lat: carStatus.lat, lng: carStatus.lng } : { lat: 13.7563, lng: 100.5018 }}
+                    zoom={15}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

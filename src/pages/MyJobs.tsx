@@ -352,14 +352,15 @@ export const MyJobs: React.FC = () => {
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('customer_name')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('route')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('vehicle')}</th>
-                    {isAdmin && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>}
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('driver')}</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedReports.map((report) => {
                     const car = typeof report.car_id === 'object' ? report.car_id : null;
-                    const member = typeof report.member_id === 'object' ? report.member_id : null;
+                    const member = (report.member_id && typeof report.member_id === 'object' ? report.member_id : null) || 
+                                   (report.driver_id && typeof report.driver_id === 'object' ? report.driver_id : null);
                     
                     return (
                       <tr 
@@ -439,14 +440,12 @@ export const MyJobs: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        {isAdmin && (
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                               <User className="w-3.5 h-3.5 text-slate-400" />
                               {member ? `${member.first_name} ${member.last_name}` : '-'}
                             </div>
                           </td>
-                        )}
                         <td className="px-6 py-4 text-right">
                           <div className="p-1.5 bg-slate-50 rounded-lg group-hover:bg-primary group-hover:text-white transition-all inline-block">
                             <ChevronRight className="w-4 h-4" />
