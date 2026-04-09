@@ -78,16 +78,16 @@ export const Admins: React.FC = () => {
   const fetchAdmins = async () => {
     try {
       setLoading(true);
-      const [adminsData, dynamicRolesData, membersData] = await Promise.all([
+      const [adminsData, directusRolesData, membersData] = await Promise.all([
         directusApi.getAdmins(),
-        directusApi.getRolePermissions(),
+        directusApi.getRoles(),
         directusApi.getMembers()
       ]);
       setAdmins(adminsData);
       
-      // Use dynamic roles if available, otherwise fallback to empty array
-      if (dynamicRolesData && dynamicRolesData.length > 0) {
-        setRoles(dynamicRolesData.map(r => ({ id: r.role, name: r.role })));
+      // Use actual Directus roles
+      if (directusRolesData && directusRolesData.length > 0) {
+        setRoles(directusRolesData);
       } else {
         setRoles([]);
       }
@@ -132,11 +132,13 @@ export const Admins: React.FC = () => {
         line_user_id: '',
         password: '',
         status: 'active',
-        role: roles.find(r => r.name === 'Administrator')?.id || ''
+        role: roles.find(r => r.name.toLowerCase() === 'administrator')?.id || roles[0]?.id || ''
       });
     }
     setIsModalOpen(true);
   };
+
+  const isUUID = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,36 +154,37 @@ export const Admins: React.FC = () => {
           delete updateData.email;
         }
 
-        if (!updateData.line_user_id || (typeof updateData.line_user_id === 'string' && updateData.line_user_id.trim() === '')) {
+        if (!isUUID(updateData.line_user_id)) {
           updateData.line_user_id = null;
-          delete updateData.line_user_id;
-        } else if (typeof updateData.line_user_id === 'object') {
-          updateData.line_user_id = updateData.line_user_id.id || null;
-          if (!updateData.line_user_id) delete updateData.line_user_id;
+          // If it's an update, we might want to set it to null to clear it
+          // But if the field doesn't exist, it might cause error.
+          // However, "Invalid foreign key" implies it exists.
         }
         
-        console.log('Sending updateData:', updateData);
         await directusApi.updateAdmin(editingAdmin.id, updateData);
       } else {
         // Create
         const createData: any = { ...formData };
-        // Remove line_user_id to prevent foreign key errors if it's not a valid UUID in directus_users
-        // The line_user_id is typically stored in line_users collection, not directus_users
-        if (!createData.line_user_id || (typeof createData.line_user_id === 'string' && createData.line_user_id.trim() === '')) {
+        if (!isUUID(createData.line_user_id)) {
           delete createData.line_user_id;
-        } else if (typeof createData.line_user_id === 'object') {
-          createData.line_user_id = createData.line_user_id.id || null;
-          if (!createData.line_user_id) delete createData.line_user_id;
         }
-        console.log('Sending createData:', createData);
         await directusApi.createAdmin(createData);
       }
       setIsModalOpen(false);
       fetchAdmins();
     } catch (err: any) {
-      console.error(err);
+      console.error('Error saving admin:', err);
       const errorData = err.response?.data;
-      const errorMsg = (Array.isArray(errorData?.errors) && errorData.errors[0]?.message) || err.message || t('error_saving');
+      let errorMsg = err.message || t('error_saving');
+      
+      if (Array.isArray(errorData?.errors) && errorData.errors.length > 0) {
+        const firstError = errorData.errors[0];
+        errorMsg = firstError.message;
+        if (firstError.extensions?.field) {
+          errorMsg += ` (ฟิลด์ที่มีปัญหา: ${firstError.extensions.field})`;
+        }
+      }
+      
       setActionError(errorMsg);
     }
   };

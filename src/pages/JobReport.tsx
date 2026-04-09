@@ -262,8 +262,8 @@ export const JobReport: React.FC = () => {
         if (points.length < 2) {
           // Fallback to legacy origin/destination if pickups/deliveries not used
           if (route.origin_url && route.destination_url) {
-            points.push({ name: route.origin || '', url: route.origin_url });
-            points.push({ name: route.destination || '', url: route.destination_url });
+            points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '' });
+            points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '' });
           } else {
             throw new Error(`เที่ยวที่ ${i+1}: กรุณาระบุลิงก์ Google Maps อย่างน้อย 2 จุด (จุดรับและจุดส่ง)`);
           }
@@ -819,6 +819,7 @@ export const JobReport: React.FC = () => {
           };
 
           const initialData = {
+            job_type: (report.job_type as 'one_way' | 'round_trip') || 'one_way',
             work_date: formatTimeForInput(report.work_date || report.date_created),
             customer_name: report.customer_name || report.customer_id?.company_name || '',
             customer_contact_name: report.customer_contact_name || report.customer_id?.contact_name || '',
@@ -834,10 +835,17 @@ export const JobReport: React.FC = () => {
             waypoints: report.waypoints || [],
             routes: report.routes || [
               {
+                type: 'outbound' as 'outbound' | 'return',
+                pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
+                deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
                 origin: report.origin || '',
                 origin_url: report.origin_url || '',
+                origin_lat: report.origin_lat,
+                origin_lng: report.origin_lng,
                 destination: report.destination || '',
                 destination_url: report.destination_url || '',
+                destination_lat: report.destination_lat,
+                destination_lng: report.destination_lng,
                 distance: report.estimated_distance,
                 route_type: report.estimated_distance > 250 ? 'upcountry' : 'bangkok_vicinity'
               }
@@ -2166,12 +2174,10 @@ export const JobReport: React.FC = () => {
       const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
       const driver = members.find(m => String(m.id) === String(currentMemberId));
       
-      const statusText = status === 'pending' ? t('status_pending_msg') : 
-                        (status === 'accepted' ? t('status_accepted_msg') : 
-                        (status === 'arrived' ? t('status_arrived_msg') : t('status_completed_msg')));
+      const statusText = status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg');
       
       const headerColor = '#2c5494'; // NES Blue
-      const statusColor = status === 'completed' ? '#27ae60' : (status === 'arrived' ? '#f39c12' : '#e54d42'); 
+      const statusColor = status === 'completed' ? '#27ae60' : '#e54d42'; 
       const displayId = formData.case_number || currentReportId;
 
       // Send notification to each member
@@ -4076,7 +4082,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                           )}
                         </div>
                         
-                        {(route.pickups || [{ name: route.origin || '', url: route.origin_url || '' }]).map((pickup: any, pIndex: number) => (
+                        {(route.pickups || [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }]).map((pickup: any, pIndex: number) => (
                           <div key={`pickup-${pIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.pickups?.length > 1) && (
                               <button
@@ -4103,7 +4109,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].name = val;
                                     if (index === 0 && pIndex === 0) newRoutes[index].origin = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -4122,7 +4128,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].url = val;
                                     if (index === 0 && pIndex === 0) newRoutes[index].origin_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -4140,7 +4146,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -4157,7 +4163,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -4190,7 +4196,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                           )}
                         </div>
                         
-                        {(route.deliveries || [{ name: route.destination || '', url: route.destination_url || '' }]).map((delivery: any, dIndex: number) => (
+                        {(route.deliveries || [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }]).map((delivery: any, dIndex: number) => (
                           <div key={`delivery-${dIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.deliveries?.length > 1) && (
                               <button
@@ -4217,7 +4223,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].name = val;
                                     if (index === 0 && dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -4236,7 +4242,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].url = val;
                                     if (index === 0 && dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -4254,7 +4260,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -4271,7 +4277,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
