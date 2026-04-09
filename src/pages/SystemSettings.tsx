@@ -19,6 +19,9 @@ export const SystemSettings: React.FC = () => {
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
     websiteBackground: localStorage.getItem('website_background') || '',
     appUrl: localStorage.getItem('app_url') || window.location.origin,
+    enableQueueSystem: localStorage.getItem('enable_queue_system') !== 'false', // Default true
+    bkkMaxDistance: parseInt(localStorage.getItem('bkk_max_distance') || '250', 10),
+    enableTracking: localStorage.getItem('enable_tracking') !== 'false', // Default true
   });
 
   useEffect(() => {
@@ -33,6 +36,9 @@ export const SystemSettings: React.FC = () => {
             websiteLogo: settings.website_logo || prev.websiteLogo,
             websiteBackground: settings.website_background || prev.websiteBackground,
             appUrl: settings.app_url || prev.appUrl,
+            enableQueueSystem: settings.enable_queue_system !== undefined ? settings.enable_queue_system : prev.enableQueueSystem,
+            bkkMaxDistance: settings.bkk_max_distance !== undefined ? settings.bkk_max_distance : prev.bkkMaxDistance,
+            enableTracking: settings.enable_tracking !== undefined ? settings.enable_tracking : prev.enableTracking,
           }));
           
           // Sync to localStorage for immediate use in app
@@ -40,6 +46,9 @@ export const SystemSettings: React.FC = () => {
           localStorage.setItem('website_logo', settings.website_logo || '');
           localStorage.setItem('website_background', settings.website_background || '');
           localStorage.setItem('app_url', settings.app_url || '');
+          localStorage.setItem('enable_queue_system', settings.enable_queue_system !== undefined ? String(settings.enable_queue_system) : 'true');
+          localStorage.setItem('bkk_max_distance', settings.bkk_max_distance !== undefined ? String(settings.bkk_max_distance) : '250');
+          localStorage.setItem('enable_tracking', settings.enable_tracking !== undefined ? String(settings.enable_tracking) : 'true');
         }
       } catch (error: any) {
         if (error.response?.status === 401) {
@@ -78,6 +87,9 @@ export const SystemSettings: React.FC = () => {
         website_logo: formData.websiteLogo,
         website_background: formData.websiteBackground,
         app_url: formData.appUrl,
+        enable_queue_system: formData.enableQueueSystem,
+        bkk_max_distance: formData.bkkMaxDistance,
+        enable_tracking: formData.enableTracking,
       });
 
       // Save to localStorage
@@ -87,6 +99,9 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('website_logo', formData.websiteLogo);
       localStorage.setItem('website_background', formData.websiteBackground);
       localStorage.setItem('app_url', formData.appUrl);
+      localStorage.setItem('enable_queue_system', String(formData.enableQueueSystem));
+      localStorage.setItem('bkk_max_distance', String(formData.bkkMaxDistance));
+      localStorage.setItem('enable_tracking', String(formData.enableTracking));
       
       setTimeout(() => {
         setIsSaving(false);
@@ -291,7 +306,77 @@ export const SystemSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">ฟีเจอร์ระบบ (System Features)</h2>
+              <p className="text-sm text-slate-500">เปิด/ปิดการใช้งานฟีเจอร์ต่างๆ ภายในระบบ</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+            <div>
+              <h3 className="font-semibold text-slate-900">ระบบจัดลำดับคิวรถอัตโนมัติ (Queue System)</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                เปิดเพื่อใช้ระบบคำนวณและแนะนำคิวรถอัตโนมัติในหน้าจ่ายงาน (คำนวณจากประวัติการวิ่งงาน กทม. และ ตจว.)
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
+              <input 
+                type="checkbox" 
+                className="sr-only peer"
+                checked={formData.enableQueueSystem}
+                onChange={(e) => setFormData({...formData, enableQueueSystem: e.target.checked})}
+              />
+              <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+            <div>
+              <h3 className="font-semibold text-slate-900">ระยะทางสูงสุดสำหรับงาน กทม./ปริมณฑล (กิโลเมตร)</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                ใช้สำหรับแยกระหว่างงาน กทม. และงานต่างจังหวัด ในระบบจัดคิวรถ (ค่าเริ่มต้น: 250 กม.)
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0 flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                value={formData.bkkMaxDistance}
+                onChange={(e) => setFormData({...formData, bkkMaxDistance: parseInt(e.target.value) || 0})}
+                className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all text-center font-semibold text-slate-700"
+              />
+              <span className="text-slate-500 font-medium">กม.</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+            <div>
+              <h3 className="font-semibold text-slate-900">ระบบติดตามพัสดุ (Tracking System)</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                เปิดเพื่อแสดงแท็บ "ติดตามพัสดุ" ในหน้าเข้าสู่ระบบ (Login) ให้ลูกค้าสามารถค้นหาสถานะงานได้
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
+              <input 
+                type="checkbox" 
+                className="sr-only peer"
+                checked={formData.enableTracking}
+                onChange={(e) => setFormData({...formData, enableTracking: e.target.checked})}
+              />
+              <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">

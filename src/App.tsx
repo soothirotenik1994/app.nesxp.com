@@ -19,6 +19,11 @@ import { LineApiSettings } from './pages/LineApiSettings';
 import { SystemSettings } from './pages/SystemSettings';
 import { ApiSettings } from './pages/ApiSettings';
 import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
+import { MaintenanceItems } from './pages/MaintenanceItems';
+import { MaintenanceReports } from './pages/MaintenanceReports';
+import { MaintenanceLog } from './pages/MaintenanceLog';
+import { RolePermissions } from './pages/RolePermissions';
+import { VehicleQueue } from './pages/VehicleQueue';
 import { useEffect } from 'react';
 import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -42,6 +47,19 @@ export default function App() {
           localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
           localStorage.setItem('user_email', user.email);
           
+          // Fetch dynamic role permissions from Directus
+          directusApi.getRolePermissions().then(permissions => {
+            if (permissions && permissions.length > 0) {
+              const permissionsMap: Record<string, any> = {};
+              permissions.forEach(p => {
+                permissionsMap[p.role] = p.permissions;
+              });
+              localStorage.setItem('dynamic_role_permissions', JSON.stringify(permissionsMap));
+            }
+          }).catch(err => {
+            console.error('Error fetching dynamic permissions:', err);
+          });
+
           // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
           localStorage.removeItem('menu_permissions');
         }).catch(err => {
@@ -78,12 +96,17 @@ export default function App() {
               <Route path="/jobs/my" element={<MyJobs />} />
               <Route path="/jobs/calendar" element={<JobCalendar />} />
               <Route path="/jobs/history" element={<JobHistory />} />
+              <Route path="/vehicle-queue" element={<VehicleQueue />} />
               <Route path="/line/settings" element={<LineSettings />} />
               <Route path="/line/api-settings" element={<LineApiSettings />} />
               <Route path="/line/broadcast" element={<LineBroadcast />} />
               <Route path="/settings/api" element={<ApiSettings />} />
               <Route path="/maintenance" element={<MaintenanceDashboard />} />
+              <Route path="/maintenance/log" element={<MaintenanceLog />} />
+              <Route path="/maintenance/items" element={<MaintenanceItems />} />
+              <Route path="/maintenance/reports" element={<MaintenanceReports />} />
               <Route path="/settings/system" element={<SystemSettings />} />
+              <Route path="/role-permissions" element={<RolePermissions />} />
               <Route path="/permissions" element={<Members />} />
               <Route path="/permissions/:memberId" element={<AssignCars />} />
             </Route>

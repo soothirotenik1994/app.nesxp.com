@@ -16,12 +16,15 @@ import {
   FileText,
   History,
   RefreshCw,
+  Wrench,
   Truck,
   MapPin,
   Settings,
   MessageSquare,
   Bell,
-  Code
+  Code,
+  ChevronRight,
+  ListOrdered
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -46,8 +49,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const userRole = localStorage.getItem('user_role') || 'Driver';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
 
+  const [maintenanceExpanded, setMaintenanceExpanded] = useState(location.pathname.startsWith('/maintenance'));
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/maintenance')) {
+      setMaintenanceExpanded(true);
+    }
+  }, [location.pathname]);
+
   // ฟังก์ชันเช็คสิทธิ์การแสดงผลเมนู (ใช้ค่าจากไฟล์ config)
   const isVisible = (key: string) => {
+    // ลองดึงสิทธิ์แบบไดนามิกจาก localStorage ก่อน
+    const dynamicPermissionsRaw = localStorage.getItem('dynamic_role_permissions');
+    if (dynamicPermissionsRaw) {
+      try {
+        const dynamicPermissions = JSON.parse(dynamicPermissionsRaw);
+        if (dynamicPermissions[userRole] && dynamicPermissions[userRole][key] !== undefined) {
+          return dynamicPermissions[userRole][key] === true;
+        }
+      } catch (e) {
+        console.error('Error parsing dynamic permissions', e);
+      }
+    }
+
+    // ถ้าไม่มีสิทธิ์ไดนามิก ให้ใช้ค่าจากไฟล์ config (Fallback)
     const permissions = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['Driver'];
     return (permissions as any)[key] === true;
   };
@@ -58,7 +83,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('vehicles'), path: '/cars', icon: Car, key: 'vehicles' },
     { name: t('customer_locations'), path: '/locations', icon: MapPin, key: 'locations' },
     { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText, key: 'new_job' },
-    { name: t('maintenance'), path: '/maintenance', icon: RefreshCw, key: 'maintenance' },
+    { name: t('maintenance'), path: '/maintenance', icon: RefreshCw, key: 'maintenance', isParent: true },
+    { name: t('maintenance_dashboard'), path: '/maintenance', icon: LayoutDashboard, key: 'maintenance_dashboard', isSub: true },
+    { name: t('maintenance_log'), path: '/maintenance/log', icon: Wrench, key: 'maintenance_log', isSub: true },
+    { name: t('maintenance_reports'), path: '/maintenance/reports', icon: FileText, key: 'maintenance_reports', isSub: true },
+    { name: t('manage_maintenance_types'), path: '/maintenance/items', icon: Settings, key: 'maintenance_items', isSub: true },
   ].filter(item => isVisible(item.key));
 
   const logisticsItems = [
@@ -66,6 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar, key: 'calendar' },
     { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList, key: 'all_jobs' },
     { name: t('job_history'), path: '/jobs/history', icon: History, key: 'history' },
+    { name: 'จัดลำดับคิวรถ', path: '/vehicle-queue', icon: ListOrdered, key: 'vehicle_queue' },
   ].filter(item => isAdmin ? isVisible(item.key) : true); // Non-admins see all logistics for now
   
   const settingsItems = [
@@ -73,6 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('admin_notifications'), path: '/admin/notifications', icon: Bell, key: 'admin_notifications' },
     { name: t('line_broadcast'), path: '/line/broadcast', icon: MessageSquare, key: 'line_broadcast' },
     { name: t('api_settings'), path: '/settings/api', icon: Code, key: 'api_settings' },
+    { name: 'จัดการสิทธิ์การใช้งาน', path: '/role-permissions', icon: Shield, key: 'role_permissions' },
     { name: t('system_settings'), path: '/settings/system', icon: Settings, key: 'system_settings' },
   ].filter(item => isVisible(item.key));
 
@@ -140,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('logistics')}</div>
-            {logisticsItems.map((item) => {
+            {logisticsItems.map((item: any) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link
@@ -148,13 +179,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                   to={item.path}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    item.isSub && "ml-6 py-2 text-sm",
                     isActive 
-                      ? "bg-white/20 text-white border border-white/30" 
+                      ? "bg-white/20 text-white" 
                       : "text-white/70 hover:bg-white/10 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               );
@@ -163,21 +195,54 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             {isAdmin && menuItems.length > 0 && (
               <>
                 <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('management')}</div>
-                {menuItems.map((item) => {
+                {menuItems.map((item: any) => {
                   const isActive = location.pathname === item.path;
+                  const isMaintenanceParent = item.key === 'maintenance';
+                  
+                  // Only show sub-items if maintenance is expanded
+                  if (item.isSub && !maintenanceExpanded) {
+                    return null;
+                  }
+
+                  if (item.isParent) {
+                    const isAnySubActive = location.pathname.startsWith('/maintenance');
+                    return (
+                      <button
+                        key={item.name}
+                        onClick={() => setMaintenanceExpanded(!maintenanceExpanded)}
+                        className={cn(
+                          "flex items-center justify-between w-full px-4 py-3 rounded-xl transition-colors",
+                          isAnySubActive 
+                            ? "bg-white/20 text-white" 
+                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon className="w-5 h-5" />
+                          <span className="font-medium">{item.name}</span>
+                        </div>
+                        <ChevronRight className={cn(
+                          "w-4 h-4 transition-transform duration-200",
+                          maintenanceExpanded && "rotate-90"
+                        )} />
+                      </button>
+                    );
+                  }
+
                   return (
                     <Link
                       key={item.name}
                       to={item.path}
                       className={cn(
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white border border-white/30" 
+                          ? "bg-white/20 text-white" 
                           : "text-white/70 hover:bg-white/10 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
                       <span className="font-medium">{item.name}</span>
                     </Link>
                   );
@@ -188,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             {isAdmin && settingsItems.length > 0 && (
               <>
                 <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('system_settings')}</div>
-                {settingsItems.map((item) => {
+                {settingsItems.map((item: any) => {
                   const isActive = location.pathname === item.path;
                   return (
                     <Link
@@ -196,13 +261,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                       to={item.path}
                       className={cn(
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white border border-white/30" 
+                          ? "bg-white/20 text-white" 
                           : "text-white/70 hover:bg-white/10 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
                       <span className="font-medium">{item.name}</span>
                     </Link>
                   );

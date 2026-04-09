@@ -1,21 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { directusApi } from '../api/directus';
 import { Car as CarType, MaintenanceHistory } from '../types';
-import { AlertCircle, Wrench, Calendar, Gauge, Edit2, X, Loader2, Save, Car as CarIcon, Plus, Trash2, History } from 'lucide-react';
+import { AlertCircle, Wrench, Calendar, Gauge, Edit2, X, Loader2, Save, Car as CarIcon, Plus, Trash2, History, TrendingUp, CheckCircle2, AlertTriangle, Settings } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import CreatableSelect from 'react-select/creatable';
 
 export const MaintenanceDashboard: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [cars, setCars] = useState<CarType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<CarType | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistory[]>([]);
+  const [allHistory, setAllHistory] = useState<MaintenanceHistory[]>([]);
+  const [maintenanceItems, setMaintenanceItems] = useState<{ value: string, label: string }[]>([]);
+  const [serviceItems, setServiceItems] = useState<string[]>(['']);
   const [newHistoryData, setNewHistoryData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
-    service_type: '',
+    cost: '',
     notes: ''
   });
   const [addingHistory, setAddingHistory] = useState(false);
@@ -40,8 +47,18 @@ export const MaintenanceDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const carsData = await directusApi.getCars();
+      const [carsData, historyData, itemsData] = await Promise.all([
+        directusApi.getCars(),
+        directusApi.getAllMaintenanceHistory(),
+        directusApi.getMaintenanceItems()
+      ]);
       setCars(carsData);
+      setAllHistory(historyData);
+      setMaintenanceItems(
+        itemsData
+          .filter(item => item.status !== 'inactive')
+          .map(item => ({ value: item.name, label: item.name }))
+      );
     } catch (err: any) {
       if (err.response?.status === 401) return;
       setError(t('failed_to_load_vehicles'));
@@ -58,6 +75,7 @@ export const MaintenanceDashboard: React.FC = () => {
     setEditingCar(car);
     const carImageId = (car.car_image && typeof car.car_image === 'object') ? (car.car_image as any).id : car.car_image;
     
+    setServiceItems(['']);
     setFormData({
       car_number: car.car_number || '',
       vehicle_type: car.vehicle_type || '',
@@ -87,20 +105,36 @@ export const MaintenanceDashboard: React.FC = () => {
 
   const handleCreateHistory = async () => {
     if (!editingCar) return;
+    const validItems = serviceItems.filter(item => item.trim() !== '');
+    if (validItems.length === 0) return;
+
     setAddingHistory(true);
     try {
+      // Check for new items and create them in the database
+      const newItemsToCreate = validItems.filter(item => !maintenanceItems.some(mi => mi.value === item));
+      if (newItemsToCreate.length > 0) {
+        await Promise.all(newItemsToCreate.map(name => directusApi.createMaintenanceItem({ name: name })));
+        // Refresh items list
+        const itemsData = await directusApi.getMaintenanceItems();
+        setMaintenanceItems(itemsData.map(item => ({ value: item.name, label: item.name })));
+      }
+
       const newRecord = await directusApi.createMaintenanceHistory({
         ...newHistoryData,
+        service_type: validItems.join(', '),
         car_id: editingCar.id,
-        mileage: Number(newHistoryData.mileage)
+        mileage: Number(newHistoryData.mileage),
+        cost: newHistoryData.cost ? Number(newHistoryData.cost) : undefined
       });
       setMaintenanceHistory([...maintenanceHistory, newRecord]);
+      setAllHistory([newRecord, ...allHistory]);
       setNewHistoryData({
         date: new Date().toISOString().split('T')[0],
         mileage: '',
-        service_type: '',
+        cost: '',
         notes: ''
       });
+      setServiceItems(['']);
     } catch (error: any) {
       if (error.response?.status === 401) return;
       console.error('Error creating maintenance record:', error);
@@ -183,6 +217,33 @@ export const MaintenanceDashboard: React.FC = () => {
   const criticalAlerts = allAlerts.filter(a => a.color === 'text-red-500');
   const warningAlerts = allAlerts.filter(a => a.color === 'text-yellow-500');
 
+  const stats = useMemo(() => {
+    const total = cars.length;
+    const inMaintenance = cars.filter(c => c.maintenance_status === 'maintenance').length;
+    const ready = total - inMaintenance;
+
+    // Calculate most frequent maintenance items
+    const itemCounts: Record<string, number> = {};
+    allHistory.forEach(record => {
+      if (record.service_type) {
+        // Split by comma if multiple items were stored
+        const items = record.service_type.split(',').map(i => i.trim());
+        items.forEach(item => {
+          if (item) {
+            itemCounts[item] = (itemCounts[item] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    const chartData = Object.entries(itemCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    return { total, inMaintenance, ready, chartData };
+  }, [cars, allHistory]);
+
   const exportToExcel = () => {
     import('xlsx').then(XLSX => {
       const data = cars.map(car => ({
@@ -208,22 +269,13 @@ export const MaintenanceDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">{t('maintenance_dashboard')}</h2>
         </div>
         <div className="flex items-center gap-4">
-          {allAlerts.length > 0 && (
-            <div className="flex gap-4">
-              {criticalAlerts.length > 0 && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold">
-                  <AlertCircle className="w-5 h-5" />
-                  {criticalAlerts.length} {t('critical_alerts')}
-                </div>
-              )}
-              {warningAlerts.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold">
-                  <AlertCircle className="w-5 h-5" />
-                  {warningAlerts.length} {t('warning_alerts')}
-                </div>
-              )}
-            </div>
-          )}
+          <button
+            onClick={() => navigate('/maintenance/items')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            <Settings className="w-4 h-4" />
+            {t('manage_maintenance_types')}
+          </button>
           <button
             onClick={exportToExcel}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-sm"
@@ -231,6 +283,93 @@ export const MaintenanceDashboard: React.FC = () => {
             {t('export_excel')}
           </button>
         </div>
+      </div>
+
+      {/* Dashboard Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 grid grid-cols-1 gap-4">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+              <CarIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-500">{t('total_vehicles')}</p>
+              <p className="text-2xl font-black text-slate-900">{stats.total}</p>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-500">{t('ready_to_use')}</p>
+              <p className="text-2xl font-black text-emerald-600">{stats.ready}</p>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
+              <Wrench className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-500">{t('in_maintenance')}</p>
+              <p className="text-2xl font-black text-red-600">{stats.inMaintenance}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              {t('most_frequent_maintenance')}
+            </h3>
+          </div>
+          <div className="h-[200px] w-full">
+            {stats.chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.chartData} layout="vertical" margin={{ left: 40, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={100} 
+                    axisLine={false} 
+                    tickLine={false}
+                    tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                    {stats.chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 italic">
+                {t('no_data')}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-8">
+        <h3 className="text-xl font-bold text-slate-900">{t('vehicle_inventory')}</h3>
+        {allAlerts.length > 0 && (
+          <div className="flex gap-4">
+            {criticalAlerts.length > 0 && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                {criticalAlerts.length} {t('critical_alerts')}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -334,9 +473,16 @@ export const MaintenanceDashboard: React.FC = () => {
                             {record.date}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-600 mb-2 flex items-center gap-1">
-                          <Gauge className="w-3 h-3" /> {record.mileage} km
-                        </p>
+                        <div className="flex items-center gap-3 mb-2">
+                          <p className="text-sm text-slate-600 flex items-center gap-1">
+                            <Gauge className="w-3 h-3" /> {record.mileage} km
+                          </p>
+                          {record.cost && (
+                            <p className="text-sm font-bold text-emerald-600 flex items-center gap-1">
+                              ฿{record.cost.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                         {record.notes && (
                           <p className="text-sm text-slate-500 bg-white p-2 rounded-lg border border-slate-100">{record.notes}</p>
                         )}
@@ -369,17 +515,70 @@ export const MaintenanceDashboard: React.FC = () => {
                         className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg outline-none focus:ring-2 focus:ring-primary text-sm"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-blue-800">{t('cost')}</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={newHistoryData.cost}
+                        onChange={(e) => setNewHistoryData({ ...newHistoryData, cost: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
+                  
+                  <div className="space-y-2">
                     <label className="text-xs font-semibold text-blue-800">{t('history_service_type')}</label>
-                    <input
-                      type="text"
-                      placeholder={t('history_service_type')}
-                      value={newHistoryData.service_type}
-                      onChange={(e) => setNewHistoryData({ ...newHistoryData, service_type: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg outline-none focus:ring-2 focus:ring-primary text-sm"
-                    />
+                    {serviceItems.map((item, index) => (
+                      <div key={index} className="flex gap-2">
+                        <div className="flex-1">
+                          <CreatableSelect
+                            isClearable
+                            placeholder={t('history_service_type')}
+                            options={maintenanceItems}
+                            value={item ? { value: item, label: item } : null}
+                            onChange={(newValue: any) => {
+                              const newItems = [...serviceItems];
+                              newItems[index] = newValue ? newValue.value : '';
+                              setServiceItems(newItems);
+                            }}
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                borderRadius: '0.5rem',
+                                borderColor: '#bfdbfe',
+                                fontSize: '0.875rem',
+                                '&:hover': {
+                                  borderColor: '#3b82f6'
+                                }
+                              }),
+                              menu: (base) => ({
+                                ...base,
+                                zIndex: 9999
+                              })
+                            }}
+                          />
+                        </div>
+                        {serviceItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setServiceItems(serviceItems.filter((_, i) => i !== index))}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setServiceItems([...serviceItems, ''])}
+                      className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                    >
+                      <Plus className="w-3 h-3" /> {t('add_item')}
+                    </button>
                   </div>
+
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-blue-800">{t('history_notes')}</label>
                     <input
@@ -393,7 +592,7 @@ export const MaintenanceDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCreateHistory}
-                    disabled={addingHistory || !newHistoryData.service_type || !newHistoryData.mileage}
+                    disabled={addingHistory || serviceItems.every(i => !i.trim()) || !newHistoryData.mileage}
                     className="w-full bg-primary text-white py-2.5 rounded-lg font-bold hover:bg-blue-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 text-sm mt-2"
                   >
                     {addingHistory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

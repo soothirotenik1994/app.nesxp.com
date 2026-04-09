@@ -78,13 +78,20 @@ export const Admins: React.FC = () => {
   const fetchAdmins = async () => {
     try {
       setLoading(true);
-      const [adminsData, rolesData, membersData] = await Promise.all([
+      const [adminsData, dynamicRolesData, membersData] = await Promise.all([
         directusApi.getAdmins(),
-        directusApi.getRoles(),
+        directusApi.getRolePermissions(),
         directusApi.getMembers()
       ]);
       setAdmins(adminsData);
-      setRoles(rolesData);
+      
+      // Use dynamic roles if available, otherwise fallback to empty array
+      if (dynamicRolesData && dynamicRolesData.length > 0) {
+        setRoles(dynamicRolesData.map(r => ({ id: r.role, name: r.role })));
+      } else {
+        setRoles([]);
+      }
+      
       setMembers(membersData);
       setError(null);
     } catch (err: any) {
@@ -110,7 +117,7 @@ export const Admins: React.FC = () => {
         last_name: admin.last_name || '',
         email: admin.email || '',
         phone: admin.phone || '',
-        line_user_id: admin.line_user_id || '',
+        line_user_id: (admin.line_user_id && typeof admin.line_user_id === 'object') ? (admin.line_user_id as any).id : (admin.line_user_id || ''),
         password: '', // Don't show password
         status: admin.status || 'active',
         role: (admin.role && typeof admin.role === 'object') ? (admin.role as any).id : (admin.role || '')
@@ -144,11 +151,30 @@ export const Admins: React.FC = () => {
         if (updateData.email === editingAdmin.email) {
           delete updateData.email;
         }
+
+        if (!updateData.line_user_id || (typeof updateData.line_user_id === 'string' && updateData.line_user_id.trim() === '')) {
+          updateData.line_user_id = null;
+          delete updateData.line_user_id;
+        } else if (typeof updateData.line_user_id === 'object') {
+          updateData.line_user_id = updateData.line_user_id.id || null;
+          if (!updateData.line_user_id) delete updateData.line_user_id;
+        }
         
+        console.log('Sending updateData:', updateData);
         await directusApi.updateAdmin(editingAdmin.id, updateData);
       } else {
         // Create
-        await directusApi.createAdmin(formData);
+        const createData: any = { ...formData };
+        // Remove line_user_id to prevent foreign key errors if it's not a valid UUID in directus_users
+        // The line_user_id is typically stored in line_users collection, not directus_users
+        if (!createData.line_user_id || (typeof createData.line_user_id === 'string' && createData.line_user_id.trim() === '')) {
+          delete createData.line_user_id;
+        } else if (typeof createData.line_user_id === 'object') {
+          createData.line_user_id = createData.line_user_id.id || null;
+          if (!createData.line_user_id) delete createData.line_user_id;
+        }
+        console.log('Sending createData:', createData);
+        await directusApi.createAdmin(createData);
       }
       setIsModalOpen(false);
       fetchAdmins();
@@ -442,7 +468,7 @@ export const Admins: React.FC = () => {
                             last_name: member.last_name || '',
                             email: member.email || '',
                             phone: member.phone || '',
-                            line_user_id: member.line_user_id || '',
+                            line_user_id: member.id || '',
                             password: member.password || '',
                             role: matchingRole ? matchingRole.id : prev.role,
                           };
@@ -542,7 +568,9 @@ export const Admins: React.FC = () => {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('line_uid')}</label>
                 <div className="w-full bg-slate-100 border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-mono break-all">
-                  {formData.line_user_id || t('not_linked')}
+                  {formData.line_user_id 
+                    ? (members.find(m => String(m.id) === String(formData.line_user_id))?.line_user_id || formData.line_user_id) 
+                    : t('not_linked')}
                 </div>
               </div>
               <div className="pt-4 flex gap-3">

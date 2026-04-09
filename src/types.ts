@@ -4,6 +4,7 @@ export interface MaintenanceHistory {
   date: string;
   mileage: number;
   service_type: string;
+  cost?: number;
   notes?: string;
 }
 

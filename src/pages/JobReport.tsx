@@ -127,15 +127,20 @@ export const JobReport: React.FC = () => {
     waypoints: [] as { name: string, url: string, lat?: number, lng?: number }[],
     routes: [
       {
-        type: 'outbound' as const,
+        type: 'outbound' as 'outbound' | 'return',
         pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
         deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
         distance: undefined as number | undefined,
         // Legacy fields for backward compatibility
         origin: '',
         origin_url: '',
+        origin_lat: undefined as number | undefined,
+        origin_lng: undefined as number | undefined,
         destination: '',
         destination_url: '',
+        destination_lat: undefined as number | undefined,
+        destination_lng: undefined as number | undefined,
+        route_type: undefined as string | undefined
       }
     ],
     estimated_distance: undefined as number | undefined,
@@ -503,6 +508,8 @@ export const JobReport: React.FC = () => {
     const memberId = localStorage.getItem('member_id');
     const userRole = localStorage.getItem('user_role');
     
+    let baseCars = cars;
+
     // Admin sees all cars, but we prioritize/filter if a customer is selected
     if (isAdmin) {
       if (formData.customer_name) {
@@ -525,30 +532,84 @@ export const JobReport: React.FC = () => {
               })
             );
             // If we found assigned cars, show them. Otherwise show all.
-            if (assignedCars.length > 0) return assignedCars;
+            if (assignedCars.length > 0) {
+              baseCars = assignedCars;
+            }
           }
         }
       }
-      return cars;
-    }
-    
-    // Drivers see all cars
-    if (userRole === 'member') {
-      return cars;
-    }
-    
-    // Customers only see cars assigned to them
-    if (userRole === 'customer' && memberId) {
-      return cars.filter(car => 
+    } else if (userRole === 'customer' && memberId) {
+      // Customers only see cars assigned to them
+      baseCars = cars.filter(car => 
         car.car_users?.some((cu: any) => {
           const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
           return String(cuId) === String(memberId);
         })
       );
     }
+
+    // Apply Queue Logic if estimated_distance is set AND queue system is enabled
+    const isQueueSystemEnabled = localStorage.getItem('enable_queue_system') !== 'false';
+    const bkkMaxDistance = parseInt(localStorage.getItem('bkk_max_distance') || '250', 10);
     
-    return cars;
-  }, [cars, isAdmin, formData.customer_name, customers, members]);
+    if (isQueueSystemEnabled && formData.estimated_distance !== undefined && formData.estimated_distance > 0) {
+      const isUpcountry = formData.estimated_distance > bkkMaxDistance;
+      
+      const carsWithQueue = baseCars.map(car => {
+        const carReports = allReports.filter(r => {
+          const reportCarId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
+          return reportCarId === car.id && r.status !== 'deleted' && r.status !== 'cancelled';
+        });
+
+        let count_bkk = 0;
+        let count_upcountry = 0;
+
+        carReports.forEach(report => {
+          const distance = report.estimated_distance || 0;
+          if (distance > 250) {
+            count_upcountry++;
+          } else {
+            count_bkk++;
+          }
+        });
+
+        const priority_score = count_bkk / (count_upcountry + 1);
+        let recommendation: 'upcountry' | 'bkk' | 'normal' = 'normal';
+        if (count_bkk - count_upcountry > 3) {
+          recommendation = 'upcountry';
+        } else if (count_upcountry - count_bkk > 2) {
+          recommendation = 'bkk';
+        }
+
+        return { ...car, _queue: { priority_score, recommendation, count_bkk, count_upcountry } };
+      });
+
+      // Sort based on queue
+      if (isUpcountry) {
+        // For upcountry, higher priority score (more BKK jobs) goes first
+        carsWithQueue.sort((a, b) => b._queue.priority_score - a._queue.priority_score);
+        
+        // Filter to only show recommended ones if there are any
+        const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'upcountry');
+        if (recommended.length > 0) {
+          return recommended;
+        }
+      } else {
+        // For BKK, lower priority score (more upcountry jobs) goes first
+        carsWithQueue.sort((a, b) => a._queue.priority_score - b._queue.priority_score);
+        
+        // Filter to only show recommended ones if there are any
+        const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'bkk');
+        if (recommended.length > 0) {
+          return recommended;
+        }
+      }
+      
+      return carsWithQueue;
+    }
+    
+    return baseCars;
+  }, [cars, isAdmin, formData.customer_name, customers, members, formData.estimated_distance, allReports]);
   const sortedMembers = useMemo(() => {
     const driverMembers = members.filter(m => m.role === 'member' || m.role === 'driver');
     
@@ -2171,7 +2232,9 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('handleSubmit triggered', formData);
     
@@ -2188,6 +2251,11 @@ export const JobReport: React.FC = () => {
       }
     }
 
+    setShowConfirmModal(true);
+  };
+
+  const executeSave = async () => {
+    setShowConfirmModal(false);
     setSubmitting(true);
     setError('');
 
@@ -4271,9 +4339,16 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Truck className="w-4 h-4" /> {t('car_number')}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Truck className="w-4 h-4" /> {t('car_number')}
+                </label>
+                {(!formData.estimated_distance || formData.estimated_distance === 0) && (
+                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
+                    คำนวณระยะทางก่อนเพื่อดูคิวรถแนะนำ
+                  </span>
+                )}
+              </div>
               <Select
                 isDisabled={!!id && !isAdmin}
                 className="react-select-container"
@@ -4291,9 +4366,21 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   const driverName = assignedNames || car.owner_name || '';
                   const vehicleType = car.vehicle_type ? ` [${car.vehicle_type}]` : '';
                   
+                  let queueLabel = '';
+                  if ((car as any)._queue) {
+                    const q = (car as any)._queue;
+                    if (formData.estimated_distance && formData.estimated_distance > 250 && q.recommendation === 'upcountry') {
+                      queueLabel = ` ⭐ คิวงาน ตจว. (คะแนน: ${q.priority_score.toFixed(2)})`;
+                    } else if (formData.estimated_distance && formData.estimated_distance <= 250 && q.recommendation === 'bkk') {
+                      queueLabel = ` ⭐ คิวงาน กทม. (คะแนน: ${q.priority_score.toFixed(2)})`;
+                    } else {
+                      queueLabel = ` (คะแนน: ${q.priority_score.toFixed(2)})`;
+                    }
+                  }
+
                   return {
                     value: car.id,
-                    label: `${car.car_number}${vehicleType} ${driverName ? `(${driverName})` : ''}`,
+                    label: `${car.car_number}${vehicleType} ${driverName ? `(${driverName})` : ''}${queueLabel}`,
                     data: car
                   };
                 })}
@@ -4326,20 +4413,23 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     // Only auto-fill driver for admins or if member_id is not set
                     // Non-admins (drivers) should keep their own pre-filled ID
                     if (isAdmin || !prev.member_id) {
-                      // Priority 1: Last driver from previous reports (History)
-                      const lastDriverId = getLastDriver(carId);
-                      if (lastDriverId) {
-                        autoFilledDriverId = lastDriverId;
-                      }
-
-                      // Priority 2: Static assignment in Car settings (if no history)
-                      if (!autoFilledDriverId && isAdmin && selectedCar && selectedCar.car_users) {
+                      // Priority 1: Static assignment in Car settings (from คลังยานพาหนะ)
+                      if (selectedCar && selectedCar.car_users) {
                         const driverMember = selectedCar.car_users.find((cu: any) => {
                           const user = cu.line_user_id;
-                          return user && (typeof user === 'object' ? user.role === 'member' : false);
-                        })?.line_user_id as Member | undefined;
+                          return user && (typeof user === 'object' ? user.role !== 'customer' : true);
+                        })?.line_user_id;
+                        
                         if (driverMember) {
-                          autoFilledDriverId = driverMember.id;
+                          autoFilledDriverId = typeof driverMember === 'object' ? driverMember.id : driverMember;
+                        }
+                      }
+
+                      // Priority 2: Last driver from previous reports (History) if no static assignment
+                      if (!autoFilledDriverId) {
+                        const lastDriverId = getLastDriver(carId);
+                        if (lastDriverId) {
+                          autoFilledDriverId = lastDriverId;
                         }
                       }
 
@@ -4695,6 +4785,85 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             referrerPolicy="no-referrer"
           />
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-900">ยืนยันข้อมูลรายงาน</h3>
+              <button onClick={() => setShowConfirmModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ประเภทงาน:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.job_type === 'round_trip' ? 'ไป-กลับ' : 'เที่ยวเดียว'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">วันที่:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.work_date}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ลูกค้า:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ต้นทาง:</span>
+                  <span className="text-sm font-semibold text-slate-900 text-right max-w-[200px] truncate">{formData.origin}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ปลายทาง:</span>
+                  <span className="text-sm font-semibold text-slate-900 text-right max-w-[200px] truncate">{formData.destination}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ระยะทางประเมิน:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.estimated_distance || 0} กม.</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">ทะเบียนรถ:</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id))?.car_number || '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">พนักงานขับรถ:</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id))?.display_name || '-'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">
+                  กรุณาตรวจสอบข้อมูลให้ถูกต้องก่อนกดยืนยันบันทึกรายงาน
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+              >
+                แก้ไขข้อมูล
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              >
+                ยืนยันบันทึก
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

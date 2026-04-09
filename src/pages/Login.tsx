@@ -75,6 +75,8 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  
+  const isTrackingEnabled = localStorage.getItem('enable_tracking') !== 'false';
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('remembered_email');
@@ -86,7 +88,12 @@ export const Login: React.FC = () => {
       setPassword(savedPassword);
       setRememberMe(true);
     }
-  }, []);
+    
+    // If tracking is disabled, force mode to login
+    if (!isTrackingEnabled && mode === 'tracking') {
+      setMode('login');
+    }
+  }, [isTrackingEnabled, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,26 +251,28 @@ export const Login: React.FC = () => {
 
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
           {/* Tab Switcher */}
-          <div className="flex border-b border-slate-100">
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className={clsx(
-                "flex-1 py-4 text-sm font-bold transition-all",
-                mode === 'login' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              {t('sign_in')}
-            </button>
-            <button
-              onClick={() => { setMode('tracking'); setError(''); }}
-              className={clsx(
-                "flex-1 py-4 text-sm font-bold transition-all",
-                mode === 'tracking' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              {t('tracking')}
-            </button>
-          </div>
+          {isTrackingEnabled && (
+            <div className="flex border-b border-slate-100">
+              <button
+                onClick={() => { setMode('login'); setError(''); }}
+                className={clsx(
+                  "flex-1 py-4 text-sm font-bold transition-all",
+                  mode === 'login' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                {t('sign_in')}
+              </button>
+              <button
+                onClick={() => { setMode('tracking'); setError(''); }}
+                className={clsx(
+                  "flex-1 py-4 text-sm font-bold transition-all",
+                  mode === 'tracking' ? "text-primary border-b-2 border-primary" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                {t('tracking')}
+              </button>
+            </div>
+          )}
 
           <div className="p-8">
             {error && (

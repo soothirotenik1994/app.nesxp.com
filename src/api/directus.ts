@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || 'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn';
+export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -517,6 +517,52 @@ export const directusApi = {
     return response.data.data || [];
   },
 
+  getAllMaintenanceHistory: async (): Promise<MaintenanceHistory[]> => {
+    const response = await api.get('/items/maintenance_history', {
+      params: {
+        sort: '-date',
+        limit: -1
+      }
+    });
+    return response.data.data || [];
+  },
+
+  getMaintenanceItems: async (): Promise<any[]> => {
+    const response = await api.get('/items/maintenance_items', {
+      params: {
+        sort: 'name',
+        limit: -1
+      }
+    });
+    return response.data.data || [];
+  },
+
+  createMaintenanceItem: async (data: { 
+    name: string; 
+    description?: string; 
+    status?: string;
+    default_mileage_interval?: number;
+    default_month_interval?: number;
+  }): Promise<any> => {
+    const response = await api.post('/items/maintenance_items', data);
+    return response.data.data;
+  },
+
+  deleteMaintenanceItem: async (id: string | number): Promise<void> => {
+    await api.delete(`/items/maintenance_items/${id}`);
+  },
+
+  updateMaintenanceItem: async (id: string | number, data: {
+    name?: string;
+    description?: string;
+    status?: string;
+    default_mileage_interval?: number;
+    default_month_interval?: number;
+  }): Promise<any> => {
+    const response = await api.patch(`/items/maintenance_items/${id}`, data);
+    return response.data.data;
+  },
+
   createMaintenanceHistory: async (data: Partial<MaintenanceHistory>): Promise<MaintenanceHistory> => {
     const response = await api.post('/items/maintenance_history', data);
     return response.data.data;
@@ -529,6 +575,32 @@ export const directusApi = {
 
   deleteCarBrand: async (id: string): Promise<void> => {
     await api.delete(`/items/car_brands/${id}`);
+  },
+
+  getRolePermissions: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/items/role_permissions', {
+        params: { limit: -1 }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching role permissions:', error);
+      return [];
+    }
+  },
+
+  updateRolePermissions: async (id: string | number, data: any): Promise<any> => {
+    const response = await api.patch(`/items/role_permissions/${id}`, data);
+    return response.data.data;
+  },
+
+  createRolePermission: async (data: any): Promise<any> => {
+    const response = await api.post('/items/role_permissions', data);
+    return response.data.data;
+  },
+
+  deleteRolePermission: async (id: string | number): Promise<void> => {
+    await api.delete(`/items/role_permissions/${id}`);
   },
 
   getItems: async (collection: string, params: any = {}): Promise<any[]> => {

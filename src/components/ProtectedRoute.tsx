@@ -14,7 +14,7 @@ export const ProtectedRoute: React.FC = () => {
   }
 
   // If driver tries to access admin pages, redirect to logistics
-  const adminPaths = ['/members', '/admins'];
+  const adminPaths = ['/members', '/admins', '/maintenance', '/role-permissions'];
   const permissionPath = '/permissions';
   
   if (!isAdmin) {
