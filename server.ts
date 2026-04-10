@@ -700,7 +700,7 @@ async function startServer() {
       const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
       
       // Query Directus for the job report with the matching case_number
-      const response = await axios.get(`${directusUrl}/items/job_reports`, {
+      const response = await axios.get(`${directusUrl}/items/work_reports`, {
         params: {
           filter: {
             case_number: {
@@ -708,7 +708,7 @@ async function startServer() {
             }
           },
           // Only fetch fields that are safe to expose publicly
-          fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs'
+          fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,car_id.car_number,driver_id.first_name,driver_id.last_name'
         },
         headers: {
           'Authorization': `Bearer ${staticToken}`
