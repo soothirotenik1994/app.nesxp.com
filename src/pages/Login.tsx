@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck, Navigation } from 'lucide-react';
+import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck, Navigation, Settings } from 'lucide-react';
 import axios from 'axios';
 import { directusApi, setAuthToken } from '../api/directus';
 import { gpsApi } from '../api/gps';
@@ -71,6 +71,9 @@ export const Login: React.FC = () => {
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [carStatus, setCarStatus] = useState<CarStatus | null>(null);
   const [showTrackingResult, setShowTrackingResult] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsUrl, setSettingsUrl] = useState(localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com');
+  const [settingsKey, setSettingsKey] = useState(localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,6 +97,13 @@ export const Login: React.FC = () => {
       setMode('login');
     }
   }, [isTrackingEnabled, mode]);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('directus_url', settingsUrl);
+    localStorage.setItem('static_api_key', settingsKey);
+    setShowSettings(false);
+    window.location.reload(); // Reload to apply new settings to axios instance
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,13 +239,80 @@ export const Login: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center p-4 relative"
       style={websiteBackground ? {
         backgroundImage: `url(${websiteBackground})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       } : {}}
     >
+      <button 
+        onClick={() => setShowSettings(true)}
+        className="absolute top-4 right-4 p-3 bg-white/80 backdrop-blur shadow-sm rounded-full text-slate-500 hover:text-slate-900 transition-colors"
+        title="Server Settings"
+      >
+        <Settings className="w-5 h-5" />
+      </button>
+
+      {showSettings && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-primary" />
+                Server Settings
+              </h2>
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Directus URL
+                </label>
+                <input
+                  type="text"
+                  value={settingsUrl}
+                  onChange={(e) => setSettingsUrl(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                  placeholder="https://data.nesxp.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Static API Key
+                </label>
+                <input
+                  type="text"
+                  value={settingsKey}
+                  onChange={(e) => setSettingsKey(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                  placeholder="Enter API Key"
+                />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSettings}
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Save & Reload
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={clsx("max-w-md w-full", !websiteBackground && "bg-slate-50")}>
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 p-2 overflow-hidden">

@@ -615,7 +615,7 @@ export const JobReport: React.FC = () => {
     
     if (!formData.car_id) return driverMembers;
     
-    const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+    const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
     if (!selectedCar || !selectedCar.car_users) return driverMembers;
 
     const linkedMemberIds = selectedCar.car_users
@@ -2751,7 +2751,7 @@ export const JobReport: React.FC = () => {
         return;
       }
 
-      const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+      const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
       const statusText = status === 'accepted' ? t('status_accepted_msg') : 
                         (status === 'arrived' ? t('status_arrived_msg') : t('status_completed_msg'));
       
@@ -3373,8 +3373,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
   const isCustomer = userRole.toLowerCase() === 'customer';
   const isEditable = (!id || isAdmin || formData.status === 'accepted') && !isCustomer;
   const isPendingCancel = formData.status === 'cancel_pending';
-  const selectedMember = members.find(m => String(m.id) === String(formData.member_id));
-  const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+  const selectedMember = members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id));
+  const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
 
   const InfoRow: React.FC<{ icon: React.ReactNode, label: string, value: string | React.ReactNode, className?: string, valueClassName?: string }> = ({ icon, label, value, className, valueClassName }) => (
     <div className={clsx("flex flex-col gap-1", className)}>
@@ -4391,8 +4391,9 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   };
                 })}
                 value={formData.car_id ? { 
-                  value: formData.car_id, 
-                  label: cars.find(c => String(c.id) === String(formData.car_id))?.car_number || formData.car_id 
+                  value: typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id, 
+                  label: cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id))?.car_number || 
+                         (typeof formData.car_id === 'object' ? (formData.car_id as any)?.car_number : formData.car_id)
                 } : null}
                 onChange={(option: any) => {
                   const carId = option?.value || '';
@@ -4520,8 +4521,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               </label>
               <select 
                 required
-                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== formData.member_id}
-                value={formData.member_id || ''}
+                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== (typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id)}
+                value={typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : (formData.member_id || '')}
                 onChange={e => {
                   const selectedId = e.target.value;
                   const member = members.find(m => String(m.id) === String(selectedId));
@@ -4543,7 +4544,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   const statusText = busy ? ` (${t('busy')})` : ` (${t('available')})`;
                   
                   // Check if this member is linked to the selected car
-                  const selectedCar = cars.find(c => String(c.id) === String(formData.car_id));
+                  const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
                   const isLinked = selectedCar?.car_users?.some((cu: any) => {
                     const cuId = typeof cu.line_user_id === 'object' ? cu.line_user_id.id : cu.line_user_id;
                     return String(cuId) === String(member.id);

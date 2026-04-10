@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
-export const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+export const DIRECTUS_URL = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+export const STATIC_API_KEY = localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -25,6 +25,12 @@ export const setAuthToken = (token: string | null) => {
 // Add request interceptor to ensure token is always sent
 api.interceptors.request.use(
   (config) => {
+    // Do not send Authorization header for login requests
+    if (config.url?.includes('/auth/login')) {
+      delete config.headers.Authorization;
+      return config;
+    }
+
     const token = localStorage.getItem('admin_token');
     if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
