@@ -435,6 +435,13 @@ export const Login: React.FC = () => {
                   onClick={async () => {
                     try {
                       const response = await axios.get('/api/line/config');
+                      
+                      // Check if the response is HTML (meaning the backend is not running and we got the SPA fallback)
+                      if (typeof response.data === 'string' && response.data.includes('<html')) {
+                        setError('Backend Server Error: The Node.js backend is not running. Please ensure you have deployed the backend server.');
+                        return;
+                      }
+
                       const { channelId, redirectUri } = response.data;
                       
                       console.log('Starting LINE Login with:', { channelId, redirectUri });
