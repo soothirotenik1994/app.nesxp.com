@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { LineCallback } from './pages/LineCallback';
+import { CustomerRating } from './pages/CustomerRating';
 import { Dashboard } from './pages/Dashboard';
 import { Members } from './pages/Members';
 import { Cars } from './pages/Cars';
@@ -82,6 +83,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/line/callback" element={<LineCallback />} />
+          <Route path="/rate/:id" element={<CustomerRating />} />
           
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>

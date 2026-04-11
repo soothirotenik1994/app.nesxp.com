@@ -201,4 +201,12 @@ export interface WorkReport {
     timestamp: string;
     notes?: string;
   }[];
+  actual_arrived_lat?: number;
+  actual_arrived_lng?: number;
+  actual_completed_lat?: number;
+  actual_completed_lng?: number;
+  is_geofence_verified?: boolean;
+  rating?: number;
+  feedback?: string;
+  rated_at?: string;
 }

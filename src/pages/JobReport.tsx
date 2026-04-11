@@ -40,6 +40,21 @@ import {
 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // metres
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // in metres
+};
+
 const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const { t } = useTranslation();
   const steps = [
@@ -1107,6 +1122,7 @@ export const JobReport: React.FC = () => {
       car_number: string;
       driver_name: string;
       driver_phone: string;
+      report_id?: string;
     },
     status?: string
   ) => {
@@ -1544,6 +1560,18 @@ export const JobReport: React.FC = () => {
         layout: "vertical",
         spacing: "sm",
         contents: [
+          ...(status === 'completed' && data.report_id ? [{
+            type: "button",
+            style: "primary",
+            height: "sm",
+            action: {
+              type: "uri",
+              label: "ให้คะแนนบริการ",
+              uri: `${window.location.origin}/rate/${data.report_id}`
+            },
+            color: "#f39c12",
+            margin: "sm"
+          }] : []),
           {
             type: "button",
             style: "primary",
@@ -2220,7 +2248,8 @@ export const JobReport: React.FC = () => {
               routes: formData.routes,
               car_number: String(selectedCar?.car_number || 'N/A'),
               driver_name: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
-              driver_phone: String(driver?.phone || '-')
+              driver_phone: String(driver?.phone || '-'),
+              report_id: currentReportId
             },
             status
           );
@@ -3006,6 +3035,38 @@ export const JobReport: React.FC = () => {
     }
   };
 
+  const verifyGeofence = async (type: 'arrived' | 'completed'): Promise<{ lat: number, lng: number, verified: boolean, distance: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          let targetLat = formData.destination_lat;
+          let targetLng = formData.destination_lng;
+          
+          if (!targetLat || !targetLng) {
+            resolve({ lat: latitude, lng: longitude, verified: true, distance: 0 });
+            return;
+          }
+          
+          const distance = calculateDistance(latitude, longitude, targetLat, targetLng);
+          const verified = distance <= 500; // 500 meters
+          resolve({ lat: latitude, lng: longitude, verified, distance });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  };
+
   const handleCompleteJob = async () => {
     if (!id) return;
     
@@ -3027,8 +3088,37 @@ export const JobReport: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await directusApi.updateWorkReport(id, { status: 'completed' });
-      setFormData(prev => ({ ...prev, status: 'completed' }));
+      const updatePayload: any = { status: 'completed' };
+      
+      if (!isAdmin) {
+        const geoResult = await verifyGeofence('completed');
+        if (geoResult) {
+          updatePayload.is_geofence_verified = geoResult.verified;
+          updatePayload.actual_completed_lat = geoResult.lat;
+          updatePayload.actual_completed_lng = geoResult.lng;
+          
+          if (!geoResult.verified) {
+            setStatusConfig({
+              type: 'error',
+              title: t('geofence_error_title', 'ไม่อยู่ในพื้นที่ที่กำหนด'),
+              message: t('geofence_error_msg', `คุณอยู่ห่างจากจุดหมายเกินไป (${Math.round(geoResult.distance)} เมตร) ไม่สามารถเปลี่ยนสถานะได้`)
+            });
+            setShowStatusModal(true);
+            setSubmitting(false);
+            
+            // Save the failed attempt coordinates
+            await directusApi.updateWorkReport(id, {
+              is_geofence_verified: false,
+              actual_completed_lat: geoResult.lat,
+              actual_completed_lng: geoResult.lng
+            }).catch(console.error);
+            return;
+          }
+        }
+      }
+
+      await directusApi.updateWorkReport(id, updatePayload);
+      setFormData(prev => ({ ...prev, ...updatePayload }));
       
       // Notify customer
       const customerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
@@ -3064,8 +3154,37 @@ export const JobReport: React.FC = () => {
     if (!id) return;
     setSubmitting(true);
     try {
-      await directusApi.updateWorkReport(id, { status: 'arrived' });
-      setFormData(prev => ({ ...prev, status: 'arrived' }));
+      const updatePayload: any = { status: 'arrived' };
+      
+      if (!isAdmin) {
+        const geoResult = await verifyGeofence('arrived');
+        if (geoResult) {
+          updatePayload.is_geofence_verified = geoResult.verified;
+          updatePayload.actual_arrived_lat = geoResult.lat;
+          updatePayload.actual_arrived_lng = geoResult.lng;
+          
+          if (!geoResult.verified) {
+            setStatusConfig({
+              type: 'error',
+              title: t('geofence_error_title', 'ไม่อยู่ในพื้นที่ที่กำหนด'),
+              message: t('geofence_error_msg', `คุณอยู่ห่างจากจุดหมายเกินไป (${Math.round(geoResult.distance)} เมตร) ไม่สามารถเปลี่ยนสถานะได้`)
+            });
+            setShowStatusModal(true);
+            setSubmitting(false);
+            
+            // Save the failed attempt coordinates
+            await directusApi.updateWorkReport(id, {
+              is_geofence_verified: false,
+              actual_arrived_lat: geoResult.lat,
+              actual_arrived_lng: geoResult.lng
+            }).catch(console.error);
+            return;
+          }
+        }
+      }
+
+      await directusApi.updateWorkReport(id, updatePayload);
+      setFormData(prev => ({ ...prev, ...updatePayload }));
       
       // Notify customer
       const customerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
