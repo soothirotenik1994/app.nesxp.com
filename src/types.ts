@@ -99,10 +99,9 @@ export interface CustomerLocation {
   email?: string;
   address?: string;
   branch?: string;
-  contact_name?: string;
-  contact_phone?: string;
   member_id?: string | Member;
   members?: {
+    id: string;
     line_user_id: Member;
   }[];
   date_created?: string;

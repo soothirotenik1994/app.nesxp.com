@@ -7,7 +7,6 @@ import { Dashboard } from './pages/Dashboard';
 import { Members } from './pages/Members';
 import { Cars } from './pages/Cars';
 import { CustomerLocations } from './pages/CustomerLocations';
-import { AssignCars } from './pages/AssignCars';
 import { Admins } from './pages/Admins';
 import { JobReport } from './pages/JobReport';
 import { JobHistory } from './pages/JobHistory';
@@ -23,8 +22,11 @@ import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
 import { MaintenanceItems } from './pages/MaintenanceItems';
 import { MaintenanceReports } from './pages/MaintenanceReports';
 import { MaintenanceLog } from './pages/MaintenanceLog';
+import { DriverRatingManagement } from './pages/DriverRatingManagement';
 import { RolePermissions } from './pages/RolePermissions';
 import { VehicleQueue } from './pages/VehicleQueue';
+import { FleetMonitor } from './pages/FleetMonitor';
+import { TripHistory } from './pages/TripHistory';
 import { useEffect } from 'react';
 import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -47,6 +49,14 @@ export default function App() {
           localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
           localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
           localStorage.setItem('user_email', user.email);
+          
+          if (user.avatar) {
+            localStorage.setItem('user_picture', directusApi.getFileUrl(user.avatar));
+          } else {
+            localStorage.removeItem('user_picture');
+          }
+          
+          window.dispatchEvent(new Event('user-info-updated'));
           
           // Fetch dynamic role permissions from Directus
           directusApi.getRolePermissions().then(permissions => {
@@ -86,10 +96,13 @@ export default function App() {
           <Route path="/rate/:id" element={<CustomerRating />} />
           
           <Route element={<ProtectedRoute />}>
+            <Route path="/monitor" element={<FleetMonitor />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/members" element={<Members />} />
               <Route path="/cars" element={<Cars />} />
+              <Route path="/cars/:carNumber/history" element={<TripHistory />} />
+              <Route path="/history" element={<TripHistory />} />
               <Route path="/locations" element={<CustomerLocations />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/admins" element={<Admins />} />
@@ -107,10 +120,10 @@ export default function App() {
               <Route path="/maintenance/log" element={<MaintenanceLog />} />
               <Route path="/maintenance/items" element={<MaintenanceItems />} />
               <Route path="/maintenance/reports" element={<MaintenanceReports />} />
+              <Route path="/ratings" element={<DriverRatingManagement />} />
               <Route path="/settings/system" element={<SystemSettings />} />
               <Route path="/role-permissions" element={<RolePermissions />} />
               <Route path="/permissions" element={<Members />} />
-              <Route path="/permissions/:memberId" element={<AssignCars />} />
             </Route>
           </Route>
 

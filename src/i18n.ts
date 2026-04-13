@@ -156,6 +156,8 @@ const resources = {
       "error_saving": "เกิดข้อผิดพลาดในการบันทึกข้อมูล",
       "error_deleting": "เกิดข้อผิดพลาดในการลบข้อมูล",
       "error": "ข้อผิดพลาด",
+      "retry": "ลองใหม่อีกครั้ง",
+      "session_expired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
       "permission_error": "ข้อผิดพลาดเกี่ยวกับสิทธิ์การใช้งาน",
       "permission_denied": "คุณไม่มีสิทธิ์ในการดำเนินการนี้",
       "check_directus_permissions": "โปรดเปิดสิทธิ์การอ่าน (Read) สำหรับคอลเลกชัน \"{{collection}}\" ในการตั้งค่า Directus สำหรับสิทธิ์ของคุณ",
@@ -460,6 +462,9 @@ const resources = {
       "failed_upload_photo": "อัปโหลดรูปโปรไฟล์ไม่สำเร็จ",
       "failed_save_member": "บันทึกข้อมูลสมาชิกไม่สำเร็จ",
       "failed_update_status": "อัปเดตสถานะไม่สำเร็จ",
+      "failed_remove_car": "ไม่สามารถเอารถออกได้",
+      "remove": "นำออก",
+      "no_assigned_vehicles": "ยังไม่มีรถที่ได้รับมอบหมาย",
       "id_label": "ID: ",
       "status_pending_msg": "รอมอบหมาย",
       "status_accepted_msg": "กำลังจัดส่งสินค้า",
@@ -480,7 +485,18 @@ const resources = {
       "calculate_distance": "คำนวณระยะทาง",
       "estimated_distance": "ระยะทางโดยประมาณ",
       "calculating": "กำลังคำนวณ...",
-      "distance_calc_error": "ไม่สามารถคำนวณระยะทางได้ กรุณาตรวจสอบลิงก์"
+      "distance_calc_error": "ไม่สามารถคำนวณระยะทางได้ กรุณาตรวจสอบลิงก์",
+      "trip_history": "ประวัติการเดินทาง",
+      "trip_summary": "สรุปการเดินทาง",
+      "start_time": "เวลาเริ่มต้น",
+      "end_time": "เวลาสิ้นสุด",
+      "max_speed": "ความเร็วสูงสุด",
+      "data_points": "จุดบันทึกข้อมูล",
+      "points": "จุด",
+      "start_point": "จุดเริ่มต้น",
+      "end_point": "จุดสิ้นสุด",
+      "no_data_found_for_period": "ไม่พบข้อมูลการเดินทางในช่วงเวลานี้",
+      "failed_to_fetch_data": "ดึงข้อมูลล้มเหลว"
     }
   }
 };

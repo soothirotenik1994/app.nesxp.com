@@ -3,8 +3,9 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Car as CarType, Member } from '../types';
-import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock, User, Shield, Calendar, Hash, Building2 } from 'lucide-react';
+import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock, User, Shield, Calendar, Hash, Building2, History } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { useNavigate } from 'react-router-dom';
 
 // Memoized CarCard component to prevent unnecessary re-renders
 const CarCard = React.memo(({ 
@@ -25,6 +26,7 @@ const CarCard = React.memo(({
   onDelete: (id: string) => void 
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   
   const imageId = typeof car.car_image === 'object' ? (car.car_image as any)?.id : car.car_image;
   const brandName = useMemo(() => {
@@ -114,9 +116,18 @@ const CarCard = React.memo(({
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-slate-900">{car.car_number}</h3>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            {t('online')}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => navigate(`/cars/${car.car_number}/history`)}
+              className="p-1.5 bg-slate-100 text-slate-600 hover:text-primary hover:bg-blue-50 rounded-lg transition-colors"
+              title={t('trip_history', 'ประวัติการเดินทาง')}
+            >
+              <History className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+              {t('online')}
+            </div>
           </div>
         </div>
         

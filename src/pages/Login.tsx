@@ -167,7 +167,7 @@ export const Login: React.FC = () => {
             return;
           }
           console.log('Staff login successful:', member.email);
-          localStorage.setItem('user_role', member.role || 'customer');
+          localStorage.setItem('user_role', member.role || 'Customer');
           localStorage.setItem('user_name', `${member.first_name} ${member.last_name}`);
           localStorage.setItem('user_email', member.email);
           localStorage.setItem('member_id', member.id);

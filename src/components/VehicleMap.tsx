@@ -26,6 +26,7 @@ interface VehicleMapProps {
   onSelectVehicle?: (vehicle: CarStatus) => void;
   center?: { lat: number; lng: number };
   zoom?: number;
+  darkMode?: boolean;
 }
 
 // Component to handle map center and zoom updates
@@ -48,7 +49,8 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
   selectedVehicle, 
   onSelectVehicle,
   center,
-  zoom = 12
+  zoom = 12,
+  darkMode = false
 }) => {
   const { t } = useTranslation();
   const defaultCenter: [number, number] = [13.7563, 100.5018]; // Bangkok
@@ -61,8 +63,8 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
       zoomControl={false}
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution={darkMode ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+        url={darkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
       />
       
       <MapUpdater center={center} zoom={zoom} />

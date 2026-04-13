@@ -5,11 +5,13 @@ import { VehicleMap } from '../components/VehicleMap';
 import { directusApi, api } from '../api/directus';
 import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
-import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash } from 'lucide-react';
+import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History } from 'lucide-react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [members, setMembers] = useState<Member[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [carStatuses, setCarStatuses] = useState<CarStatus[]>([]);
@@ -390,8 +392,15 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Dashboard Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-900">{t('dashboard')}</h2>
+          <button 
+            onClick={() => window.open('/monitor', '_blank')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+          >
+            <MapIcon className="w-4 h-4" />
+            Live Monitor
+          </button>
         </div>
         
         <div className="flex items-center gap-3">
@@ -564,11 +573,25 @@ export const Dashboard: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="col-span-3 flex flex-col items-end">
+                      <div className="col-span-3 flex flex-col items-end gap-1">
                         <span className="text-[10px] font-medium text-slate-400">
                           {format(new Date(v.lastUpdate), 'HH:mm:ss')}
                         </span>
-                        <ChevronRight className={`w-3 h-3 mt-1 ${isSelected ? 'text-primary' : 'text-slate-200'}`} />
+                        <div className="flex items-center gap-1">
+                          {localStorage.getItem('is_admin') === 'true' && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/cars/${v.carNumber}/history`);
+                              }}
+                              className="p-1 text-slate-400 hover:text-primary hover:bg-blue-50 rounded transition-colors"
+                              title={t('trip_history', 'ประวัติการเดินทาง')}
+                            >
+                              <History className="w-3 h-3" />
+                            </button>
+                          )}
+                          <ChevronRight className={`w-3 h-3 ${isSelected ? 'text-primary' : 'text-slate-200'}`} />
+                        </div>
                       </div>
                     </div>
                   );

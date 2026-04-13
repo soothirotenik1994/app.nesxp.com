@@ -104,6 +104,177 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
+const processImageWithOverlay = async (file: File, location: { lat: number, lng: number } | null): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      // Set canvas dimensions to match image
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw image
+      ctx.drawImage(img, 0, 0);
+
+      // Prepare overlay text
+      const now = new Date();
+      const timestamp = now.toLocaleString('th-TH', { 
+        year: 'numeric', month: 'long', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+      });
+      
+      let locationText = '';
+      if (location) {
+        locationText = `Lat: ${location.lat.toFixed(6)}, Lng: ${location.lng.toFixed(6)}`;
+      }
+
+      // Set text style
+      const fontSize = Math.max(24, Math.floor(canvas.width / 35));
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      
+      // Draw background for text for better readability
+      const textHeight = locationText ? fontSize * 2.5 : fontSize * 1.5;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, canvas.height - textHeight - 40, canvas.width, textHeight + 40);
+
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'left';
+
+      const padding = 40;
+      let y = canvas.height - padding;
+
+      // Draw location text
+      if (locationText) {
+        ctx.fillText(locationText, padding, y);
+        y -= fontSize * 1.2;
+      }
+
+      // Draw timestamp
+      ctx.fillText(timestamp, padding, y);
+
+      // Convert back to blob
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Canvas toBlob failed'));
+      }, 'image/jpeg', 0.85);
+      
+      // Clean up
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = (err) => {
+      URL.revokeObjectURL(img.src);
+      reject(err);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+};
+
+const WebcamModal: React.FC<{
+  onCapture: (file: File) => void;
+  onClose: () => void;
+}> = ({ onCapture, onClose }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+        });
+        setStream(s);
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+        }
+      } catch (err) {
+        console.error("Error accessing camera:", err);
+        setError("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการตั้งค่าสิทธิ์การใช้งานกล้อง");
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const capture = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            onCapture(file);
+          }
+        }, 'image/jpeg', 0.9);
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] bg-black/90 flex flex-col items-center justify-center p-4">
+      <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-4 flex items-center justify-between border-b border-slate-800">
+          <h3 className="text-white font-bold">ถ่ายภาพด้วยกล้อง</h3>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        <div className="relative aspect-video bg-black">
+          {error ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+              <p className="text-white font-medium">{error}</p>
+              <button onClick={onClose} className="mt-6 px-6 py-2 bg-white text-slate-900 rounded-xl font-bold">
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          ) : (
+            <>
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+            </>
+          )}
+        </div>
+
+        {!error && (
+          <div className="p-6 flex justify-center">
+            <button 
+              onClick={capture}
+              className="w-20 h-20 rounded-full bg-white border-8 border-slate-200 flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <div className="w-12 h-12 rounded-full bg-emerald-500" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const JobReport: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -116,6 +287,10 @@ export const JobReport: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [processingPhotos, setProcessingPhotos] = useState(false);
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [webcamType, setWebcamType] = useState<'pickup' | 'delivery' | 'document' | null>(null);
+  const isMobile = useMemo(() => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent), []);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -284,27 +459,24 @@ export const JobReport: React.FC = () => {
           }
         }
 
-        for (let j = 0; j < points.length - 1; j++) {
-          const originUrl = points[j].url;
-          const destinationUrl = points[j+1].url;
+        // Filter out consecutive duplicate URLs
+        const uniquePoints = points.filter((p, index) => index === 0 || p.url !== points[index - 1].url);
 
-          if (originUrl === destinationUrl) {
-            continue; // Skip identical consecutive points
-          }
-
+        if (uniquePoints.length >= 2) {
           try {
             const response = await axios.post('/api/calculate-distance', {
-              originUrl,
-              destinationUrl
+              originUrl: uniquePoints[0].url,
+              destinationUrl: uniquePoints[uniquePoints.length - 1].url,
+              waypointUrls: uniquePoints.slice(1, -1).map(p => p.url)
             });
             
             if (response.data && response.data.distance !== undefined) {
-              routeDistance += response.data.distance;
+              routeDistance = response.data.distance;
             } else {
-              throw new Error(`ไม่สามารถคำนวณระยะทางระหว่างจุดที่ ${j+1} และ ${j+2} ในเที่ยวที่ ${i+1} ได้`);
+              throw new Error(`ไม่สามารถคำนวณระยะทางสำหรับเที่ยวที่ ${i+1} ได้`);
             }
           } catch (urlErr: any) {
-            console.error(`URL calculation failed for route ${i+1}, leg ${j+1}:`, urlErr);
+            console.error(`URL calculation failed for route ${i+1}:`, urlErr);
             throw urlErr;
           }
         }
@@ -472,18 +644,20 @@ export const JobReport: React.FC = () => {
     if (!customerLoc) return [];
     const memberIds: string[] = [];
     
-    // 1. Primary member
-    const primaryMember = typeof customerLoc.member_id === 'object' ? customerLoc.member_id : null;
-    const primaryIdRaw = primaryMember ? primaryMember.id : customerLoc.member_id;
-    const primaryId = resolveMemberId(primaryIdRaw);
-    if (primaryId) memberIds.push(String(primaryId));
-    
-    // 2. Additional members
+    // 1. Primary member link
+    const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
+    if (primaryId && !memberIds.includes(String(primaryId))) {
+      memberIds.push(String(primaryId));
+    }
+
+    // 2. Members from the group
     if (customerLoc.members && Array.isArray(customerLoc.members)) {
       customerLoc.members.forEach((m: any) => {
         const mMember = typeof m.line_user_id === 'object' ? m.line_user_id : 
-                        (typeof m.members_id === 'object' ? m.members_id : null);
-        const mIdRaw = mMember ? mMember.id : (m.line_user_id || m.members_id);
+                        (typeof m.members_id === 'object' ? m.members_id : 
+                        (typeof m.line_users_id === 'object' ? m.line_users_id : null));
+        
+        const mIdRaw = mMember ? mMember.id : (m.line_users_id || m.line_user_id || m.members_id);
         const mid = resolveMemberId(mIdRaw);
         if (mid && !memberIds.includes(String(mid))) {
           memberIds.push(String(mid));
@@ -678,7 +852,8 @@ export const JobReport: React.FC = () => {
     type: 'pickup' | 'delivery' | 'document',
     onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
     onRemove: (index: number) => void,
-    onRemoveExisting: (index: number) => void
+    onRemoveExisting: (index: number) => void,
+    isProcessing?: boolean
   ) => (
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
       <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
@@ -700,11 +875,45 @@ export const JobReport: React.FC = () => {
           </div>
         ))}
       </div>
-      <label className="flex items-center justify-center gap-2 w-full py-3 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200 transition-colors">
-        <Camera className="w-5 h-5 text-slate-600" />
-        <span className="font-semibold text-slate-700">{t('upload_photo_btn')}</span>
-        <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
-      </label>
+      <div className="flex flex-col gap-3">
+        {isProcessing ? (
+          <div className="flex items-center justify-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+            <span className="text-sm font-medium text-slate-500">กำลังประมวลผลรูปภาพ...</span>
+          </div>
+        ) : (
+          <>
+            <button 
+              type="button"
+              onClick={() => {
+                if (isMobile) {
+                  document.getElementById(`camera-input-${type}`)?.click();
+                } else {
+                  setWebcamType(type);
+                  setShowWebcam(true);
+                }
+              }}
+              className="flex items-center justify-center gap-3 py-4 bg-emerald-50 text-emerald-700 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-all border border-emerald-200 shadow-sm active:scale-[0.98]"
+            >
+              <Camera className="w-6 h-6" />
+              <span className="font-bold text-base">{t('take_photo', 'ถ่ายภาพ')}</span>
+              <input 
+                id={`camera-input-${type}`}
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                className="hidden" 
+                onChange={onUpload} 
+              />
+            </button>
+            <label className="flex items-center justify-center gap-3 py-4 bg-slate-100 text-slate-700 rounded-2xl cursor-pointer hover:bg-slate-200 transition-all border border-slate-200 shadow-sm active:scale-[0.98]">
+              <Plus className="w-6 h-6" />
+              <span className="font-bold text-base">{t('upload_photo_btn')}</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
+            </label>
+          </>
+        )}
+      </div>
     </div>
   );
   
@@ -837,8 +1046,8 @@ export const JobReport: React.FC = () => {
             job_type: (report.job_type as 'one_way' | 'round_trip') || 'one_way',
             work_date: formatTimeForInput(report.work_date || report.date_created),
             customer_name: report.customer_name || report.customer_id?.company_name || '',
-            customer_contact_name: report.customer_contact_name || report.customer_id?.contact_name || '',
-            customer_contact_phone: report.customer_contact_phone || report.customer_id?.contact_phone || '',
+            customer_contact_name: report.customer_contact_name || '',
+            customer_contact_phone: report.customer_contact_phone || '',
             origin: report.origin || '',
             origin_url: report.origin_url || '',
             origin_lat: report.origin_lat,
@@ -892,7 +1101,8 @@ export const JobReport: React.FC = () => {
           };
           
           setFormData(initialData);
-          setInitialValues(initialData);
+          // Deep clone to prevent mutation issues when comparing in handleSubmit
+          setInitialValues(JSON.parse(JSON.stringify(initialData)));
           setOriginalCustomerAndCar({
             customerId: String(initialData.customer_id),
             carId: String(initialData.car_id)
@@ -968,23 +1178,53 @@ export const JobReport: React.FC = () => {
         }
       }
       
-      // For admins, we auto-fill if member_id is empty
-      // For non-admins, we don't overwrite their own ID which is pre-filled in fetchData
-      if (isAdmin && !formData.member_id) {
-        let autoFilledDriverId = getLastDriver(currentCarId);
+      // Auto-fill driver based on car assignment
+      if (currentCarId && (isAdmin || !formData.member_id)) {
+        let autoFilledDriverId = null;
         
-        // Fallback to static assignment if no history
-        if (!autoFilledDriverId) {
-          const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
-          if (selectedCar && selectedCar.car_users) {
-            const driverMember = selectedCar.car_users.find((cu: any) => {
+        // Priority 1: Static assignment in Car settings
+        const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
+        if (selectedCar && selectedCar.car_users) {
+          // Try to find a member with driver-like role first
+          let driverMember = selectedCar.car_users.find((cu: any) => {
+            const user = cu.line_user_id;
+            const role = typeof user === 'object' ? user.role : '';
+            return user && (role === 'member' || role === 'driver' || role === 'staff');
+          })?.line_user_id;
+
+          // Fallback: Find any member that is not a customer
+          if (!driverMember) {
+            driverMember = selectedCar.car_users.find((cu: any) => {
               const user = cu.line_user_id;
-              return user && (typeof user === 'object' ? user.role === 'member' : false);
-            })?.line_user_id as Member | undefined;
-            if (driverMember) {
-              autoFilledDriverId = driverMember.id;
-            }
+              const role = typeof user === 'object' ? user.role : '';
+              return user && role !== 'customer';
+            })?.line_user_id;
           }
+
+          if (driverMember) {
+            autoFilledDriverId = typeof driverMember === 'object' ? driverMember.id : driverMember;
+          }
+        }
+
+        // Priority 1.5: Match by owner_name if car_users didn't work
+        if (!autoFilledDriverId && selectedCar?.owner_name) {
+          const ownerName = selectedCar.owner_name.trim().toLowerCase();
+          const matchingMember = members.find(m => {
+            const fullName = `${m.first_name} ${m.last_name}`.trim().toLowerCase();
+            const displayName = (m.display_name || '').toLowerCase();
+            return fullName === ownerName || 
+                   displayName === ownerName || 
+                   fullName.includes(ownerName) || 
+                   ownerName.includes(fullName);
+          });
+          if (matchingMember) {
+            autoFilledDriverId = matchingMember.id;
+          }
+        }
+
+        // Priority 2: Last driver from previous reports
+        if (!autoFilledDriverId) {
+          autoFilledDriverId = getLastDriver(currentCarId);
         }
 
         if (autoFilledDriverId) {
@@ -1017,19 +1257,51 @@ export const JobReport: React.FC = () => {
     }
   }, [formData.member_id, members]);
 
+  const handleWebcamCapture = async (file: File) => {
+    if (!webcamType) return;
+    
+    // Create a mock event to reuse handlePhotoChange
+    const mockEvent = {
+      target: {
+        files: [file]
+      }
+    } as any;
+    
+    setShowWebcam(false);
+    await handlePhotoChange(mockEvent, webcamType);
+    setWebcamType(null);
+  };
+
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pickup' | 'delivery' | 'document') => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setSubmitting(true);
+    setProcessingPhotos(true);
     try {
+      // Get current location for timestamp overlay
+      const currentLocation = await new Promise<{ lat: number, lng: number } | null>((resolve) => {
+        if (!navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 5000, enableHighAccuracy: true }
+        );
+      });
+
       let newPhotos: any[] = [];
       if (type === 'pickup') newPhotos = [...pickupPhotos];
       else if (type === 'delivery') newPhotos = [...deliveryPhotos];
       else newPhotos = [...documentPhotos];
 
       for (const file of files) {
-        // Extract EXIF data
+        // Process image with overlay (timestamp and location)
+        const processedBlob = await processImageWithOverlay(file, currentLocation);
+        const processedFile = new File([processedBlob], file.name, { type: 'image/jpeg' });
+
+        // Extract EXIF data (optional, but keeping for metadata consistency)
         const metadata: any = await new Promise((resolve) => {
           EXIF.getData(file as any, function(this: any) {
             const allMetadata = EXIF.getAllTags(this);
@@ -1053,9 +1325,9 @@ export const JobReport: React.FC = () => {
             }
 
             resolve({
-              latitude,
-              longitude,
-              timestamp,
+              latitude: latitude || currentLocation?.lat,
+              longitude: longitude || currentLocation?.lng,
+              timestamp: timestamp || new Date().toISOString(),
               all: allMetadata
             });
           });
@@ -1064,11 +1336,11 @@ export const JobReport: React.FC = () => {
         const reader = new FileReader();
         const previewUrl = await new Promise<string>((resolve) => {
           reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(processedFile);
         });
 
         newPhotos.push({
-          file,
+          file: processedFile,
           metadata,
           preview: previewUrl
         } as any);
@@ -1085,7 +1357,7 @@ export const JobReport: React.FC = () => {
       console.error("Error processing photos:", err);
       setError("Error processing photos. Please try again.");
     } finally {
-      setSubmitting(false);
+      setProcessingPhotos(false);
     }
   };
 
@@ -2158,12 +2430,6 @@ export const JobReport: React.FC = () => {
 
   const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'arrived' | 'completed', jobId?: string, targetCustomerId?: string) => {
     try {
-      // Only send customer notifications for 'accepted' and 'completed' statuses
-      if (status === 'pending' || status === 'arrived') {
-        console.log(`Skipping customer notification for status: ${status}. We only notify customers on 'accepted' and 'completed'.`);
-        return;
-      }
-
       const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id);
       const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
       const currentMemberId = typeof formData.member_id === 'object' && formData.member_id ? (formData.member_id as any).id : formData.member_id;
@@ -2172,7 +2438,6 @@ export const JobReport: React.FC = () => {
       console.log(`Starting customer notification for status: ${status}, customer_id: ${currentCustomerId}, report_id: ${currentReportId}`);
       
       const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
-      console.log('Customer notifications enabled status:', notificationsEnabled);
       
       if (!notificationsEnabled) {
         console.log('Customer notifications are disabled in localStorage');
@@ -2185,7 +2450,6 @@ export const JobReport: React.FC = () => {
       }
 
       const customerLoc = customers.find(c => String(c.id) === String(currentCustomerId));
-      console.log('Found customer location:', customerLoc ? customerLoc.company_name : 'not found');
       
       if (!customerLoc) {
         console.log(`Customer location ${currentCustomerId} not found in customers list`);
@@ -2202,10 +2466,14 @@ export const JobReport: React.FC = () => {
       const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
       const driver = members.find(m => String(m.id) === String(currentMemberId));
       
-      const statusText = status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg');
+      const statusText = status === 'pending' ? t('status_pending_msg') :
+                        status === 'accepted' ? t('status_accepted_msg') :
+                        status === 'arrived' ? t('status_arrived_msg') :
+                        t('status_completed_msg');
       
-      const headerColor = '#2c5494'; // NES Blue
-      const statusColor = status === 'completed' ? '#27ae60' : '#e54d42'; 
+      const statusColor = status === 'completed' ? '#27ae60' : 
+                          status === 'arrived' ? '#f39c12' :
+                          status === 'accepted' ? '#2c5494' : '#e54d42'; 
       const displayId = formData.case_number || currentReportId;
 
       // Send notification to each member
@@ -2512,25 +2780,48 @@ export const JobReport: React.FC = () => {
           await sendNewJobNotificationToDriver(currentMemberId, currentCarId);
         } else if (!driverChanged && currentMemberId) {
           // Check if routes/pickups/deliveries were added
-          const countPoints = (routes: any[]) => {
+          const countPickups = (routes: any[]) => {
             let total = 0;
             if (!routes) return total;
             routes.forEach(r => {
-              if (r.pickups) total += r.pickups.length;
+              if (r.pickups) total += r.pickups.filter((p: any) => p.name).length;
               else if (r.origin) total += 1;
-              if (r.deliveries) total += r.deliveries.length;
+            });
+            return total;
+          };
+
+          const countDeliveries = (routes: any[]) => {
+            let total = 0;
+            if (!routes) return total;
+            routes.forEach(r => {
+              if (r.deliveries) total += r.deliveries.filter((d: any) => d.name).length;
               else if (r.destination) total += 1;
             });
             return total;
           };
 
-          const oldPointsCount = countPoints(initialValues.routes);
-          const newPointsCount = countPoints(formData.routes);
-          const pointsAdded = newPointsCount > oldPointsCount;
+          const oldPickups = countPickups(initialValues.routes);
+          const newPickups = countPickups(formData.routes);
+          const oldDeliveries = countDeliveries(initialValues.routes);
+          const newDeliveries = countDeliveries(formData.routes);
 
-          if (pointsAdded) {
-            console.log('Points added, notifying driver of additional work...');
-            await sendAdditionalWorkNotificationToDriver(currentMemberId, currentCarId);
+          console.log('DEBUG: Point counts:', { 
+            oldPickups, newPickups, 
+            oldDeliveries, newDeliveries,
+            pickupsAdded: newPickups > oldPickups,
+            deliveriesAdded: newDeliveries > oldDeliveries
+          });
+
+          const pickupsAdded = newPickups > oldPickups;
+          const deliveriesAdded = newDeliveries > oldDeliveries;
+
+          if (pickupsAdded || deliveriesAdded) {
+            console.log('Points added, notifying driver of additional work...', { pickupsAdded, deliveriesAdded });
+            let type: 'pickup' | 'delivery' | 'both' = 'both';
+            if (pickupsAdded && !deliveriesAdded) type = 'pickup';
+            else if (!pickupsAdded && deliveriesAdded) type = 'delivery';
+            
+            await sendAdditionalWorkNotificationToDriver(currentMemberId, currentCarId, type);
             notifiedAdditionalWork = true;
           }
         }
@@ -2688,7 +2979,7 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const sendAdditionalWorkNotificationToDriver = async (driverId: string, carId: string) => {
+  const sendAdditionalWorkNotificationToDriver = async (driverId: string, carId: string, type: 'pickup' | 'delivery' | 'both' = 'both') => {
     try {
       const notificationsEnabled = localStorage.getItem('line_notifications_enabled') !== 'false';
       const driver = members.find(m => String(m.id) === String(driverId));
@@ -2699,8 +2990,15 @@ export const JobReport: React.FC = () => {
       if (notificationsEnabled && lineId) {
         const selectedCar = cars.find(c => String(c.id) === String(carId));
         
+        let title = 'มีการเพิ่มจุดรับ/ส่ง (งานเพิ่มเติม)';
+        if (type === 'pickup') title = '🔔 มีการเพิ่มจุดรับสินค้าใหม่ (งานเพิ่มเติม)';
+        else if (type === 'delivery') title = '🔔 มีการเพิ่มจุดส่งสินค้าใหม่ (งานเพิ่มเติม)';
+        else title = '🔔 มีการเพิ่มจุดรับและจุดส่งใหม่ (งานเพิ่มเติม)';
+        
+        console.log(`Sending additional work notification: ${title} to ${lineId}`);
+
         const flexContents = generateDriverFlexMessage(
-          'มีการเพิ่มจุดรับ/ส่ง (งานเพิ่มเติม)',
+          title,
           {
             case_number: String(formData.case_number || 'N/A'),
             car_number: String(selectedCar?.car_number || 'N/A'),
@@ -2749,17 +3047,19 @@ export const JobReport: React.FC = () => {
         const messages = [
           {
             type: "text",
-            text: `🔔 มีการเพิ่มจุดรับ/ส่ง (งานเพิ่มเติม)\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\nระยะทางรวม: ${formData.estimated_distance || 0} km`
+            text: `${title}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\nระยะทางรวม: ${formData.estimated_distance || 0} km`
           },
           {
             type: "flex",
-            altText: 'มีการเพิ่มจุดรับ/ส่ง (งานเพิ่มเติม)',
+            altText: title,
             contents: flexContents
           }
         ];
         
         await lineService.sendPushMessage(lineId, messages);
         console.log('Additional work notification sent to driver successfully');
+      } else {
+        console.warn('Skipping additional work notification:', { notificationsEnabled, hasLineId: !!lineId, driverId });
       }
     } catch (err: any) {
       if (err.response?.status === 401) return;
@@ -3399,22 +3699,20 @@ export const JobReport: React.FC = () => {
     if (memberIds.length === 0) return contactName || '-';
 
     const selectedMembers = members.filter(m => memberIds.includes(String(m.id)));
-    const lineNames = selectedMembers.map(m => m.display_name).filter(Boolean).join(', ');
-    const realNames = selectedMembers.map(m => {
-      const first = m.first_name || '';
-      const last = m.last_name || '';
-      return `${first} ${last}`.trim();
-    }).filter(Boolean).join(', ');
-
-    if (lineNames && realNames) {
-      return `${lineNames}\n${realNames}`;
-    } else if (lineNames) {
-      return lineNames;
-    } else if (realNames) {
-      return realNames;
-    }
     
-    return contactName || '-';
+    return selectedMembers.map((m, idx) => {
+      const lineName = m.display_name || '';
+      const realName = `${m.first_name || ''} ${m.last_name || ''}`.trim();
+      
+      if (lineName && realName && lineName !== realName) {
+        return `${idx + 1}. ${realName} (${lineName})`;
+      } else if (realName) {
+        return `${idx + 1}. ${realName}`;
+      } else if (lineName) {
+        return `${idx + 1}. ${lineName}`;
+      }
+      return `${idx + 1}. -`;
+    }).join('\n');
   };
 
   const generateReportText = () => {
@@ -3935,37 +4233,26 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   const selectedCustomerLoc = option?.data;
                   
                   // Format contact name with LINE name and real name if linked members exist
-                  let formattedContactName = selectedCustomerLoc?.contact_name || '';
+                  let formattedContactName = '';
                   if (selectedCustomerLoc) {
-                    const memberIds: string[] = [];
-                    const primaryId = typeof selectedCustomerLoc.member_id === 'object' ? selectedCustomerLoc.member_id?.id : selectedCustomerLoc.member_id;
-                    if (primaryId) memberIds.push(String(primaryId));
-                    
-                    if (selectedCustomerLoc.members && Array.isArray(selectedCustomerLoc.members)) {
-                      selectedCustomerLoc.members.forEach((m: any) => {
-                        const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-                        if (id && !memberIds.includes(String(id))) {
-                          memberIds.push(String(id));
-                        }
-                      });
-                    }
+                    const memberIds = getCustomerMemberIds(selectedCustomerLoc);
 
                     if (memberIds.length > 0) {
                       const selectedMembers = members.filter(m => memberIds.includes(String(m.id)));
-                      const lineNames = selectedMembers.map(m => m.display_name).filter(Boolean).join(', ');
-                      const realNames = selectedMembers.map(m => {
-                        const first = m.first_name || '';
-                        const last = m.last_name || '';
-                        return `${first} ${last}`.trim();
-                      }).filter(Boolean).join(', ');
                       
-                      if (lineNames && realNames) {
-                        formattedContactName = `${lineNames}\n${realNames}`;
-                      } else if (lineNames) {
-                        formattedContactName = lineNames;
-                      } else if (realNames) {
-                        formattedContactName = realNames;
-                      }
+                      formattedContactName = selectedMembers.map((m, idx) => {
+                        const lineName = m.display_name || '';
+                        const realName = `${m.first_name || ''} ${m.last_name || ''}`.trim();
+                        
+                        if (lineName && realName && lineName !== realName) {
+                          return `${idx + 1}. ${realName} (${lineName})`;
+                        } else if (realName) {
+                          return `${idx + 1}. ${realName}`;
+                        } else if (lineName) {
+                          return `${idx + 1}. ${lineName}`;
+                        }
+                        return `${idx + 1}. -`;
+                      }).join('\n');
                     }
                   }
 
@@ -3974,7 +4261,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     customer_name: customerName,
                     customer_id: selectedCustomerLoc?.id || '',
                     customer_contact_name: formattedContactName,
-                    customer_contact_phone: selectedCustomerLoc?.contact_phone || '',
+                    customer_contact_phone: selectedCustomerLoc?.phone || '',
                     case_number: !id ? generateCaseNumber(selectedCustomerLoc?.company_code || 'TH') : prev.case_number
                   }));
                   
@@ -4230,7 +4517,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].name = val;
-                                    if (index === 0 && pIndex === 0) newRoutes[index].origin = val;
+                                    if (pIndex === 0) newRoutes[index].origin = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -4249,7 +4536,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].url = val;
-                                    if (index === 0 && pIndex === 0) newRoutes[index].origin_url = val;
+                                    if (pIndex === 0) newRoutes[index].origin_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -4344,7 +4631,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].name = val;
-                                    if (index === 0 && dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
+                                    if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -4363,7 +4650,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].url = val;
-                                    if (index === 0 && dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
+                                    if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -4420,7 +4707,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   <button
                     type="button"
                     onClick={handleCalculateDistance}
-                    disabled={isCalculatingDistance || formData.routes.some(r => !r.origin_url || !r.destination_url)}
+                    disabled={isCalculatingDistance || formData.routes.some(r => {
+                      const points = [
+                        ...(r.pickups || []).filter(p => p.url),
+                        ...(r.deliveries || []).filter(d => d.url)
+                      ];
+                      return points.length < 2 && (!r.origin_url || !r.destination_url);
+                    })}
                     className="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                   >
                     {isCalculatingDistance ? (
@@ -4533,21 +4826,45 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       next_maintenance_mileage: selectedCar?.next_maintenance_mileage
                     };
 
-                    // Auto-fill logic for Driver
+                    // Auto-fill driver based on car assignment
                     let autoFilledDriverId = null;
-
-                    // Only auto-fill driver for admins or if member_id is not set
-                    // Non-admins (drivers) should keep their own pre-filled ID
-                    if (isAdmin || !prev.member_id) {
+                    if (carId) {
                       // Priority 1: Static assignment in Car settings (from คลังยานพาหนะ)
                       if (selectedCar && selectedCar.car_users) {
-                        const driverMember = selectedCar.car_users.find((cu: any) => {
+                        // Try to find a member with driver-like role first
+                        let driverMember = selectedCar.car_users.find((cu: any) => {
                           const user = cu.line_user_id;
-                          return user && (typeof user === 'object' ? user.role !== 'customer' : true);
+                          const role = typeof user === 'object' ? user.role : '';
+                          return user && (role === 'member' || role === 'driver' || role === 'staff');
                         })?.line_user_id;
+
+                        // Fallback: Find any member that is not a customer
+                        if (!driverMember) {
+                          driverMember = selectedCar.car_users.find((cu: any) => {
+                            const user = cu.line_user_id;
+                            const role = typeof user === 'object' ? user.role : '';
+                            return user && role !== 'customer';
+                          })?.line_user_id;
+                        }
                         
                         if (driverMember) {
                           autoFilledDriverId = typeof driverMember === 'object' ? driverMember.id : driverMember;
+                        }
+                      }
+
+                      // Priority 1.5: Match by owner_name if car_users didn't work
+                      if (!autoFilledDriverId && selectedCar?.owner_name) {
+                        const ownerName = selectedCar.owner_name.trim().toLowerCase();
+                        const matchingMember = members.find(m => {
+                          const fullName = `${m.first_name} ${m.last_name}`.trim().toLowerCase();
+                          const displayName = (m.display_name || '').toLowerCase();
+                          return fullName === ownerName || 
+                                 displayName === ownerName || 
+                                 fullName.includes(ownerName) || 
+                                 ownerName.includes(fullName);
+                        });
+                        if (matchingMember) {
+                          autoFilledDriverId = matchingMember.id;
                         }
                       }
 
@@ -4565,7 +4882,16 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                           nextData.member_id = String(autoFilledDriverId);
                           nextData.phone = driver.phone || nextData.phone;
                         }
+                      } else if (isAdmin) {
+                        // If no driver assigned to car and we are admin, clear member_id 
+                        // so they know no one is assigned
+                        nextData.member_id = '';
+                        nextData.phone = '';
                       }
+                    } else if (isAdmin) {
+                      // If car is cleared and we are admin, also clear driver
+                      nextData.member_id = '';
+                      nextData.phone = '';
                     }
                     
                     return nextData;
@@ -4640,7 +4966,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               </label>
               <select 
                 required
-                disabled={!!id && !isAdmin && localStorage.getItem('member_id') !== (typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id)}
+                disabled={!!(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id) || (!!id && !isAdmin && localStorage.getItem('member_id') !== (typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id))}
                 value={typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : (formData.member_id || '')}
                 onChange={e => {
                   const selectedId = e.target.value;
@@ -4660,7 +4986,6 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 <option value="">{t('select_member')}</option>
                 {sortedMembers.map(member => {
                   const busy = isMemberBusy(member.id);
-                  const statusText = busy ? ` (${t('busy')})` : ` (${t('available')})`;
                   
                   // Check if this member is linked to the selected car
                   const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
@@ -4671,7 +4996,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
                   return (
                     <option key={member.id} value={member.id} className={busy ? "text-red-500" : "text-green-500"}>
-                      {member.first_name} {member.last_name} {statusText}{isLinked ? ` (${t('assigned_vehicles')})` : ''}
+                      {member.first_name} {member.last_name} {isLinked ? ` (${t('assigned_vehicles')})` : ''}
                     </option>
                   );
                 })}
@@ -4835,9 +5160,9 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             </label>
             
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {renderPhotoSection(t('photo_pickup'), pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'), (i) => removeExistingPhoto(i, 'pickup'))}
-              {renderPhotoSection(t('photo_delivery'), deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'), (i) => removeExistingPhoto(i, 'delivery'))}
-              {renderPhotoSection(t('photo_document'), documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'), (i) => removeExistingPhoto(i, 'document'))}
+              {renderPhotoSection(t('photo_pickup'), pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'), (i) => removeExistingPhoto(i, 'pickup'), processingPhotos)}
+              {renderPhotoSection(t('photo_delivery'), deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'), (i) => removeExistingPhoto(i, 'delivery'), processingPhotos)}
+              {renderPhotoSection(t('photo_document'), documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'), (i) => removeExistingPhoto(i, 'document'), processingPhotos)}
             </div>
         </div>
       </div>
@@ -4875,13 +5200,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
           <button 
             type="submit"
-            disabled={submitting || !isEditable}
+            disabled={submitting || processingPhotos || !isEditable}
             className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {submitting ? (
+            {submitting || processingPhotos ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {t('loading')}
+                {processingPhotos ? t('processing_photos', 'กำลังประมวลผลรูปภาพ...') : t('loading')}
               </>
             ) : (
               <>
@@ -4912,6 +5237,17 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             referrerPolicy="no-referrer"
           />
         </div>
+      )}
+
+      {/* Webcam Modal */}
+      {showWebcam && (
+        <WebcamModal 
+          onCapture={handleWebcamCapture} 
+          onClose={() => {
+            setShowWebcam(false);
+            setWebcamType(null);
+          }} 
+        />
       )}
 
       {/* Confirmation Modal */}

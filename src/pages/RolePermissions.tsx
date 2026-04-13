@@ -44,6 +44,7 @@ const MENU_KEYS = [
   { key: 'calendar', label: 'ปฏิทินงาน', icon: Calendar, group: 'โลจิสติกส์' },
   { key: 'all_jobs', label: 'รายการงาน', icon: ClipboardList, group: 'โลจิสติกส์' },
   { key: 'history', label: 'ประวัติงาน', icon: History, group: 'โลจิสติกส์' },
+  { key: 'trip_history', label: 'ดูรถย้อนหลัง', icon: MapPin, group: 'โลจิสติกส์' },
   { key: 'vehicle_queue', label: 'จัดลำดับคิวรถ', icon: ListOrdered, group: 'โลจิสติกส์' },
   
   { key: 'reports', label: 'รายงาน', icon: ShieldCheck, group: 'การจัดการ' },

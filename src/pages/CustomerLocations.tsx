@@ -3,9 +3,156 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { CustomerLocation, Member } from '../types';
-import { Search, Plus, MapPin, Edit2, Trash2, X, Loader2, AlertCircle, Building2, User, Phone, Mail, FileText, Map, Users, Hash } from 'lucide-react';
+import { clsx } from 'clsx';
+import { Search, Plus, MapPin, Edit2, Trash2, X, Loader2, AlertCircle, Building2, User, Phone, Mail, FileText, Map, Users, Hash, GripVertical, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import Select from 'react-select';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  useDroppable,
+  rectIntersection,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+interface SortableMemberProps {
+  member: Member;
+  onRemove?: (id: string) => void;
+  onAdd?: (id: string) => void;
+  isOverlay?: boolean;
+}
+
+const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd, isOverlay }) => {
+  if (!member) return null;
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: String(member.id) });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isOverlay ? 1000 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        "flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm mb-2 group cursor-default",
+        isOverlay && "shadow-xl border-primary/30 ring-2 ring-primary/10"
+      )}
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-slate-50 rounded-md text-slate-400">
+        <GripVertical className="w-4 h-4" />
+      </div>
+      
+      {member.picture_url ? (
+        <img 
+          src={directusApi.getFileUrl(member.picture_url)} 
+          alt="" 
+          className="w-8 h-8 rounded-full object-cover border border-slate-100"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-100">
+          {(member.display_name || member.first_name || 'U').charAt(0).toUpperCase()}
+        </div>
+      )}
+      
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-slate-900 truncate">
+          {member.display_name || `${member.first_name} ${member.last_name}`}
+        </p>
+        {member.email && <p className="text-[10px] text-slate-500 truncate">{member.email}</p>}
+      </div>
+
+      {onAdd && (
+        <button 
+          type="button"
+          onClick={() => onAdd(member.id)}
+          className="p-1.5 hover:bg-primary/10 text-primary rounded-lg transition-colors"
+          title="คลิกเพื่อเพิ่ม"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      )}
+
+      {onRemove && (
+        <button 
+          type="button"
+          onClick={() => onRemove(member.id)}
+          className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-colors"
+          title="คลิกเพื่อลบ"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+const DroppableContainer = ({ id, items, title, onRemove, onAdd, icon: Icon, emptyText }: any) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div className="flex-1 flex flex-col min-h-[300px]">
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <Icon className="w-3.5 h-3.5 text-slate-400" />
+        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</h3>
+        <span className="ml-auto text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+          {items.length}
+        </span>
+      </div>
+      
+      <div
+        ref={setNodeRef}
+        className={clsx(
+          "flex-1 p-2 rounded-xl border-2 border-dashed transition-all overflow-y-auto max-h-[350px]",
+          isOver ? "bg-primary/5 border-primary/30 ring-4 ring-primary/5" : "bg-slate-50/50 border-slate-200"
+        )}
+      >
+        <SortableContext items={items.map((i: any) => String(i.id))} strategy={verticalListSortingStrategy}>
+          {items.length > 0 ? (
+            items.map((member: any) => (
+              <SortableMember 
+                key={member.id} 
+                member={member} 
+                onRemove={onRemove} 
+                onAdd={onAdd}
+              />
+            ))
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400">
+              <Icon className="w-6 h-6 mb-2 opacity-20" />
+              <p className="text-[10px]">{emptyText}</p>
+            </div>
+          )}
+        </SortableContext>
+      </div>
+    </div>
+  );
+};
 
 export const CustomerLocations: React.FC = () => {
   const { t } = useTranslation();
@@ -15,6 +162,10 @@ export const CustomerLocations: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [junctionField, setJunctionField] = useState<string>('line_users_id');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<CustomerLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -29,11 +180,107 @@ export const CustomerLocations: React.FC = () => {
     email: '',
     address: '',
     branch: '',
-    contact_name: '',
-    contact_phone: '',
-    member_id: '',
     member_ids: [] as string[]
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) {
+      console.log('Drag ended with no drop target');
+      return;
+    }
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    
+    console.log(`Drag End: active=${activeId}, over=${overId}`);
+
+    const isActiveInSelected = formData.member_ids.map(String).includes(activeId);
+    const isOverInSelected = formData.member_ids.map(String).includes(overId) || overId === 'selected-container';
+    const isOverInAvailable = !formData.member_ids.map(String).includes(overId) || overId === 'available-container';
+
+    console.log(`Status: isActiveInSelected=${isActiveInSelected}, isOverInSelected=${isOverInSelected}, isOverInAvailable=${isOverInAvailable}`);
+
+    if (isActiveInSelected && isOverInAvailable) {
+      console.log('Moving from Selected to Available');
+      setFormData(prev => ({
+        ...prev,
+        member_ids: prev.member_ids.filter(id => String(id) !== activeId)
+      }));
+    } else if (!isActiveInSelected && isOverInSelected) {
+      console.log('Moving from Available to Selected');
+      setFormData(prev => ({
+        ...prev,
+        member_ids: [...prev.member_ids, activeId]
+      }));
+    } else if (isActiveInSelected && isOverInSelected) {
+      console.log('Reordering within Selected');
+      if (activeId !== overId) {
+        setFormData(prev => {
+          const oldIndex = prev.member_ids.map(String).indexOf(activeId);
+          const newIndex = prev.member_ids.map(String).indexOf(overId);
+          
+          if (newIndex === -1) return prev;
+          
+          return {
+            ...prev,
+            member_ids: arrayMove(prev.member_ids, oldIndex, newIndex)
+          };
+        });
+      }
+    }
+  };
+
+  const handleAddMember = (memberId: any) => {
+    const idStr = String(memberId);
+    const currentIds = formData.member_ids.map(String);
+    if (!currentIds.includes(idStr)) {
+      setFormData(prev => ({
+        ...prev,
+        member_ids: [...prev.member_ids, idStr]
+      }));
+    }
+    setMemberSearchTerm('');
+  };
+
+  const handleRemoveMember = (memberId: any) => {
+    const idStr = String(memberId);
+    setFormData(prev => ({
+      ...prev,
+      member_ids: prev.member_ids.filter(id => String(id) !== idStr)
+    }));
+  };
+
+  const availableMembers = members.filter(m => 
+    (m.role === 'customer' || m.role === 'member' || m.role === 'general') && 
+    !formData.member_ids.map(String).includes(String(m.id)) &&
+    (
+      (m.display_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+      (m.first_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+      (m.last_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+      (m.email || '').toLowerCase().includes(memberSearchTerm.toLowerCase())
+    )
+  );
+
+  const selectedMembersList = members.filter(m => formData.member_ids.map(String).includes(String(m.id)))
+    .sort((a, b) => formData.member_ids.map(String).indexOf(String(a.id)) - formData.member_ids.map(String).indexOf(String(b.id)));
 
   const fetchData = async () => {
     setLoading(true);
@@ -43,8 +290,28 @@ export const CustomerLocations: React.FC = () => {
         directusApi.getCustomerLocations(),
         directusApi.getMembers()
       ]);
+      console.log('Fetched Locations:', locationsData.length);
       setLocations(locationsData);
       setMembers(membersData);
+
+      // Detect junction field from existing data
+      if (locationsData.length > 0) {
+        const locWithMembers = locationsData.find(l => l.members && l.members.length > 0);
+        if (locWithMembers && locWithMembers.members) {
+          const m = locWithMembers.members[0] as any;
+          console.log('Detecting junction field from sample member:', m);
+          if (m.line_users_id !== undefined) {
+            console.log('Detected junction field: line_users_id');
+            setJunctionField('line_users_id');
+          } else if (m.members_id !== undefined) {
+            console.log('Detected junction field: members_id');
+            setJunctionField('members_id');
+          } else if (m.line_user_id !== undefined) {
+            console.log('Detected junction field: line_user_id');
+            setJunctionField('line_user_id');
+          }
+        }
+      }
     } catch (err: any) {
       if (err.response?.status === 401) {
         return;
@@ -62,23 +329,25 @@ export const CustomerLocations: React.FC = () => {
 
   const handleOpenModal = (location?: CustomerLocation) => {
     if (location) {
+      console.log('Opening Modal for Location:', location.id);
+      console.log('Location Members:', location.members);
       setEditingLocation(location);
       setOriginalMembers(location.members || []);
       
-      // Extract member IDs from both member_id and members array
+      // Extract member IDs from members array
       const memberIds: string[] = [];
-      
-      const primaryMemberId = typeof location.member_id === 'object' ? location.member_id?.id : location.member_id;
-      if (primaryMemberId) memberIds.push(String(primaryMemberId));
       
       if (location.members && Array.isArray(location.members)) {
         location.members.forEach((m: any) => {
-          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+          const id = typeof m.line_users_id === 'object' ? m.line_users_id?.id :
+                     (typeof m.line_user_id === 'object' ? m.line_user_id?.id : 
+                     (typeof m.members_id === 'object' ? m.members_id?.id : (m.line_users_id || m.line_user_id || m.members_id)));
           if (id && !memberIds.includes(String(id))) {
             memberIds.push(String(id));
           }
         });
       }
+      console.log('Extracted Member IDs:', memberIds);
 
       setFormData({
         company_name: location.company_name || '',
@@ -88,9 +357,6 @@ export const CustomerLocations: React.FC = () => {
         email: location.email || '',
         address: location.address || '',
         branch: location.branch || '',
-        contact_name: location.contact_name || '',
-        contact_phone: location.contact_phone || '',
-        member_id: primaryMemberId || '',
         member_ids: memberIds
       });
     } else {
@@ -104,9 +370,6 @@ export const CustomerLocations: React.FC = () => {
         email: '',
         address: '',
         branch: '',
-        contact_name: '',
-        contact_phone: '',
-        member_id: '',
         member_ids: []
       });
     }
@@ -123,65 +386,134 @@ export const CustomerLocations: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    
     setSubmitting(true);
     setActionError(null);
     try {
-      const { member_ids, ...rest } = formData;
+      const validMemberIds = formData.member_ids.filter(id => id && id !== '');
+      console.log('Valid Member IDs for submission:', validMemberIds);
+      
+      // Determine the best junction field to use
+      let currentJunctionField = junctionField;
+      if (originalMembers.length > 0) {
+        const m = originalMembers[0];
+        if (m.line_users_id !== undefined) currentJunctionField = 'line_users_id';
+        else if (m.members_id !== undefined) currentJunctionField = 'members_id';
+        else if (m.line_user_id !== undefined) currentJunctionField = 'line_user_id';
+      }
+      console.log('Using junction field for submission:', currentJunctionField);
+      
       const payload: any = {
-        ...rest,
-        member_id: member_ids[0] && member_ids[0] !== '' ? member_ids[0] : null, // Primary member for backward compatibility
+        company_name: formData.company_name,
+        company_code: formData.company_code,
+        tax_id: formData.tax_id,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        branch: formData.branch,
       };
 
-      // For Directus M2M updates, we need to handle existing relations
-      const validMemberIds = member_ids.filter(id => id && id !== '');
-      
       if (editingLocation) {
-        // For Directus M2M updates, we use the nested syntax to sync the relationship
         const currentJunctions = originalMembers || [];
         
         // Identify junction records to delete
         const toDelete = currentJunctions
           .filter(j => {
-            const userId = typeof j.line_user_id === 'object' ? j.line_user_id?.id : j.line_user_id;
+            const userId = typeof j.line_users_id === 'object' ? j.line_users_id?.id :
+                           (typeof j.line_user_id === 'object' ? j.line_user_id?.id : 
+                           (typeof j.members_id === 'object' ? j.members_id?.id : (j.line_users_id || j.line_user_id || j.members_id)));
             return userId && !validMemberIds.includes(String(userId));
           })
           .map(j => j.id)
-          .filter(Boolean);
+          .filter(id => id !== undefined && id !== null);
         
         // Identify new members to add
         const toCreate = validMemberIds
           .filter(userId => !currentJunctions.some(j => {
-            const existingUserId = typeof j.line_user_id === 'object' ? j.line_user_id?.id : j.line_user_id;
+            const existingUserId = typeof j.line_users_id === 'object' ? j.line_users_id?.id :
+                                   (typeof j.line_user_id === 'object' ? j.line_user_id?.id : 
+                                   (typeof j.members_id === 'object' ? j.members_id?.id : (j.line_users_id || j.line_user_id || j.members_id)));
             return existingUserId && String(existingUserId) === String(userId);
           }))
-          .map(userId => ({ line_user_id: userId }));
+          .map(userId => {
+            const idStr = String(userId);
+            const id = !isNaN(Number(idStr)) && idStr.trim() !== '' ? Number(idStr) : userId;
+            
+            const item: any = {};
+            item[currentJunctionField] = id;
+            return item;
+          });
 
-        // Use the nested action syntax for Directus
-        if (toCreate.length > 0 || toDelete.length > 0) {
-          payload.members = {
-            create: toCreate,
-            delete: toDelete
-          };
-        } else {
-          delete payload.members;
+        console.log('M2M Sync:', { toCreate, toDelete });
+
+        // Use explicit create/delete syntax for M2M
+        payload.members = {
+          create: toCreate,
+          delete: toDelete,
+          update: []
+        };
+
+        // Set member_id as fallback for older parts of the app
+        if (validMemberIds.length > 0) {
+          const firstId = validMemberIds[0];
+          const firstIdStr = String(firstId);
+          payload.member_id = !isNaN(Number(firstIdStr)) && firstIdStr.trim() !== '' ? Number(firstIdStr) : firstId;
         }
       } else {
         // For new records, just send the list of junction objects
-        payload.members = validMemberIds.map(id => ({
-          line_user_id: id
-        }));
+        if (validMemberIds.length > 0) {
+          payload.members = validMemberIds.map(userId => {
+            const userIdStr = String(userId);
+            const id = !isNaN(Number(userIdStr)) && userIdStr.trim() !== '' ? Number(userIdStr) : userId;
+            
+            const item: any = {};
+            item[currentJunctionField] = id;
+            return item;
+          });
+          
+          // Set member_id as fallback
+          const firstId = validMemberIds[0];
+          const firstIdStr = String(firstId);
+          payload.member_id = !isNaN(Number(firstIdStr)) && firstIdStr.trim() !== '' ? Number(firstIdStr) : firstId;
+        }
       }
 
+      console.log('Submitting Customer Location Payload:', JSON.stringify(payload, null, 2));
+
       if (editingLocation) {
-        await directusApi.updateCustomerLocation(editingLocation.id, payload);
+        const response = await directusApi.updateCustomerLocation(editingLocation.id, payload);
+        console.log('Update Response:', response);
       } else {
-        await directusApi.createCustomerLocation(payload);
+        const response = await directusApi.createCustomerLocation(payload);
+        console.log('Create Response:', response);
       }
+      
+      // Show success message
+      setActionError(null);
       setIsModalOpen(false);
-      fetchData();
+      setEditingLocation(null);
+      setOriginalMembers([]);
+      setFormData({
+        company_name: '',
+        company_code: '',
+        tax_id: '',
+        phone: '',
+        email: '',
+        address: '',
+        branch: '',
+        member_ids: []
+      });
+      await fetchData();
+      window.alert('บันทึกข้อมูลสำเร็จ');
     } catch (err: any) {
-      console.error('Error saving location:', err);
-      setActionError(err.message || 'Failed to save location');
+      console.error('CRITICAL: Error saving location:', err);
+      if (err.response) {
+        console.error('Error Response Data:', err.response.data);
+      }
+      const errorMsg = err.response?.data?.errors?.[0]?.message || err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล';
+      setActionError(errorMsg);
+      window.alert(`เกิดข้อผิดพลาด: ${errorMsg}`);
     } finally {
       setSubmitting(false);
     }
@@ -320,8 +652,6 @@ export const CustomerLocations: React.FC = () => {
                     )}
                     {(() => {
                       const memberIds: string[] = [];
-                      const primaryId = typeof loc.member_id === 'object' ? loc.member_id?.id : loc.member_id;
-                      if (primaryId) memberIds.push(String(primaryId));
                       
                       if (loc.members && Array.isArray(loc.members)) {
                         loc.members.forEach((m: any) => {
@@ -338,7 +668,7 @@ export const CustomerLocations: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
                           <div className="flex -space-x-2 overflow-hidden">
-                            {members.filter(m => memberIds.includes(m.id)).map((m, i) => (
+                            {members.filter(m => memberIds.includes(String(m.id))).map((m, i) => (
                               <div key={m.id} className="inline-block h-6 w-6 rounded-full ring-2 ring-white overflow-hidden bg-slate-100" title={m.display_name || `${m.first_name} ${m.last_name}`}>
                                 {m.picture_url ? (
                                   <img 
@@ -357,7 +687,7 @@ export const CustomerLocations: React.FC = () => {
                           </div>
                           <p className="text-xs text-slate-500 ml-1">
                             {(() => {
-                              const selectedMembers = members.filter(m => memberIds.includes(m.id));
+                              const selectedMembers = members.filter(m => memberIds.includes(String(m.id)));
                               if (selectedMembers.length <= 2) {
                                 return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
                               }
@@ -371,15 +701,6 @@ export const CustomerLocations: React.FC = () => {
                       <div className="flex items-start gap-2">
                         <Map className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
                         <p className="text-xs text-slate-500 line-clamp-2">{loc.address}</p>
-                      </div>
-                    )}
-                    {(loc.contact_name || loc.contact_phone) && (
-                      <div className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
-                        <User className="w-3.5 h-3.5 text-primary" />
-                        <div className="flex flex-col">
-                          <p className="text-[10px] font-bold text-primary uppercase leading-none mb-1">{t('contact_person')}</p>
-                          <p className="text-xs text-slate-700 font-medium">{loc.contact_name || '-'} {loc.contact_phone ? `(${loc.contact_phone})` : ''}</p>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -416,6 +737,12 @@ export const CustomerLocations: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-8">
+              {actionError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 flex items-center gap-3 text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  {actionError}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column: Basic Info */}
                 <div className="space-y-6">
@@ -514,13 +841,13 @@ export const CustomerLocations: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right Column: Members & Contact */}
+                {/* Right Column: Contact Person Group */}
                 <div className="space-y-6">
-                  <div className="space-y-1.5">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-slate-400" />
-                        {t('customer_role')}
+                      <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-primary" />
+                        {t('contact_person')} ({formData.member_ids.length})
                       </label>
                       <button 
                         type="button"
@@ -531,125 +858,80 @@ export const CustomerLocations: React.FC = () => {
                         {t('add_member')}
                       </button>
                     </div>
-                    <Select
-                      isMulti
-                      options={members
-                        .filter(m => m.role === 'customer' || formData.member_ids.includes(m.id))
-                        .map(m => ({
-                          value: m.id,
-                          label: m.display_name || `${m.first_name} ${m.last_name}`,
-                          email: m.email,
-                          picture: m.picture_url
-                        }))
-                      }
-                      value={members
-                        .filter(m => formData.member_ids.includes(m.id))
-                        .map(m => ({
-                          value: m.id,
-                          label: m.display_name || `${m.first_name} ${m.last_name}`,
-                          email: m.email,
-                          picture: m.picture_url
-                        }))
-                      }
-                      formatOptionLabel={(option: any) => (
-                        <div className="flex items-center gap-2">
-                          {option.picture ? (
-                            <img 
-                              src={directusApi.getFileUrl(option.picture)} 
-                              alt="" 
-                              className="w-6 h-6 rounded-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-400">
-                              {option.label.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{option.label}</span>
-                            {option.email && <span className="text-[10px] text-slate-400 leading-none">{option.email}</span>}
-                          </div>
-                        </div>
-                      )}
-                      onChange={(selectedOptions) => {
-                        const selectedIds = selectedOptions ? (selectedOptions as any[]).map(o => o.value) : [];
-                        
-                        setFormData({
-                          ...formData,
-                          member_ids: selectedIds
-                        });
-                      }}
-                      placeholder={t('select_members')}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderRadius: '0.75rem',
-                          padding: '2px',
-                          backgroundColor: '#f8fafc',
-                          borderColor: '#e2e8f0',
-                          '&:hover': {
-                            borderColor: '#cbd5e1'
-                          }
-                        }),
-                        menu: (base) => ({
-                          ...base,
-                          borderRadius: '0.75rem',
-                          overflow: 'hidden',
-                          zIndex: 100
-                        })
-                      }}
-                    />
-                  </div>
 
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                        <User className="w-4 h-4 text-primary" />
-                        {t('contact_person')}
-                      </label>
-                      {formData.member_ids.length > 0 && (
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const firstMember = members.find(m => String(m.id) === String(formData.member_ids[0]));
-                            if (firstMember) {
-                              setFormData({
-                                ...formData,
-                                contact_name: firstMember.display_name || `${firstMember.first_name} ${firstMember.last_name}`,
-                                contact_phone: firstMember.phone || ''
-                              });
-                            }
-                          }}
-                          className="text-[10px] font-bold text-primary hover:underline"
-                        >
-                          {t('use_member_info')}
-                        </button>
-                      )}
-                    </div>
-                    
+                    <p className="text-[10px] text-slate-500 bg-blue-50 p-2 rounded-lg border border-blue-100">
+                      * สมาชิกในกลุ่มนี้จะได้รับการแจ้งเตือนผ่าน LINE เมื่อมีการมอบหมายงาน
+                    </p>
+
+                    {/* Member Selection Area */}
                     <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">{t('contact_name')}</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input 
-                          type="text" 
-                          value={formData.contact_name}
-                          onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                          placeholder={t('contact_name')}
+                          type="text"
+                          placeholder="ค้นหาสมาชิก..."
+                          value={memberSearchTerm}
+                          onChange={(e) => setMemberSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
                         />
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">{t('contact_phone')}</label>
-                        <input 
-                          type="text" 
-                          value={formData.contact_phone}
-                          onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                          placeholder={t('contact_phone')}
-                        />
-                      </div>
+
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={rectIntersection}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <div className="flex flex-col gap-4">
+                          <DroppableContainer
+                            id="available-container"
+                            title="สมาชิกที่ว่าง"
+                            icon={User}
+                            items={availableMembers}
+                            onAdd={handleAddMember}
+                            emptyText="ไม่พบสมาชิกที่ว่าง"
+                          />
+                          
+                          <div className="flex items-center justify-center gap-4 text-slate-300 py-2">
+                            <div className="h-px flex-1 bg-slate-100"></div>
+                            <div className="flex flex-col items-center">
+                              <ArrowRight className="w-4 h-4 rotate-90 md:rotate-0" />
+                              <ArrowLeft className="w-4 h-4 rotate-90 md:rotate-0" />
+                            </div>
+                            <div className="h-px flex-1 bg-slate-100"></div>
+                          </div>
+
+                          <DroppableContainer
+                            id="selected-container"
+                            title="สมาชิกที่เลือก"
+                            icon={CheckCircle2}
+                            items={selectedMembersList}
+                            onRemove={handleRemoveMember}
+                            emptyText="ลากสมาชิกมาวางที่นี่"
+                          />
+                        </div>
+
+                        <DragOverlay dropAnimation={{
+                          sideEffects: defaultDropAnimationSideEffects({
+                            styles: {
+                              active: {
+                                opacity: '0.5',
+                              },
+                            },
+                          }),
+                        }}>
+                          {activeId ? (() => {
+                            const activeMember = members.find(m => String(m.id) === String(activeId));
+                            if (!activeMember) return null;
+                            return (
+                              <SortableMember 
+                                member={activeMember} 
+                                isOverlay 
+                              />
+                            );
+                          })() : null}
+                        </DragOverlay>
+                      </DndContext>
                     </div>
                   </div>
                 </div>

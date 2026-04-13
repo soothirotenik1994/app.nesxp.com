@@ -2,7 +2,13 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
-export const STATIC_API_KEY = localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+const getStaticKey = () => {
+  const key = localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+  if (key === 'null' || key === 'undefined' || !key) return null;
+  return key;
+};
+
+export const STATIC_API_KEY = getStaticKey();
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
@@ -34,9 +40,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem('admin_token');
     if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(`Using Admin Token for: ${config.url}`);
     } else if (STATIC_API_KEY) {
       // Use static key if no admin token
       config.headers.Authorization = `Bearer ${STATIC_API_KEY}`;
+      console.log(`Using Static API Key for: ${config.url}`);
+    } else {
+      console.log(`No Authorization header for: ${config.url}`);
     }
     return config;
   },
@@ -370,7 +380,7 @@ export const directusApi = {
   getCustomerLocation: async (id: string): Promise<any> => {
     const response = await api.get(`/items/customer_locations/${id}`, {
       params: {
-        fields: '*,member_id.*,members.*,members.line_user_id.*'
+        fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*'
       }
     });
     return response.data.data;
@@ -379,7 +389,7 @@ export const directusApi = {
   getCustomerLocations: async (): Promise<any[]> => {
     const response = await api.get('/items/customer_locations', {
       params: {
-        fields: '*,member_id.*,members.*,members.line_user_id.*',
+        fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*',
         sort: '-date_created',
         limit: -1
       }
@@ -675,6 +685,25 @@ export const directusApi = {
     } catch (error) {
       console.error('Tracking error:', error);
       throw error;
+    }
+  },
+
+  getVehicleHistory: async (carNumber: string, startTime: string, endTime: string): Promise<any[]> => {
+    try {
+      const response = await api.get('/items/vehicle_location_history', {
+        params: {
+          filter: {
+            car_number: { _eq: carNumber },
+            timestamp: { _between: [startTime, endTime] }
+          },
+          sort: 'timestamp',
+          limit: -1
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching vehicle history:', error);
+      return [];
     }
   },
 

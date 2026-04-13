@@ -6,6 +6,7 @@ import {
   Users, 
   Car, 
   ShieldCheck, 
+  Star,
   UserCog,
   Shield,
   LogOut,
@@ -64,8 +65,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     if (dynamicPermissionsRaw) {
       try {
         const dynamicPermissions = JSON.parse(dynamicPermissionsRaw);
-        if (dynamicPermissions[userRole] && dynamicPermissions[userRole][key] !== undefined) {
-          return dynamicPermissions[userRole][key] === true;
+        // Case-insensitive role check
+        const roleKey = Object.keys(dynamicPermissions).find(
+          r => r.toLowerCase() === userRole.toLowerCase()
+        );
+        
+        if (roleKey && dynamicPermissions[roleKey][key] !== undefined) {
+          return dynamicPermissions[roleKey][key] === true;
         }
       } catch (e) {
         console.error('Error parsing dynamic permissions', e);
@@ -73,7 +79,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     }
 
     // ถ้าไม่มีสิทธิ์ไดนามิก ให้ใช้ค่าจากไฟล์ config (Fallback)
-    const permissions = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS['Driver'];
+    // Case-insensitive fallback check
+    const fallbackRoleKey = Object.keys(ROLE_PERMISSIONS).find(
+      r => r.toLowerCase() === userRole.toLowerCase()
+    );
+    
+    const permissions = ROLE_PERMISSIONS[fallbackRoleKey || ''] || ROLE_PERMISSIONS['Driver'];
     return (permissions as any)[key] === true;
   };
 
@@ -81,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('reports'), path: '/reports', icon: ShieldCheck, key: 'reports' },
     { name: t('members'), path: '/members', icon: Users, key: 'members' },
     { name: t('vehicles'), path: '/cars', icon: Car, key: 'vehicles' },
+    { name: 'คะแนนคนขับ', path: '/ratings', icon: Star, key: 'driver_ratings' },
     { name: t('customer_locations'), path: '/locations', icon: MapPin, key: 'locations' },
     { name: t('new_job_assignment'), path: '/jobs/new', icon: FileText, key: 'new_job' },
     { name: t('maintenance'), path: '/maintenance', icon: RefreshCw, key: 'maintenance', isParent: true },
@@ -95,8 +107,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: t('job_calendar'), path: '/jobs/calendar', icon: Calendar, key: 'calendar' },
     { name: isAdmin ? t('all_jobs') : t('my_assigned_jobs'), path: '/jobs/my', icon: ClipboardList, key: 'all_jobs' },
     { name: t('job_history'), path: '/jobs/history', icon: History, key: 'history' },
+    { name: 'ดูรถย้อนหลัง', path: '/history', icon: MapPin, key: 'trip_history' },
     { name: 'จัดลำดับคิวรถ', path: '/vehicle-queue', icon: ListOrdered, key: 'vehicle_queue' },
-  ].filter(item => isAdmin ? isVisible(item.key) : true); // Non-admins see all logistics for now
+  ].filter(item => isVisible(item.key));
   
   const settingsItems = [
     { name: t('admins'), path: '/admins', icon: UserCog, key: 'admins' },
@@ -126,6 +139,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const handleBackToAdmin = () => {
     localStorage.removeItem('is_switched_account');
     localStorage.removeItem('member_id');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_picture');
+    localStorage.removeItem('user_email');
+    
+    // Restore admin role manually before reload so it doesn't flash
+    // App.tsx will fetch the real role from API, but this makes the transition smoother
+    localStorage.setItem('user_role', 'Administrator');
+    localStorage.setItem('is_admin', 'true');
+    
     // App.tsx will refresh the user info on reload
     window.location.href = '/';
   };

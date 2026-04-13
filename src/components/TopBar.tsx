@@ -28,6 +28,24 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
   const isAdmin = localStorage.getItem('user_role')?.toLowerCase() === 'administrator' || localStorage.getItem('user_role')?.toLowerCase() === 'admin';
   
   useEffect(() => {
+    const handleStorageChange = () => {
+      setUserInfo({
+        name: localStorage.getItem('user_name') || t('admin_user'),
+        role: localStorage.getItem('user_role') || t('super_admin'),
+        picture: localStorage.getItem('user_picture') || ''
+      });
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('user-info-updated', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('user-info-updated', handleStorageChange);
+    };
+  }, [t]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);

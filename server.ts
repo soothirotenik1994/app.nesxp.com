@@ -572,6 +572,80 @@ async function startServer() {
     }
   });
 
+  // Cron endpoint to record GPS history
+  app.get("/api/cron/record-gps", async (req, res) => {
+    try {
+      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+      const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      
+      // 1. Fetch all cars
+      const carsResponse = await axios.get(`${directusUrl}/items/cars`, {
+        headers: { 'Authorization': `Bearer ${staticToken}` }
+      });
+      const cars = carsResponse.data.data;
+      
+      if (!cars || cars.length === 0) {
+        return res.json({ message: "No cars found" });
+      }
+
+      // 2. Get GPS Session
+      const currentSessionId = await getSessionId();
+      if (!currentSessionId) {
+        return res.status(500).json({ error: "Failed to authenticate with GPS provider" });
+      }
+
+      const historyRecords = [];
+
+      // 3. Fetch GPS for each car
+      for (const car of cars) {
+        try {
+          const gpsResponse = await axios.get(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/car/log_data/car_status?carNumber=${car.car_number}`, {
+            headers: { 'Authorization': currentSessionId },
+            timeout: 5000
+          });
+          
+          let data = gpsResponse.data?.result || gpsResponse.data;
+          if (Array.isArray(data)) data = data[0];
+
+          if (data && data.logGisy && data.logGisx) {
+            const lat = data.logGisy / 1000000;
+            const lng = data.logGisx / 1000000;
+            const speed = data.logSpeed || data.speed || 0;
+            
+            historyRecords.push({
+              car_number: car.car_number,
+              lat: lat,
+              lng: lng,
+              speed: speed,
+              // Use current time for timestamp
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (err: any) {
+          console.error(`Failed to fetch GPS for ${car.car_number} in cron:`, err.message);
+        }
+      }
+
+      // 4. Save to Directus
+      if (historyRecords.length > 0) {
+        try {
+          await axios.post(`${directusUrl}/items/vehicle_location_history`, historyRecords, {
+            headers: { 'Authorization': `Bearer ${staticToken}` }
+          });
+          console.log(`Saved ${historyRecords.length} GPS records to history.`);
+        } catch (saveErr: any) {
+          console.error('Failed to save to vehicle_location_history. Does the collection exist?', saveErr.message);
+          return res.status(500).json({ error: "Failed to save to collection. Please ensure 'vehicle_location_history' exists in Directus." });
+        }
+      }
+
+      res.json({ success: true, recorded: historyRecords.length });
+    } catch (error: any) {
+      console.error('Cron record-gps error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Proxy for GPS API to avoid CORS
   app.get("/api/proxy/gps/:carNumber", async (req, res) => {
     try {
