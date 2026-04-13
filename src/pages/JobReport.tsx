@@ -467,7 +467,8 @@ export const JobReport: React.FC = () => {
             const response = await axios.post('/api/calculate-distance', {
               originUrl: uniquePoints[0].url,
               destinationUrl: uniquePoints[uniquePoints.length - 1].url,
-              waypointUrls: uniquePoints.slice(1, -1).map(p => p.url)
+              waypointUrls: uniquePoints.slice(1, -1).map(p => p.url),
+              apiKey: localStorage.getItem('google_maps_api_key')
             });
             
             if (response.data && response.data.distance !== undefined) {
@@ -528,6 +529,109 @@ export const JobReport: React.FC = () => {
         type: 'error',
         title: t('error'),
         message: displayMessage
+      });
+      setShowStatusModal(true);
+    } finally {
+      setIsCalculatingDistance(false);
+    }
+  };
+
+  const handleOptimizeRoute = async () => {
+    setIsCalculatingDistance(true);
+    try {
+      const newRoutes = [...formData.routes];
+      let totalDistance = 0;
+
+      for (let i = 0; i < newRoutes.length; i++) {
+        const route = newRoutes[i];
+        
+        // Collect all points
+        const pickups = [...(route.pickups || [])].filter(p => p.url);
+        const deliveries = [...(route.deliveries || [])].filter(d => d.url);
+        
+        const allPoints = [...pickups, ...deliveries];
+
+        if (allPoints.length < 3) {
+          // If only 2 points, just calculate distance normally
+          const response = await axios.post('/api/calculate-distance', {
+            originUrl: allPoints[0].url,
+            destinationUrl: allPoints[allPoints.length - 1].url,
+            waypointUrls: [],
+            apiKey: localStorage.getItem('google_maps_api_key')
+          });
+          newRoutes[i] = { ...route, distance: response.data.distance };
+          totalDistance += response.data.distance;
+          continue;
+        }
+
+        // Keep first pickup as start and last delivery as end
+        const origin = allPoints[0];
+        const destination = allPoints[allPoints.length - 1];
+        const waypoints = allPoints.slice(1, -1);
+
+        const response = await axios.post('/api/calculate-distance', {
+          originUrl: origin.url,
+          destinationUrl: destination.url,
+          waypointUrls: waypoints.map(w => w.url),
+          optimize: true,
+          apiKey: localStorage.getItem('google_maps_api_key')
+        });
+
+        if (response.data && response.data.status === 'OK' && response.data.optimizedOrder) {
+          const order = response.data.optimizedOrder; // Array of indices of waypoints
+          const optimizedWaypoints = order.map((idx: number) => waypoints[idx]);
+          
+          // Re-distribute back to pickups and deliveries while maintaining the optimized sequence
+          // We'll put all optimized waypoints that were originally pickups into pickups, 
+          // and those that were deliveries into deliveries, but in the new order.
+          const finalPickups = [origin];
+          const finalDeliveries = [];
+          
+          optimizedWaypoints.forEach((wp: any) => {
+            const wasPickup = pickups.some(p => p.url === wp.url && p !== origin);
+            if (wasPickup) {
+              finalPickups.push(wp);
+            } else {
+              finalDeliveries.push(wp);
+            }
+          });
+          finalDeliveries.push(destination);
+
+          newRoutes[i] = {
+            ...route,
+            pickups: finalPickups,
+            deliveries: finalDeliveries,
+            distance: response.data.distance,
+            route_type: response.data.distance > 250 ? 'upcountry' : 'bangkok_vicinity'
+          };
+          totalDistance += response.data.distance;
+        } else {
+          // Fallback or no optimization available
+          newRoutes[i] = { ...route, distance: response.data.distance };
+          totalDistance += response.data.distance;
+        }
+      }
+
+      const finalDistance = Math.round(totalDistance * 10) / 10;
+      
+      setFormData(prev => ({
+        ...prev,
+        routes: newRoutes,
+        estimated_distance: finalDistance
+      }));
+
+      setStatusConfig({
+        type: 'success',
+        title: t('success'),
+        message: `จัดลำดับเส้นทางและคำนวณระยะทางสำเร็จ! ระยะทางรวม: ${finalDistance} km`
+      });
+      setShowStatusModal(true);
+    } catch (error: any) {
+      console.error('Optimize route error:', error);
+      setStatusConfig({
+        type: 'error',
+        title: t('error'),
+        message: error.response?.data?.error || error.message || 'เกิดข้อผิดพลาดในการจัดลำดับเส้นทาง'
       });
       setShowStatusModal(true);
     } finally {
@@ -855,64 +959,89 @@ export const JobReport: React.FC = () => {
     onRemoveExisting: (index: number) => void,
     isProcessing?: boolean
   ) => (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-4">{title}</h3>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        {existingPhotos.map((fileId, i) => (
-          <div key={`existing-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
-            <img src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} alt="existing" className="w-full h-full object-cover" />
-            <button onClick={() => onRemoveExisting(i)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
-        {photos.map((p, i) => (
-          <div key={`new-${i}`} className="relative aspect-square rounded-xl overflow-hidden border">
-            <img src={p.preview} alt="preview" className="w-full h-full object-cover" />
-            <button onClick={() => onRemove(i)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+    <div className="flex flex-col h-full bg-slate-50/50 rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="p-3 border-b border-slate-200 bg-white">
+        <h4 className="text-sm font-bold text-slate-700 text-center">{title}</h4>
       </div>
-      <div className="flex flex-col gap-3">
-        {isProcessing ? (
-          <div className="flex items-center justify-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-            <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
-            <span className="text-sm font-medium text-slate-500">กำลังประมวลผลรูปภาพ...</span>
-          </div>
-        ) : (
-          <>
-            <button 
-              type="button"
-              onClick={() => {
-                if (isMobile) {
-                  document.getElementById(`camera-input-${type}`)?.click();
-                } else {
-                  setWebcamType(type);
-                  setShowWebcam(true);
-                }
-              }}
-              className="flex items-center justify-center gap-3 py-4 bg-emerald-50 text-emerald-700 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-all border border-emerald-200 shadow-sm active:scale-[0.98]"
-            >
-              <Camera className="w-6 h-6" />
-              <span className="font-bold text-base">{t('take_photo', 'ถ่ายภาพ')}</span>
-              <input 
-                id={`camera-input-${type}`}
-                type="file" 
-                accept="image/*" 
-                capture="environment" 
-                className="hidden" 
-                onChange={onUpload} 
+      
+      <div className="p-3 flex-1 space-y-3">
+        {/* Gallery Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          {existingPhotos.map((fileId, i) => (
+            <div key={`existing-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+              <img 
+                src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} 
+                alt="existing" 
+                className="w-full h-full object-cover cursor-pointer"
+                onClick={() => setFullscreenImage(directusApi.getFileUrl(fileId))}
               />
-            </button>
-            <label className="flex items-center justify-center gap-3 py-4 bg-slate-100 text-slate-700 rounded-2xl cursor-pointer hover:bg-slate-200 transition-all border border-slate-200 shadow-sm active:scale-[0.98]">
-              <Plus className="w-6 h-6" />
-              <span className="font-bold text-base">{t('upload_photo_btn')}</span>
-              <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
-            </label>
-          </>
-        )}
+              <button 
+                type="button"
+                onClick={() => onRemoveExisting(i)} 
+                className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {photos.map((p, i) => (
+            <div key={`new-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+              <img 
+                src={p.preview} 
+                alt="preview" 
+                className="w-full h-full object-cover cursor-pointer"
+                onClick={() => setFullscreenImage(p.preview)}
+              />
+              <button 
+                type="button"
+                onClick={() => onRemove(i)} 
+                className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Upload Buttons */}
+        <div className="flex flex-col gap-2">
+          {isProcessing ? (
+            <div className="flex items-center justify-center py-4 bg-white rounded-xl border border-dashed border-slate-300">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (isMobile) {
+                    document.getElementById(`camera-input-${type}`)?.click();
+                  } else {
+                    setWebcamType(type);
+                    setShowWebcam(true);
+                  }
+                }}
+                className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100 active:scale-[0.98]"
+              >
+                <Camera className="w-5 h-5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{t('take_photo', 'ถ่ายภาพ')}</span>
+                <input 
+                  id={`camera-input-${type}`}
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment" 
+                  className="hidden" 
+                  onChange={onUpload} 
+                />
+              </button>
+              <label className="flex flex-col items-center justify-center gap-1 py-3 bg-slate-100 text-slate-600 rounded-xl cursor-pointer hover:bg-slate-200 transition-all border border-slate-200 active:scale-[0.98]">
+                <Plus className="w-5 h-5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{t('upload_photo_btn', 'อัปโหลด')}</span>
+                <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
+              </label>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -4722,6 +4851,25 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       <><MapPin className="w-4 h-4" /> {t('calculate_distance')}</>
                     )}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOptimizeRoute}
+                    disabled={isCalculatingDistance || formData.routes.some(r => {
+                      const points = [
+                        ...(r.pickups || []).filter(p => p.url),
+                        ...(r.deliveries || []).filter(d => d.url)
+                      ];
+                      return points.length < 3;
+                    })}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                  >
+                    {isCalculatingDistance ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> {t('calculating')}</>
+                    ) : (
+                      <><Truck className="w-4 h-4" /> {t('optimize_route')}</>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -5154,17 +5302,30 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             <h3 className="font-bold text-slate-800">{t('photos')} {t('and')} {t('notes')}</h3>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <Camera className="w-4 h-4" /> {t('upload_photos')}
-            </label>
-            
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {renderPhotoSection(t('photo_pickup'), pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'), (i) => removeExistingPhoto(i, 'pickup'), processingPhotos)}
               {renderPhotoSection(t('photo_delivery'), deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'), (i) => removeExistingPhoto(i, 'delivery'), processingPhotos)}
               {renderPhotoSection(t('photo_document'), documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'), (i) => removeExistingPhoto(i, 'document'), processingPhotos)}
             </div>
-        </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <FileText className="w-4 h-4" /> {t('notes')}
+              </label>
+              <textarea 
+                rows={4}
+                disabled={!!id && !isAdmin}
+                placeholder={t('notes_placeholder', 'ระบุหมายเหตุหรือรายละเอียดเพิ่มเติม...')}
+                value={formData.notes || ''}
+                onChange={e => setFormData({...formData, notes: e.target.value})}
+                className={clsx(
+                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                )}
+              />
+            </div>
+          </div>
       </div>
 
         {/* Action Buttons */}

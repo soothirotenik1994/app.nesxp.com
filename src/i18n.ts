@@ -483,6 +483,7 @@ const resources = {
       "time_remaining": "เวลาที่เหลือในการรับงาน",
       "google_map_url": "ลิงก์ Google Map",
       "calculate_distance": "คำนวณระยะทาง",
+      "optimize_route": "จัดลำดับเส้นทางอัตโนมัติ",
       "estimated_distance": "ระยะทางโดยประมาณ",
       "calculating": "กำลังคำนวณ...",
       "distance_calc_error": "ไม่สามารถคำนวณระยะทางได้ กรุณาตรวจสอบลิงก์",

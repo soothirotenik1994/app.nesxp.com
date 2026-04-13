@@ -443,13 +443,13 @@ async function startServer() {
 
   app.post("/api/calculate-distance", async (req, res) => {
     try {
-      const { originUrl, destinationUrl, waypointUrls = [] } = req.body;
+      const { originUrl, destinationUrl, waypointUrls = [], optimize = false, apiKey: clientApiKey } = req.body;
       if (!originUrl || !destinationUrl) {
         return res.status(400).json({ error: "originUrl and destinationUrl are required" });
       }
 
       const allUrls = [originUrl, ...waypointUrls, destinationUrl];
-      const allCoords = [];
+      const allCoords: { lat: number, lng: number }[] = [];
 
       for (const url of allUrls) {
         try {
@@ -463,6 +463,55 @@ async function startServer() {
         }
       }
 
+      const apiKey = clientApiKey || process.env.GOOGLE_MAPS_API_KEY;
+      
+      // If we have an API key, use Google Maps Directions API for better accuracy and optimization
+      if (apiKey && apiKey !== 'YOUR_GOOGLE_MAPS_API_KEY') {
+        try {
+          console.log(`Using Google Maps Directions API (Optimize: ${optimize})`);
+          const origin = `${allCoords[0].lat},${allCoords[0].lng}`;
+          const destination = `${allCoords[allCoords.length - 1].lat},${allCoords[allCoords.length - 1].lng}`;
+          
+          let waypointsParam = "";
+          if (allCoords.length > 2) {
+            const waypoints = allCoords.slice(1, -1).map(c => `${c.lat},${c.lng}`).join('|');
+            waypointsParam = optimize ? `optimize:true|${waypoints}` : waypoints;
+          }
+
+          const response = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
+            params: {
+              origin,
+              destination,
+              waypoints: waypointsParam,
+              key: apiKey,
+              mode: 'driving',
+              language: 'th'
+            }
+          });
+
+          if (response.data.status === 'OK') {
+            const route = response.data.routes[0];
+            const distanceInMeters = route.legs.reduce((acc: number, leg: any) => acc + leg.distance.value, 0);
+            const distanceInKm = distanceInMeters / 1000;
+            const optimizedOrder = route.waypoint_order; // Array of indices relative to the waypoints provided
+
+            return res.json({
+              distance: Math.round(distanceInKm * 10) / 10,
+              optimizedOrder: optimizedOrder,
+              allCoords: allCoords,
+              status: 'OK',
+              source: 'google_maps'
+            });
+          } else {
+            console.warn(`Google Maps Directions API returned status: ${response.data.status}. Falling back to Haversine.`);
+          }
+        } catch (googleErr: any) {
+          console.error('Google Maps API Error:', googleErr.message);
+          // Fallback to Haversine below
+        }
+      }
+
+      // Fallback: Haversine formula to calculate distance in km
       let totalDistance = 0;
       for (let i = 0; i < allCoords.length - 1; i++) {
         const d = calculateDistance(allCoords[i].lat, allCoords[i].lng, allCoords[i+1].lat, allCoords[i+1].lng);
@@ -473,10 +522,11 @@ async function startServer() {
       const estimatedDrivingDistance = totalDistance * 1.3;
 
       res.json({ 
-        distance: estimatedDrivingDistance,
+        distance: Math.round(estimatedDrivingDistance * 10) / 10,
         originCoords: allCoords[0],
         destCoords: allCoords[allCoords.length - 1],
-        allCoords
+        allCoords,
+        source: 'haversine'
       });
     } catch (error: any) {
       console.error('Error in /api/calculate-distance:', error.message);

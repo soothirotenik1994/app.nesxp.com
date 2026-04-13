@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare } from 'lucide-react';
+import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare, MapPin } from 'lucide-react';
 import { directusApi } from '../api/directus';
 import { LineSettings } from './LineSettings';
 
@@ -19,6 +19,7 @@ export const SystemSettings: React.FC = () => {
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
     websiteBackground: localStorage.getItem('website_background') || '',
     appUrl: localStorage.getItem('app_url') || window.location.origin,
+    googleMapsApiKey: localStorage.getItem('google_maps_api_key') || '',
     enableQueueSystem: localStorage.getItem('enable_queue_system') !== 'false', // Default true
     bkkMaxDistance: parseInt(localStorage.getItem('bkk_max_distance') || '250', 10),
     enableTracking: localStorage.getItem('enable_tracking') !== 'false', // Default true
@@ -36,6 +37,7 @@ export const SystemSettings: React.FC = () => {
             websiteLogo: settings.website_logo || prev.websiteLogo,
             websiteBackground: settings.website_background || prev.websiteBackground,
             appUrl: settings.app_url || prev.appUrl,
+            googleMapsApiKey: settings.google_maps_api_key || prev.googleMapsApiKey,
             enableQueueSystem: settings.enable_queue_system !== undefined ? settings.enable_queue_system : prev.enableQueueSystem,
             bkkMaxDistance: settings.bkk_max_distance !== undefined ? settings.bkk_max_distance : prev.bkkMaxDistance,
             enableTracking: settings.enable_tracking !== undefined ? settings.enable_tracking : prev.enableTracking,
@@ -46,6 +48,7 @@ export const SystemSettings: React.FC = () => {
           localStorage.setItem('website_logo', settings.website_logo || '');
           localStorage.setItem('website_background', settings.website_background || '');
           localStorage.setItem('app_url', settings.app_url || '');
+          localStorage.setItem('google_maps_api_key', settings.google_maps_api_key || '');
           localStorage.setItem('enable_queue_system', settings.enable_queue_system !== undefined ? String(settings.enable_queue_system) : 'true');
           localStorage.setItem('bkk_max_distance', settings.bkk_max_distance !== undefined ? String(settings.bkk_max_distance) : '250');
           localStorage.setItem('enable_tracking', settings.enable_tracking !== undefined ? String(settings.enable_tracking) : 'true');
@@ -87,6 +90,7 @@ export const SystemSettings: React.FC = () => {
         website_logo: formData.websiteLogo,
         website_background: formData.websiteBackground,
         app_url: formData.appUrl,
+        google_maps_api_key: formData.googleMapsApiKey,
         enable_queue_system: formData.enableQueueSystem,
         bkk_max_distance: formData.bkkMaxDistance,
         enable_tracking: formData.enableTracking,
@@ -99,6 +103,7 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('website_logo', formData.websiteLogo);
       localStorage.setItem('website_background', formData.websiteBackground);
       localStorage.setItem('app_url', formData.appUrl);
+      localStorage.setItem('google_maps_api_key', formData.googleMapsApiKey);
       localStorage.setItem('enable_queue_system', String(formData.enableQueueSystem));
       localStorage.setItem('bkk_max_distance', String(formData.bkkMaxDistance));
       localStorage.setItem('enable_tracking', String(formData.enableTracking));
@@ -417,6 +422,21 @@ export const SystemSettings: React.FC = () => {
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="Enter your Directus static token"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                Google Maps API Key
+              </label>
+              <input 
+                type="password" 
+                value={formData.googleMapsApiKey}
+                onChange={(e) => setFormData({...formData, googleMapsApiKey: e.target.value})}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                placeholder="Enter your Google Maps API Key"
+              />
+              <p className="text-[10px] text-slate-400">ใช้สำหรับคำนวณระยะทางจริงและจัดลำดับเส้นทางอัตโนมัติ (Route Optimization)</p>
             </div>
           </div>
 
