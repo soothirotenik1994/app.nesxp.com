@@ -35,12 +35,13 @@ export const ApiSettings: React.FC = () => {
   };
 
   const handleTestApi = async () => {
-    if (!testCaseNumber) return;
+    const trimmedCaseNumber = testCaseNumber.trim();
+    if (!trimmedCaseNumber) return;
     setIsTesting(true);
     setTestResult(null);
     setTestError(null);
     try {
-      const response = await axios.get(`/api/track/${testCaseNumber}`);
+      const response = await axios.get(`/api/track/${trimmedCaseNumber}`);
       setTestResult(response.data);
     } catch (error: any) {
       console.error('API Test Error:', error);

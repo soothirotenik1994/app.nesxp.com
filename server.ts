@@ -816,7 +816,10 @@ async function startServer() {
   app.get('/api/track/:case_number', async (req, res) => {
     try {
       const { case_number } = req.params;
+      console.log(`Backend: Tracking request received for case: ${case_number}`);
+      
       if (!case_number) {
+        console.warn('Backend: Tracking request missing case number');
         return res.status(400).json({ error: 'Case number is required' });
       }
 
@@ -840,8 +843,10 @@ async function startServer() {
       });
 
       const jobs = response.data.data;
+      console.log(`Backend: Directus returned ${jobs?.length || 0} jobs for case: ${case_number}`);
 
       if (!jobs || jobs.length === 0) {
+        console.warn(`Backend: Tracking number not found in Directus: ${case_number}`);
         return res.status(404).json({ error: 'Tracking number not found' });
       }
 
