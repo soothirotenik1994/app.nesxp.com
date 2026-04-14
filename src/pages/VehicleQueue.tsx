@@ -149,78 +149,78 @@ export const VehicleQueue: React.FC = () => {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ListOrdered className="w-8 h-8 text-primary" />
             ระบบจัดลำดับคิวรถ
           </h1>
-          <p className="text-gray-500 mt-1">คำนวณลำดับคิวอัตโนมัติจากประวัติการวิ่งงาน (กทม. vs ต่างจังหวัด)</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">คำนวณลำดับคิวอัตโนมัติจากประวัติการวิ่งงาน (กทม. vs ต่างจังหวัด)</p>
         </div>
         
         <div className="flex items-center gap-3">
           <button
             onClick={fetchData}
-            className="p-2 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
+            className="p-2 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
             title="รีเฟรชข้อมูล"
           >
             <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
           </button>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               placeholder="ค้นหาทะเบียนรถ, ชื่อคนขับ..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none w-full sm:w-64"
+              className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none w-full sm:w-64 dark:text-slate-100"
             />
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-700 dark:text-red-400">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">ลำดับ</th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">ข้อมูลรถ</th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">งาน กทม.<br/><span className="text-xs font-normal text-gray-400">(≤ {bkkMaxDistance} กม.)</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">งานต่างจังหวัด<br/><span className="text-xs font-normal text-gray-400">(&gt; {bkkMaxDistance} กม.)</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">Priority Score<br/><span className="text-xs font-normal text-gray-400">(กทม. / (ตจว. + 1))</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">สถานะคิวถัดไป</th>
+              <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">ลำดับ</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">ข้อมูลรถ</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400 text-center">งาน กทม.<br/><span className="text-xs font-normal text-slate-400">(≤ {bkkMaxDistance} กม.)</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400 text-center">งานต่างจังหวัด<br/><span className="text-xs font-normal text-slate-400">(&gt; {bkkMaxDistance} กม.)</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400 text-center">Priority Score<br/><span className="text-xs font-normal text-slate-400">(กทม. / (ตจว. + 1))</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400">สถานะคิวถัดไป</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <RefreshCw className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-gray-500">กำลังคำนวณลำดับคิว...</p>
+                    <p className="text-slate-500 dark:text-slate-400">กำลังคำนวณลำดับคิว...</p>
                   </td>
                 </tr>
               ) : filteredQueue.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
                     ไม่พบข้อมูลรถที่ค้นหา
                   </td>
                 </tr>
               ) : (
                 filteredQueue.map((item, index) => (
-                  <tr key={item.car.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={item.car.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
                         index === 0 ? "bg-amber-100 text-amber-700" :
-                        index === 1 ? "bg-gray-200 text-gray-700" :
+                        index === 1 ? "bg-slate-200 text-slate-700" :
                         index === 2 ? "bg-orange-100 text-orange-700" :
-                        "bg-gray-50 text-gray-500"
+                        "bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
                       )}>
                         {index + 1}
                       </div>
@@ -231,23 +231,23 @@ export const VehicleQueue: React.FC = () => {
                           <CarIcon className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900">{item.car.car_number}</p>
-                          <p className="text-sm text-gray-500">{item.car.owner_name || 'ไม่ระบุคนขับ'}</p>
+                          <p className="font-bold text-slate-900 dark:text-slate-100">{item.car.car_number}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">{item.car.owner_name || 'ไม่ระบุคนขับ'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-lg font-bold">
+                      <span className="inline-block px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg font-bold">
                         {item.count_bkk}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="inline-block px-3 py-1 bg-purple-50 text-purple-700 rounded-lg font-bold">
+                      <span className="inline-block px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-lg font-bold">
                         {item.count_upcountry}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="font-mono font-bold text-lg text-gray-900">
+                      <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">
                         {item.priority_score.toFixed(2)}
                       </span>
                     </td>

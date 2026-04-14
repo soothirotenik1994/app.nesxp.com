@@ -31,11 +31,20 @@ import { useEffect } from 'react';
 import { setAuthToken, directusApi } from './api/directus';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SystemAlertProvider } from './context/SystemAlertContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   useEffect(() => {
+    // Force light mode if no theme is set, or if we want to reset it for the user
+    const savedTheme = localStorage.getItem('theme');
+    if (!savedTheme || savedTheme === 'dark') {
+      localStorage.setItem('theme', 'light');
+      window.document.documentElement.classList.remove('dark');
+      window.document.documentElement.classList.add('light');
+    }
+
     const token = localStorage.getItem('admin_token');
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       setAuthToken(token);
       
       // Refresh user info
@@ -88,48 +97,50 @@ export default function App() {
   }, []);
 
   return (
-    <SystemAlertProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/line/callback" element={<LineCallback />} />
-          <Route path="/rate/:id" element={<CustomerRating />} />
-          
-          <Route element={<ProtectedRoute />}>
-            <Route path="/monitor" element={<FleetMonitor />} />
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/members" element={<Members />} />
-              <Route path="/cars" element={<Cars />} />
-              <Route path="/cars/:carNumber/history" element={<TripHistory />} />
-              <Route path="/history" element={<TripHistory />} />
-              <Route path="/locations" element={<CustomerLocations />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/admins" element={<Admins />} />
-              <Route path="/jobs/new" element={<JobReport />} />
-              <Route path="/jobs/edit/:id" element={<JobReport />} />
-              <Route path="/jobs/my" element={<MyJobs />} />
-              <Route path="/jobs/calendar" element={<JobCalendar />} />
-              <Route path="/jobs/history" element={<JobHistory />} />
-              <Route path="/vehicle-queue" element={<VehicleQueue />} />
-              <Route path="/line/settings" element={<LineSettings />} />
-              <Route path="/line/api-settings" element={<LineApiSettings />} />
-              <Route path="/line/broadcast" element={<LineBroadcast />} />
-              <Route path="/settings/api" element={<ApiSettings />} />
-              <Route path="/maintenance" element={<MaintenanceDashboard />} />
-              <Route path="/maintenance/log" element={<MaintenanceLog />} />
-              <Route path="/maintenance/items" element={<MaintenanceItems />} />
-              <Route path="/maintenance/reports" element={<MaintenanceReports />} />
-              <Route path="/ratings" element={<DriverRatingManagement />} />
-              <Route path="/settings/system" element={<SystemSettings />} />
-              <Route path="/role-permissions" element={<RolePermissions />} />
-              <Route path="/permissions" element={<Members />} />
+    <ThemeProvider>
+      <SystemAlertProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/line/callback" element={<LineCallback />} />
+            <Route path="/rate/:id" element={<CustomerRating />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route path="/monitor" element={<FleetMonitor />} />
+              <Route element={<Layout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/members" element={<Members />} />
+                <Route path="/cars" element={<Cars />} />
+                <Route path="/cars/:carNumber/history" element={<TripHistory />} />
+                <Route path="/history" element={<TripHistory />} />
+                <Route path="/locations" element={<CustomerLocations />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/admins" element={<Admins />} />
+                <Route path="/jobs/new" element={<JobReport />} />
+                <Route path="/jobs/edit/:id" element={<JobReport />} />
+                <Route path="/jobs/my" element={<MyJobs />} />
+                <Route path="/jobs/calendar" element={<JobCalendar />} />
+                <Route path="/jobs/history" element={<JobHistory />} />
+                <Route path="/vehicle-queue" element={<VehicleQueue />} />
+                <Route path="/line/settings" element={<LineSettings />} />
+                <Route path="/line/api-settings" element={<LineApiSettings />} />
+                <Route path="/line/broadcast" element={<LineBroadcast />} />
+                <Route path="/settings/api" element={<ApiSettings />} />
+                <Route path="/maintenance" element={<MaintenanceDashboard />} />
+                <Route path="/maintenance/log" element={<MaintenanceLog />} />
+                <Route path="/maintenance/items" element={<MaintenanceItems />} />
+                <Route path="/maintenance/reports" element={<MaintenanceReports />} />
+                <Route path="/ratings" element={<DriverRatingManagement />} />
+                <Route path="/settings/system" element={<SystemSettings />} />
+                <Route path="/role-permissions" element={<RolePermissions />} />
+                <Route path="/permissions" element={<Members />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </SystemAlertProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </SystemAlertProvider>
+    </ThemeProvider>
   );
 }

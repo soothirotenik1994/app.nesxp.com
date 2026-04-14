@@ -497,7 +497,13 @@ const resources = {
       "start_point": "จุดเริ่มต้น",
       "end_point": "จุดสิ้นสุด",
       "no_data_found_for_period": "ไม่พบข้อมูลการเดินทางในช่วงเวลานี้",
-      "failed_to_fetch_data": "ดึงข้อมูลล้มเหลว"
+      "failed_to_fetch_data": "ดึงข้อมูลล้มเหลว",
+      "rows_per_page": "จำนวนแถวต่อหน้า",
+      "showing_range": "แสดง {{start}} ถึง {{end}} จากทั้งหมด {{total}} รายการ",
+      "first_page": "หน้าแรก",
+      "previous_page": "หน้าก่อนหน้า",
+      "next_page": "หน้าถัดไป",
+      "last_page": "หน้าสุดท้าย"
     }
   }
 };

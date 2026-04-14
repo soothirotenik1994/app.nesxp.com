@@ -16,6 +16,20 @@
   --line: #141414;
 }
 
+.dark {
+  --bg: #141414;
+  --ink: #E4E3E0;
+  --line: #333333;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 transition-colors duration-200;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-50;
+}
+
 /* Custom styles for the app */
 .bg-primary { background-color: var(--color-primary); }
 .text-primary { color: var(--color-primary); }

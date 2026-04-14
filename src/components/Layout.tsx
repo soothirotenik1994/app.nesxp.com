@@ -42,7 +42,7 @@ export const Layout: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden transition-colors duration-200">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -53,14 +53,14 @@ export const Layout: React.FC = () => {
         />
         
         {isAdmin && showLimitWarning && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm font-medium">
               <AlertCircle className="w-4 h-4" />
               <span>{t('line_limit_reached_warning')}</span>
             </div>
             <button 
               onClick={dismissWarning}
-              className="text-amber-500 hover:text-amber-700 p-1 rounded-full hover:bg-amber-100 transition-colors"
+              className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 p-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-800 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

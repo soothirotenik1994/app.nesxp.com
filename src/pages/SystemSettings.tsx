@@ -14,7 +14,7 @@ export const SystemSettings: React.FC = () => {
   
   const [formData, setFormData] = useState({
     directusUrl: localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com',
-    staticApiKey: localStorage.getItem('static_api_key') || 'KC7bsoqj_bmFeKWJcDGadyxXZsleRUi4',
+    staticApiKey: localStorage.getItem('static_api_key') || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
     websiteName: localStorage.getItem('website_name') || 'NES Tracking',
     websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
     websiteBackground: localStorage.getItem('website_background') || '',

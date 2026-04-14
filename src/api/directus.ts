@@ -4,7 +4,7 @@ import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../ty
 export const DIRECTUS_URL = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
 const getStaticKey = () => {
   const key = localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
-  if (key === 'null' || key === 'undefined' || !key) return null;
+  if (key === 'null' || key === 'undefined' || !key || key === '') return null;
   return key;
 };
 
@@ -599,8 +599,11 @@ export const directusApi = {
         params: { limit: -1 }
       });
       return response.data.data || [];
-    } catch (error) {
-      console.error('Error fetching role permissions:', error);
+    } catch (error: any) {
+      // Only log if it's not a 401 (which is handled by the interceptor)
+      if (error.response?.status !== 401) {
+        console.error('Error fetching role permissions:', error);
+      }
       return [];
     }
   },

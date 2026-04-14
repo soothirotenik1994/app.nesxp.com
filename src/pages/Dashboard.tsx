@@ -5,13 +5,17 @@ import { VehicleMap } from '../components/VehicleMap';
 import { directusApi, api } from '../api/directus';
 import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
-import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History } from 'lucide-react';
-import { format } from 'date-fns';
+import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History, TrendingUp, Package, BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { format, subDays, startOfDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
+import { useTheme } from '../context/ThemeContext';
+import { clsx } from 'clsx';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [members, setMembers] = useState<Member[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [carStatuses, setCarStatuses] = useState<CarStatus[]>([]);
@@ -21,6 +25,8 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
+  const [jobStats, setJobStats] = useState<any[]>([]);
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
 
   const fetchGpsData = async (carsData: Car[]) => {
     const BATCH_SIZE = 3;
@@ -294,6 +300,40 @@ export const Dashboard: React.FC = () => {
       setMembers(relatedMembers);
       setCars(finalCars);
 
+      // Fetch job stats for chart
+      try {
+        const reports = await directusApi.getWorkReports();
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const d = subDays(new Date(), i);
+          return format(d, 'yyyy-MM-dd');
+        }).reverse();
+
+        const statsMap = new Map();
+        last7Days.forEach(date => statsMap.set(date, 0));
+
+        reports.forEach(r => {
+          const date = format(new Date(r.work_date || r.date_created), 'yyyy-MM-dd');
+          if (statsMap.has(date)) {
+            statsMap.set(date, statsMap.get(date) + 1);
+          }
+        });
+
+        const chartData = last7Days.map(date => ({
+          date: format(new Date(date), 'dd MMM'),
+          jobs: statsMap.get(date)
+        }));
+        setJobStats(chartData);
+        
+        // Set recent jobs
+        setRecentJobs(reports.sort((a, b) => 
+          new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+        ).slice(0, 5));
+      } catch (e: any) {
+        if (e.response?.status !== 401) {
+          console.error('Error fetching job stats:', e);
+        }
+      }
+
       // Initial GPS fetch
       await fetchGpsData(finalCars);
       setCountdown(600);
@@ -393,10 +433,10 @@ export const Dashboard: React.FC = () => {
       {/* Dashboard Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-slate-900">{t('dashboard')}</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('dashboard')}</h2>
           <button 
             onClick={() => window.open('/monitor', '_blank')}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 dark:bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors shadow-lg shadow-slate-900/20"
           >
             <MapIcon className="w-4 h-4" />
             Live Monitor
@@ -404,17 +444,17 @@ export const Dashboard: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-medium text-slate-600 shadow-sm">
+          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 shadow-sm">
             <Clock className="w-4 h-4 text-slate-400" />
             <span className="text-xs text-slate-400 mr-1">{t('last_update')}:</span>
-            <span className="font-semibold">
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
               {carStatuses.length > 0 
                 ? format(new Date(Math.max(...carStatuses.map(s => new Date(s.lastUpdate).getTime()))), 'HH:mm:ss')
                 : format(new Date(), 'HH:mm:ss')}
             </span>
           </div>
           
-          <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2 text-sm font-bold text-primary shadow-sm">
+          <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-800 flex items-center gap-2 text-sm font-bold text-primary dark:text-blue-400 shadow-sm">
             <Sparkles className="w-4 h-4 animate-pulse" />
             <span className="text-xs text-blue-400 mr-1">{t('next_update')}:</span>
             <span>{formatCountdown(countdown)}</span>
@@ -429,6 +469,126 @@ export const Dashboard: React.FC = () => {
           localStorage.getItem('user_role')?.toLowerCase() === 'driver'
         } 
       />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Analytics Section */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                {t('delivery_performance', 'ประสิทธิภาพการส่งสินค้า')}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('last_7_days', '7 วันที่ผ่านมา')}</p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-full text-[10px] font-bold">
+              <ArrowUpRight className="w-3 h-3" />
+              +12.5%
+            </div>
+          </div>
+          
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={jobStats}>
+                <defs>
+                  <linearGradient id="colorJobs" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#334155' : '#f1f5f9'} />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: theme === 'dark' ? '#64748b' : '#94a3b8' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: theme === 'dark' ? '#64748b' : '#94a3b8' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', 
+                    borderRadius: '12px', 
+                    border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    color: theme === 'dark' ? '#f8fafc' : '#1e293b'
+                  }}
+                  itemStyle={{ color: theme === 'dark' ? '#f8fafc' : '#1e293b' }}
+                  labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: theme === 'dark' ? '#94a3b8' : '#64748b' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="jobs" 
+                  stroke="#2563eb" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorJobs)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Recent Jobs Section */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              {t('recent_jobs', 'งานล่าสุด')}
+            </h3>
+            <button 
+              onClick={() => navigate('/jobs/history')}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              {t('view_all', 'ดูทั้งหมด')}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {recentJobs.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                {t('no_data')}
+              </div>
+            ) : (
+              recentJobs.map((job) => (
+                <div 
+                  key={job.id}
+                  onClick={() => navigate(`/jobs/edit/${job.id}`)}
+                  className="group p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 dark:hover:border-primary/40 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">#{formatCaseNumber(job)}</span>
+                    <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase ${
+                      job.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
+                      job.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' :
+                      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {t(job.status)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:bg-primary group-hover:text-white transition-colors">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate max-w-[150px]">
+                        {job.customer_name || t('no_customer')}
+                      </p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                        {format(new Date(job.date_created), 'dd MMM yyyy, HH:mm')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-2xl flex items-center justify-between">
@@ -448,7 +608,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Section */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-[500px] lg:h-[600px] relative">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-[500px] lg:h-[600px] relative">
             <VehicleMap 
               vehicles={carStatuses} 
               selectedVehicle={selectedVehicle}
@@ -460,25 +620,25 @@ export const Dashboard: React.FC = () => {
             {/* Map Overlay Info */}
             {selectedVehicle && (() => {
               return (
-                <div className="absolute bottom-4 left-4 right-4 lg:left-auto lg:w-72 bg-white p-4 rounded-xl border border-slate-200 shadow-lg z-[1000]">
+                <div className="absolute bottom-4 left-4 right-4 lg:left-auto lg:w-72 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg z-[1000]">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h4 className="font-bold text-slate-900">{selectedVehicle.carNumber}</h4>
-                      <p className="text-xs text-slate-500">{selectedVehicle.memberName || t('no_member')}</p>
+                      <h4 className="font-bold text-slate-900 dark:text-slate-100">{selectedVehicle.carNumber}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{selectedVehicle.memberName || t('no_member')}</p>
                     </div>
                     <div className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${
-                      selectedVehicle.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                      selectedVehicle.status === 'online' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}>
                       {selectedVehicle.status === 'online' ? t('online') : t('offline')}
                     </div>
                   </div>
                   
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                       <Navigation className="w-3 h-3 text-slate-400" />
                       <span className="truncate">{selectedVehicle.address || t('locating')}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                       <Activity className="w-3 h-3 text-slate-400" />
                       <span>{selectedVehicle.speed} km/h</span>
                     </div>
@@ -486,7 +646,7 @@ export const Dashboard: React.FC = () => {
                   
                   <button 
                     onClick={() => setSelectedVehicle(null)}
-                    className="mt-3 w-full py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-lg hover:bg-slate-200 transition-colors"
+                    className="mt-3 w-full py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                   >
                     {t('close')}
                   </button>
@@ -497,11 +657,11 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Vehicle List Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px] lg:h-[600px] overflow-hidden">
-          <div className="p-6 border-b border-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col h-[500px] lg:h-[600px] overflow-hidden">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">{t('vehicles')}</h3>
-              <div className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded uppercase">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{t('vehicles')}</h3>
+              <div className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold rounded uppercase">
                 {filteredStatuses.length} {t('units')}
               </div>
             </div>
@@ -513,7 +673,7 @@ export const Dashboard: React.FC = () => {
                 placeholder={t('search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all dark:text-slate-100"
               />
             </div>
           </div>
@@ -522,15 +682,15 @@ export const Dashboard: React.FC = () => {
             {loading ? (
               <div className="p-8 text-center space-y-4">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-slate-500 text-sm">{t('loading')}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">{t('loading')}</p>
               </div>
             ) : filteredStatuses.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm">
                 {t('no_data')}
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                <div className="grid grid-cols-12 px-6 py-2 bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="grid grid-cols-12 px-6 py-2 bg-slate-50 dark:bg-slate-900 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-800">
                   <span className="col-span-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('vehicle')}</span>
                   <span className="col-span-5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('status')}</span>
                   <span className="col-span-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 text-right">{t('update')}</span>
@@ -544,12 +704,16 @@ export const Dashboard: React.FC = () => {
                     <div
                       key={v.carNumber}
                       onClick={() => handleZoomToVehicle(v)}
-                      className={`grid grid-cols-12 items-center px-6 py-4 transition-all cursor-pointer hover:bg-slate-50 ${
-                        isSelected ? "bg-blue-50 border-l-4 border-primary" : "bg-white"
-                      }`}
+                      className={clsx(
+                        "grid grid-cols-12 items-center px-6 py-4 transition-all cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                        isSelected ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-primary" : "bg-white dark:bg-slate-900"
+                      )}
                     >
                       <div className="col-span-4 flex flex-col pr-2">
-                        <span className={`text-sm font-bold tracking-tight ${isSelected ? 'text-primary' : 'text-slate-900'}`}>
+                        <span className={clsx(
+                          "text-sm font-bold tracking-tight",
+                          isSelected ? 'text-primary' : 'text-slate-900 dark:text-slate-100'
+                        )}>
                           {v.carNumber}
                         </span>
                         <span className="text-[9px] font-medium text-slate-400 uppercase truncate">
@@ -560,7 +724,7 @@ export const Dashboard: React.FC = () => {
                       <div className="col-span-5 flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
-                            v.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                            v.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
                           }`} />
                           <span className={`text-[10px] font-bold uppercase ${
                             v.status === 'online' ? 'text-emerald-600' : 'text-slate-400'
@@ -568,7 +732,7 @@ export const Dashboard: React.FC = () => {
                             {v.status === 'online' ? t('online') : t('offline')}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
                           {v.speed} km/h
                         </div>
                       </div>
@@ -584,13 +748,13 @@ export const Dashboard: React.FC = () => {
                                 e.stopPropagation();
                                 navigate(`/cars/${v.carNumber}/history`);
                               }}
-                              className="p-1 text-slate-400 hover:text-primary hover:bg-blue-50 rounded transition-colors"
+                              className="p-1 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
                               title={t('trip_history', 'ประวัติการเดินทาง')}
                             >
                               <History className="w-3 h-3" />
                             </button>
                           )}
-                          <ChevronRight className={`w-3 h-3 ${isSelected ? 'text-primary' : 'text-slate-200'}`} />
+                          <ChevronRight className={`w-3 h-3 ${isSelected ? 'text-primary' : 'text-slate-200 dark:text-slate-700'}`} />
                         </div>
                       </div>
                     </div>
