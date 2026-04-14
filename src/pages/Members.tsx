@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { lineService } from '../services/lineService';
 import { Member } from '../types';
-import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check, Shield, UserCheck, Lock, RefreshCw, Eye, EyeOff, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check, Shield, UserCheck, Lock, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -213,8 +213,6 @@ export const Members: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('members_columns_v2');
     return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'vehicles', 'actions'];
@@ -538,10 +536,6 @@ export const Members: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, pageSize]);
-
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
       const fullName = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
@@ -553,13 +547,6 @@ export const Members: React.FC = () => {
       return fullName.includes(search) || email.includes(search) || phone.includes(searchTerm) || role.includes(search);
     });
   }, [members, searchTerm]);
-
-  const paginatedMembers = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredMembers.slice(startIndex, startIndex + pageSize);
-  }, [filteredMembers, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredMembers.length / pageSize) || 1;
 
   const editingMemberCars = useMemo(() => {
     if (!editingMember) return [];
@@ -773,14 +760,14 @@ export const Members: React.FC = () => {
                     <p className="text-slate-500">{t('loading')}</p>
                   </td>
                 </tr>
-              ) : paginatedMembers.length === 0 ? (
+              ) : filteredMembers.length === 0 ? (
                 <tr>
                   <td colSpan={visibleColumns.length} className="px-6 py-12 text-center text-slate-400">
                     {t('no_data')}
                   </td>
                 </tr>
               ) : (
-                paginatedMembers.map((member) => (
+                filteredMembers.map((member) => (
                   <MemberRow 
                     key={member.id}
                     member={member}
@@ -796,78 +783,6 @@ export const Members: React.FC = () => {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Controls */}
-        {!loading && filteredMembers.length > 0 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">{t('rows_per_page') || 'Rows per page'}:</span>
-                <select 
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  {[10, 20, 50, 100].map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-              <span className="text-sm text-slate-500">
-                {t('showing_range', { 
-                  start: (currentPage - 1) * pageSize + 1, 
-                  end: Math.min(currentPage * pageSize, filteredMembers.length),
-                  total: filteredMembers.length
-                }) || `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(currentPage * pageSize, filteredMembers.length)} of ${filteredMembers.length}`}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('first_page')}
-              >
-                <ChevronsLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('previous_page')}
-              >
-                <ChevronRight className="w-4 h-4 rotate-180" />
-              </button>
-              
-              <div className="flex items-center gap-1.5 px-2">
-                <span className="text-sm font-bold text-slate-900">{currentPage}</span>
-                <span className="text-sm text-slate-400">/</span>
-                <span className="text-sm text-slate-500">{totalPages}</span>
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('next_page')}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('last_page')}
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Member Modal */}

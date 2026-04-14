@@ -328,10 +328,8 @@ export const Dashboard: React.FC = () => {
         setRecentJobs(reports.sort((a, b) => 
           new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
         ).slice(0, 5));
-      } catch (e: any) {
-        if (e.response?.status !== 401) {
-          console.error('Error fetching job stats:', e);
-        }
+      } catch (e) {
+        console.error('Error fetching job stats:', e);
       }
 
       // Initial GPS fetch

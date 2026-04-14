@@ -14,8 +14,6 @@ import {
   Loader2, 
   ExternalLink,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Filter,
   FileText,
   X,
@@ -35,7 +33,7 @@ export const JobHistory: React.FC = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const itemsPerPage = 10;
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -109,7 +107,7 @@ export const JobHistory: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, startDate, endDate, pageSize]);
+  }, [searchTerm]);
 
   const formatTimeDisplay = (time: any) => {
     if (!time || typeof time !== 'string') return '-';
@@ -220,13 +218,13 @@ ${!isCustomer ? `
     });
   }, [reports, searchTerm, startDate, endDate]);
 
-  const totalPages = Math.ceil(filteredReports.length / pageSize) || 1;
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const paginatedReports = useMemo(() => {
     return filteredReports.slice(
-      (currentPage - 1) * pageSize,
-      currentPage * pageSize
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
     );
-  }, [filteredReports, currentPage, pageSize]);
+  }, [filteredReports, currentPage, itemsPerPage]);
 
   const handleExportExcel = useCallback(() => {
     const dataToExport = filteredReports.map(r => {
@@ -467,73 +465,37 @@ ${!isCustomer ? `
         </div>
 
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">{t('rows_per_page') || 'Rows per page'}:</span>
-                <select 
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+          <div className="p-6 border-t border-slate-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 rotate-180" />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={clsx(
+                    "w-10 h-10 rounded-xl font-bold text-sm transition-all",
+                    currentPage === page 
+                      ? "bg-primary text-white shadow-lg shadow-blue-100" 
+                      : "text-slate-500 hover:bg-slate-50"
+                  )}
                 >
-                  {[10, 20, 50, 100].map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-              <span className="text-sm text-slate-500">
-                {t('showing_range', { 
-                  start: (currentPage - 1) * pageSize + 1, 
-                  end: Math.min(currentPage * pageSize, filteredReports.length),
-                  total: filteredReports.length
-                }) || `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(currentPage * pageSize, filteredReports.length)} of ${filteredReports.length}`}
-              </span>
+                  {page}
+                </button>
+              ))}
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('first_page')}
-              >
-                <ChevronsLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('previous_page')}
-              >
-                <ChevronRight className="w-4 h-4 rotate-180" />
-              </button>
-              
-              <div className="flex items-center gap-1.5 px-2">
-                <span className="text-sm font-bold text-slate-900">{currentPage}</span>
-                <span className="text-sm text-slate-400">/</span>
-                <span className="text-sm text-slate-500">{totalPages}</span>
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('next_page')}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('last_page')}
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         )}
       </div>

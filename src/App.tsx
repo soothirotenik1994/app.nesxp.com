@@ -35,16 +35,8 @@ import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   useEffect(() => {
-    // Force light mode if no theme is set, or if we want to reset it for the user
-    const savedTheme = localStorage.getItem('theme');
-    if (!savedTheme || savedTheme === 'dark') {
-      localStorage.setItem('theme', 'light');
-      window.document.documentElement.classList.remove('dark');
-      window.document.documentElement.classList.add('light');
-    }
-
     const token = localStorage.getItem('admin_token');
-    if (token && token !== 'null' && token !== 'undefined') {
+    if (token) {
       setAuthToken(token);
       
       // Refresh user info

@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { Car as CarType, Member } from '../types';
-import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock, User, Shield, Calendar, Hash, Building2, History, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, Plus, Car as CarIcon, Edit2, Trash2, X, Loader2, AlertCircle, Save, Phone, MapPin, Clock, User, Shield, Calendar, Hash, Building2, History } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useNavigate } from 'react-router-dom';
 
@@ -196,8 +196,6 @@ export const Cars: React.FC = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteBrandId, setDeleteBrandId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
   const [formData, setFormData] = useState({
     car_number: '',
     vehicle_type: '',
@@ -400,10 +398,6 @@ export const Cars: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, pageSize]);
-
   const filteredCars = useMemo(() => {
     return cars.filter(c => {
       // If not admin, only show cars that this driver has permission for
@@ -424,13 +418,6 @@ export const Cars: React.FC = () => {
       return carNum.includes(search) || desc.includes(search) || owner.includes(search);
     });
   }, [cars, searchTerm, isAdmin, memberId, allPermissions]);
-
-  const paginatedCars = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredCars.slice(startIndex, startIndex + pageSize);
-  }, [filteredCars, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredCars.length / pageSize) || 1;
 
   const handleEdit = useCallback((car: CarType) => handleOpenModal(car), []);
   const handleDeleteClick = useCallback((id: string) => setDeleteId(id), []);
@@ -487,12 +474,12 @@ export const Cars: React.FC = () => {
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-slate-500">{t('loading')}</p>
             </div>
-          ) : paginatedCars.length === 0 ? (
+          ) : filteredCars.length === 0 ? (
             <div className="col-span-full py-12 text-center text-slate-400">
               {t('no_data')}
             </div>
           ) : (
-            paginatedCars.map((car) => (
+            filteredCars.map((car) => (
               <CarCard 
                 key={car.id} 
                 car={car} 
@@ -506,78 +493,6 @@ export const Cars: React.FC = () => {
             ))
           )}
         </div>
-
-        {/* Pagination Controls */}
-        {!loading && filteredCars.length > 0 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">{t('rows_per_page') || 'Rows per page'}:</span>
-                <select 
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  {[12, 24, 48, 96].map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-              <span className="text-sm text-slate-500">
-                {t('showing_range', { 
-                  start: (currentPage - 1) * pageSize + 1, 
-                  end: Math.min(currentPage * pageSize, filteredCars.length),
-                  total: filteredCars.length
-                }) || `Showing ${(currentPage - 1) * pageSize + 1} to ${Math.min(currentPage * pageSize, filteredCars.length)} of ${filteredCars.length}`}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('first_page')}
-              >
-                <ChevronsLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('previous_page')}
-              >
-                <ChevronRight className="w-4 h-4 rotate-180" />
-              </button>
-              
-              <div className="flex items-center gap-1.5 px-2">
-                <span className="text-sm font-bold text-slate-900">{currentPage}</span>
-                <span className="text-sm text-slate-400">/</span>
-                <span className="text-sm text-slate-500">{totalPages}</span>
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('next_page')}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent transition-colors flex items-center justify-center"
-                title={t('last_page')}
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Vehicle Modal */}

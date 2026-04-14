@@ -179,6 +179,7 @@ const processImageWithOverlay = async (file: File, location: { lat: number, lng:
   });
 };
 
+
 export const JobReport: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -3851,10 +3852,10 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
   const InfoRow: React.FC<{ icon: React.ReactNode, label: string, value: string | React.ReactNode, className?: string, valueClassName?: string }> = ({ icon, label, value, className, valueClassName }) => (
     <div className={clsx("flex flex-col gap-1", className)}>
-      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
         {icon} {label}
       </label>
-      <div className={clsx("text-sm font-bold bg-slate-50/50 dark:bg-slate-800/50 px-4 py-3 rounded-2xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap", valueClassName || "text-slate-700 dark:text-slate-300")}>
+      <div className={clsx("text-sm font-bold bg-slate-50/50 px-4 py-3 rounded-2xl border border-slate-100 whitespace-pre-wrap", valueClassName || "text-slate-700")}>
         {value || '-'}
       </div>
     </div>
@@ -3960,9 +3961,9 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         <StatusTimeline status={formData.status} />
 
         {/* Driver & Vehicle Card */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
               {selectedMember?.picture_url ? (
                 <img 
                   src={directusApi.getFileUrl(selectedMember.picture_url)} 
@@ -3971,14 +3972,14 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600">
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
                   <User className="w-8 h-8" />
                 </div>
               )}
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">{t('driver_name')}</p>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{t('driver_name')}</p>
+              <h3 className="text-lg font-bold text-slate-900">
                 {selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : t('not_assigned')}
               </h3>
               <div className="flex items-center gap-3 mt-1">
@@ -3995,7 +3996,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             {selectedCar?.car_number && (
               <button 
                 onClick={() => navigate(`/?vehicle=${selectedCar.car_number}`)}
-                className="bg-primary text-white p-4 rounded-2xl shadow-lg shadow-blue-100 dark:shadow-blue-900/20 hover:scale-105 active:scale-95 transition-all"
+                className="bg-primary text-white p-4 rounded-2xl shadow-lg shadow-blue-100 hover:scale-105 active:scale-95 transition-all"
                 title="Track GPS"
               >
                 <MapPin className="w-6 h-6" />
@@ -4003,17 +4004,17 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('car_number')}</p>
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('car_number')}</p>
+              <div className="flex items-center gap-2 text-slate-700">
                 <Truck className="w-4 h-4 text-primary" />
                 <span className="font-bold">{selectedCar?.car_number || '-'}</span>
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('vehicle_type')}</p>
-              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('vehicle_type')}</p>
+              <div className="flex items-center gap-2 text-slate-700">
                 <Package className="w-4 h-4 text-primary" />
                 <span className="font-bold">{formData.vehicle_type || '-'}</span>
               </div>
@@ -4022,7 +4023,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         </div>
 
         {/* Job Details Grid */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
+        <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InfoRow icon={<Hash className="w-3 h-3" />} label={t('case_number')} value={formData.case_number} />
             <InfoRow icon={<Calendar className="w-3 h-3" />} label={t('report_date')} value={formData.work_date.replace('T', ' ')} />
@@ -4047,25 +4048,25 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50 dark:border-slate-800">
+          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
             <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('standby_time')}</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{formData.standby_time ? new Date(formData.standby_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('standby_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.standby_time ? new Date(formData.standby_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
             <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('departure_time')}</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{formData.departure_time ? new Date(formData.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('departure_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.departure_time ? new Date(formData.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
             <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('arrival_time')}</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{formData.arrival_time ? new Date(formData.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('arrival_time')}</p>
+              <p className="text-xs font-bold text-slate-700">{formData.arrival_time ? new Date(formData.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
           </div>
 
           {formData.notes && (
-            <div className="pt-6 border-t border-slate-50 dark:border-slate-800">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{t('notes')}</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400 italic leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+            <div className="pt-6 border-t border-slate-50">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('notes')}</p>
+              <p className="text-sm text-slate-600 italic leading-relaxed bg-slate-50 p-4 rounded-2xl">
                 "{formData.notes}"
               </p>
             </div>
@@ -4074,16 +4075,16 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
         {/* Photos Section */}
         {photoPreviews.length > 0 && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <Camera className="w-5 h-5 text-primary" /> {t('photos')}
               </h3>
-              <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{photoPreviews.length} {t('images')}</span>
+              <span className="text-xs font-bold text-slate-400">{photoPreviews.length} {t('images')}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {photoPreviews.map((preview, index) => (
-                <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm group">
+                <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm group">
                   <img 
                     src={preview} 
                     alt="Job Photo" 
@@ -4115,11 +4116,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
   return (
     <div className="max-w-2xl mx-auto pb-12">
       <div className="mb-8 flex flex-col gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+        <h2 className="text-2xl font-bold text-slate-900">
           {id ? t('update_job_details') : t('new_job_assignment_title')}
         </h2>
         {formData.case_number && (
-          <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <div className="text-sm text-slate-500 font-medium">
             {t('case_number')}: {formData.case_number}
           </div>
         )}
@@ -4135,7 +4136,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     disabled={submitting || isJobOverdue}
                     className={clsx(
                       "px-8 py-4 text-white rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg w-full sm:w-auto justify-center",
-                      (submitting || isJobOverdue) ? "bg-slate-400 cursor-not-allowed shadow-none" : "bg-[#007A3E] hover:bg-[#00602F] shadow-green-100 dark:shadow-green-900/20"
+                      (submitting || isJobOverdue) ? "bg-slate-400 cursor-not-allowed shadow-none" : "bg-[#007A3E] hover:bg-[#00602F] shadow-green-100"
                     )}
                   >
                     <CheckCircle2 className="w-5 h-5" />
@@ -4156,7 +4157,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   type="button"
                   onClick={() => setShowCancelConfirm(true)}
                   disabled={submitting}
-                  className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100 dark:shadow-red-900/20"
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
                 >
                   <X className="w-4 h-4" />
                   {t('cancel_job')}
@@ -4169,7 +4170,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   type="button"
                   onClick={handleReopenJob}
                   disabled={submitting}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-lg shadow-amber-100 dark:shadow-amber-900/20"
+                  className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-lg shadow-amber-100"
                 >
                   <Plus className="w-4 h-4" />
                   {t('reopen_job')}
@@ -4182,7 +4183,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   type="button"
                   onClick={handleDeleteJob}
                   disabled={submitting}
-                  className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100 dark:shadow-red-900/20"
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-100"
                 >
                   <Trash2 className="w-4 h-4" />
                   {t('delete_job')}
@@ -4193,7 +4194,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-slate-200 text-slate-800 rounded-xl font-bold hover:bg-slate-300 transition-all flex items-center gap-2"
               >
                 {t('back')}
               </button>
@@ -4206,38 +4207,38 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
       <form onSubmit={handleSubmit} className="space-y-6">
         {id && <StatusTimeline status={formData.status} />}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl text-sm font-bold border border-red-100 dark:border-red-800 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="w-5 h-5" />
             {error}
           </div>
         )}
         {/* Cancellation Reason Section */}
         {formData.cancel_reason && (
-          <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-3xl border border-red-100 dark:border-red-800 shadow-sm space-y-3">
+          <div className="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <div className="p-2 bg-red-100 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="font-bold text-red-800 dark:text-red-300">{t('cancel_reason')}</h3>
+              <h3 className="font-bold text-red-800">{t('cancel_reason')}</h3>
             </div>
-            <p className="text-red-700 dark:text-red-400 bg-white/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-red-200 dark:border-red-800">
+            <p className="text-red-700 bg-white/50 p-4 rounded-2xl border border-red-200">
               {formData.cancel_reason}
             </p>
           </div>
         )}
 
         {/* Basic Info Section */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <div className="p-2 bg-blue-50 rounded-lg">
               <FileText className="w-5 h-5 text-primary" />
             </div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-200">{t('job_details')}</h3>
+            <h3 className="font-bold text-slate-800">{t('job_details')}</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Hash className="w-4 h-4" /> {t('case_number')}
               </label>
               <input 
@@ -4248,13 +4249,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, case_number: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                  "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
                 )}
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> {t('report_date')}
               </label>
               <input 
@@ -4268,13 +4269,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-slate-100"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> {t('customer_name')}
               </label>
               <Select
@@ -4430,12 +4431,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, customer_contact_name: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
-                  (!!id && !isAdmin) ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-slate-100"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Phone className="w-4 h-4" /> {t('contact_phone')}
               </label>
               <input 
@@ -4446,7 +4447,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, customer_contact_phone: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-slate-100"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -4455,7 +4456,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           {/* Routes Section */}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
                 <Truck className="w-4 h-4 text-primary" /> เส้นทางการเดินทาง ({formData.routes.length})
               </h4>
               {(!id || isAdmin) && (
@@ -4484,7 +4485,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       ]
                     });
                   }}
-                  className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 px-3 py-1.5 bg-primary/10 dark:bg-primary/20 rounded-lg transition-colors"
+                  className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 px-3 py-1.5 bg-primary/10 rounded-lg transition-colors"
                 >
                   <Plus className="w-3 h-3" /> เพิ่มเส้นทาง
                 </button>
@@ -4493,7 +4494,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
             <div className="space-y-4">
               {formData.routes.map((route, index) => (
-                <div key={index} className="p-6 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative group transition-all hover:border-primary/30">
+                <div key={index} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm relative group transition-all hover:border-primary/30">
                   {(!id || isAdmin) && index > 0 && (
                     <button
                       type="button"
@@ -4508,14 +4509,14 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   )}
                   
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 bg-primary/10 dark:bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm">
+                    <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm">
                       {index + 1}
                     </div>
-                    <span className="font-bold text-slate-700 dark:text-slate-300">เส้นทางที่ {index + 1}</span>
+                    <span className="font-bold text-slate-700">เส้นทางที่ {index + 1}</span>
                     {route.distance !== undefined && (
                       <div className={clsx(
                         "ml-auto px-3 py-1 rounded-full text-xs font-bold",
-                        route.route_type === 'upcountry' ? "bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"
+                        route.route_type === 'upcountry' ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"
                       )}>
                         {route.distance} km • {route.route_type === 'upcountry' ? 'ต่างจังหวัด' : 'กรุงเทพปริมณฑล'}
                       </div>
@@ -4526,7 +4527,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       {/* Pickups */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h5 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <h5 className="font-bold text-slate-700 flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-primary" /> จุดรับสินค้า (Pickups)
                           </h5>
                           {(!id || isAdmin) && (
@@ -4545,7 +4546,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.pickups || [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }]).map((pickup: any, pIndex: number) => (
-                          <div key={`pickup-${pIndex}`} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                          <div key={`pickup-${pIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.pickups?.length > 1) && (
                               <button
                                 type="button"
@@ -4561,7 +4562,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ชื่อสถานที่จุดรับ {pIndex + 1}</label>
+                                <label className="text-xs font-semibold text-slate-500">ชื่อสถานที่จุดรับ {pIndex + 1}</label>
                                 <input 
                                   type="text" 
                                   required
@@ -4576,11 +4577,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     if (pIndex === 0) newRoutes[index].origin = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ลิงก์ Google Map</label>
+                                <label className="text-xs font-semibold text-slate-500">ลิงก์ Google Map</label>
                                 <input 
                                   type="text" 
                                   required
@@ -4595,11 +4596,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     if (pIndex === 0) newRoutes[index].origin_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ชื่อผู้ติดต่อ (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">ชื่อผู้ติดต่อ (ถ้ามี)</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
@@ -4612,11 +4613,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     newRoutes[index].pickups[pIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">เบอร์โทร (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">เบอร์โทร (ถ้ามี)</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
@@ -4629,7 +4630,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     newRoutes[index].pickups[pIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                             </div>
@@ -4640,7 +4641,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       {/* Deliveries */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h5 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <h5 className="font-bold text-slate-700 flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-red-500" /> จุดส่งสินค้า (Deliveries)
                           </h5>
                           {(!id || isAdmin) && (
@@ -4659,7 +4660,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.deliveries || [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }]).map((delivery: any, dIndex: number) => (
-                          <div key={`delivery-${dIndex}`} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 relative group">
+                          <div key={`delivery-${dIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.deliveries?.length > 1) && (
                               <button
                                 type="button"
@@ -4675,7 +4676,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ชื่อสถานที่จุดส่ง {dIndex + 1}</label>
+                                <label className="text-xs font-semibold text-slate-500">ชื่อสถานที่จุดส่ง {dIndex + 1}</label>
                                 <input 
                                   type="text" 
                                   required
@@ -4690,11 +4691,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ลิงก์ Google Map</label>
+                                <label className="text-xs font-semibold text-slate-500">ลิงก์ Google Map</label>
                                 <input 
                                   type="text" 
                                   required
@@ -4709,11 +4710,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">ชื่อผู้ติดต่อ (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">ชื่อผู้ติดต่อ (ถ้ามี)</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
@@ -4726,11 +4727,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     newRoutes[index].deliveries[dIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">เบอร์โทร (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">เบอร์โทร (ถ้ามี)</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
@@ -4743,7 +4744,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     newRoutes[index].deliveries[dIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
                             </div>
@@ -4756,7 +4757,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
             {(!id || isAdmin) && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -4802,7 +4803,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             )}
             
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
                 {t('estimated_distance')} ({t('km')})
               </label>
               <input
@@ -4814,7 +4815,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 placeholder="0.0"
                 className={clsx(
                   "w-full px-4 py-2.5 rounded-xl border transition-all outline-none font-medium",
-                  (!!id && !isAdmin) ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700 dark:text-slate-300"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700"
                 )}
               />
             </div>
@@ -4822,22 +4823,22 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         </div>
 
         {/* Vehicle & Driver Section */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-              <Truck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <div className="p-2 bg-orange-50 rounded-lg">
+              <Truck className="w-5 h-5 text-orange-600" />
             </div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-200">{t('vehicles')} {t('and')} {t('drivers')}</h3>
+            <h3 className="font-bold text-slate-800">{t('vehicles')} {t('and')} {t('drivers')}</h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <Truck className="w-4 h-4" /> {t('car_number')}
                 </label>
                 {(!formData.estimated_distance || formData.estimated_distance === 0) && (
-                  <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md">
+                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
                     คำนวณระยะทางก่อนเพื่อดูคิวรถแนะนำ
                   </span>
                 )}

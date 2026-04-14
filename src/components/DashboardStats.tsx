@@ -57,10 +57,10 @@ export const DashboardStats: React.FC<StatsProps> = ({
       {stats.map((stat) => (
         <div 
           key={stat.name} 
-          className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               {stat.name}
             </div>
             <div className={`${stat.color} p-2 rounded-xl`}>
@@ -68,10 +68,10 @@ export const DashboardStats: React.FC<StatsProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+            <div className="text-3xl font-bold text-slate-900">
               {stat.value.toLocaleString()}
             </div>
-            <div className="text-xs font-medium text-slate-400 dark:text-slate-500">
+            <div className="text-xs font-medium text-slate-400">
               {t('units') || 'Units'}
             </div>
           </div>

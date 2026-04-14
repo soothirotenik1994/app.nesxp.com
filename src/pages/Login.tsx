@@ -326,7 +326,7 @@ export const Login: React.FC = () => {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{websiteName}</h1>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden text-slate-900">
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
           {/* Tab Switcher */}
           {isTrackingEnabled && (
             <div className="flex border-b border-slate-100">
@@ -371,7 +371,7 @@ export const Login: React.FC = () => {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                       placeholder="example@email.com"
                     />
                   </div>
@@ -388,7 +388,7 @@ export const Login: React.FC = () => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                       placeholder="••••••••"
                     />
                   </div>
@@ -479,7 +479,7 @@ export const Login: React.FC = () => {
                       required
                       value={caseNumber}
                       onChange={(e) => setCaseNumber(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                       placeholder="THXXXXXXXXXX"
                     />
                   </div>
@@ -496,7 +496,7 @@ export const Login: React.FC = () => {
                       required
                       value={trackingPhone}
                       onChange={(e) => setTrackingPhone(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                       placeholder="08X-XXX-XXXX"
                     />
                   </div>
