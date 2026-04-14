@@ -856,8 +856,16 @@ async function startServer() {
         data: jobs[0]
       });
     } catch (error: any) {
-      console.error('Tracking API error:', error.response?.data || error.message);
-      res.status(500).json({ error: 'Failed to fetch tracking information' });
+      const errorDetail = error.response?.data || error.message;
+      console.error('Tracking API error:', errorDetail);
+      res.status(500).json({ 
+        error: 'Failed to fetch tracking information',
+        details: errorDetail,
+        debug: {
+          directusUrl: (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, ''),
+          hasToken: !!(process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN)
+        }
+      });
     }
   });
 

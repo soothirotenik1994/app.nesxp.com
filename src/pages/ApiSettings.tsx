@@ -45,7 +45,12 @@ export const ApiSettings: React.FC = () => {
       setTestResult(response.data);
     } catch (error: any) {
       console.error('API Test Error:', error);
-      setTestError(error.response?.data?.error || error.message || 'Failed to fetch tracking data');
+      const errorData = error.response?.data;
+      if (errorData && errorData.details) {
+        setTestError(`${errorData.error}: ${typeof errorData.details === 'object' ? JSON.stringify(errorData.details) : errorData.details}`);
+      } else {
+        setTestError(errorData?.error || error.message || 'Failed to fetch tracking data');
+      }
     } finally {
       setIsTesting(false);
     }
