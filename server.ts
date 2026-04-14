@@ -8,6 +8,8 @@ import puppeteer from "puppeteer";
 import 'dotenv/config';
 
 async function startServer() {
+  console.log('Backend: startServer() called');
+  console.log('Backend: NODE_ENV:', process.env.NODE_ENV);
   const app = express();
   const PORT = 3000;
 
@@ -27,7 +29,8 @@ async function startServer() {
       const response = await axios.get(url, {
         headers: {
           'Authorization': `Bearer ${staticToken}`
-        }
+        },
+        timeout: 5000
       });
       
       // Return the first setting found
@@ -147,6 +150,55 @@ async function startServer() {
 
   app.use(cors());
   app.use(express.json());
+
+  // LINE Config Check - Move higher up
+  app.get("/api/line/config", async (req, res) => {
+    console.log('Backend: /api/line/config requested');
+    try {
+      const settings = await getLineSettingsFromDirectus();
+      
+      // Use redirect_uri from Directus, or LINE_REDIRECT_URI from env, or APP_URL from env, or fallback
+      let redirectUri = settings?.redirect_uri || process.env.LINE_REDIRECT_URI || process.env.VITE_LINE_REDIRECT_URI;
+      
+      console.log('Backend: Initial redirectUri:', redirectUri);
+      console.log('Backend: APP_URL:', process.env.APP_URL);
+
+      if (!redirectUri || redirectUri.includes('app.nesxp.com')) {
+        if (process.env.APP_URL) {
+          redirectUri = `${process.env.APP_URL.replace(/\/$/, '')}/line/callback`;
+        } else {
+          // Fallback to current host if possible (though this is a backend route)
+          const host = req.get('host');
+          const protocol = req.protocol;
+          if (host) {
+            redirectUri = `${protocol}://${host}/line/callback`;
+          } else {
+            redirectUri = "https://app.nesxp.com/line/callback";
+          }
+        }
+      }
+      
+      console.log('Backend: Final redirectUri:', redirectUri);
+
+      const channelId = settings?.channel_id || process.env.VITE_LINE_CHANNEL_ID || "2009240188";
+      const accessToken = settings?.channel_access_token;
+      
+      res.json({
+        configured: !!accessToken,
+        redirectUri,
+        channelId
+      });
+    } catch (err: any) {
+      console.error('Backend: Error in /api/line/config:', err.message);
+      res.status(500).json({ error: 'Internal Server Error', message: err.message });
+    }
+  });
+
+  // API health check - Move to top for faster verification
+  app.get("/api/health", (req, res) => {
+    console.log('Backend: Health check requested');
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // Helper to extract coordinates from Google Maps URL
   const extractCoordinates = async (url: string): Promise<{ lat: number, lng: number } | null> => {
@@ -752,11 +804,6 @@ async function startServer() {
     }
   });
 
-  // API health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
-  
   // Proxy for LINE Login code exchange
   app.post("/api/auth/line/token", async (req, res) => {
     try {
@@ -784,29 +831,6 @@ async function startServer() {
     }
   });
 
-  // LINE Config Check
-  app.get("/api/line/config", async (req, res) => {
-    const settings = await getLineSettingsFromDirectus();
-    
-    // Use redirect_uri from Directus, or LINE_REDIRECT_URI from env, or APP_URL from env, or fallback
-    let redirectUri = settings?.redirect_uri || process.env.LINE_REDIRECT_URI;
-    
-    if (!redirectUri) {
-      if (process.env.APP_URL) {
-        redirectUri = `${process.env.APP_URL}/line/callback`;
-      } else {
-        // Default to the user's requested production URL
-        redirectUri = "https://app.nesxp.com/line/callback";
-      }
-    }
-
-    const accessToken = settings?.channel_access_token;
-    res.json({
-      configured: !!accessToken,
-      redirectUri,
-      channelId: settings?.channel_id || "2009240188"
-    });
-  });
 
   // LINE Config Check (legacy)
   app.get("/api/line/config-check", async (req, res) => {
@@ -1017,6 +1041,12 @@ async function startServer() {
         details: typeof errorData === 'object' ? JSON.stringify(errorData) : errorData
       });
     }
+  });
+
+  // Catch-all for unmatched API routes
+  app.all("/api/*", (req, res) => {
+    console.log(`Backend: Unmatched API request: ${req.method} ${req.path}`);
+    res.status(404).json({ error: "API route not found", path: req.path });
   });
 
   // Vite middleware for development

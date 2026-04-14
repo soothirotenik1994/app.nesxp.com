@@ -66,7 +66,7 @@ export const CustomerRating: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
           <p className="text-slate-500 font-medium">{t('loading', 'กำลังโหลด...')}</p>
@@ -77,7 +77,7 @@ export const CustomerRating: React.FC = () => {
 
   if (error && !report) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-red-100 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8" />
@@ -97,7 +97,7 @@ export const CustomerRating: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 max-w-md w-full text-center">
           <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10" />
@@ -126,7 +126,7 @@ export const CustomerRating: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 max-w-md w-full overflow-hidden">
         <div className="bg-primary p-6 text-white text-center">
           <h1 className="text-xl font-bold mb-1">ให้คะแนนบริการ</h1>
@@ -166,7 +166,7 @@ export const CustomerRating: React.FC = () => {
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               placeholder="บอกเราหน่อยว่าคุณชอบอะไร หรืออยากให้เราปรับปรุงอะไร..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none h-32 transition-all"
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none h-32 transition-all"
             />
           </div>
           

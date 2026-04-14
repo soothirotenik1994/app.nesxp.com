@@ -120,7 +120,7 @@ const CarCard = React.memo(({
             <button 
               onClick={() => navigate(`/cars/${car.car_number}/history`)}
               className="p-1.5 bg-slate-100 text-slate-600 hover:text-primary hover:bg-blue-50 rounded-lg transition-colors"
-              title={t('trip_history', 'ประวัติการเดินทาง')}
+              title={t('trip_history')}
             >
               <History className="w-4 h-4" />
             </button>
@@ -243,7 +243,7 @@ export const Cars: React.FC = () => {
       if (detail.toLowerCase().includes('permission') || detail.toLowerCase().includes('forbidden')) {
         setError(`${t('permission_error')}: ${t('check_directus_permissions', { collection: 'cars' })}`);
       } else {
-        setError(detail || 'Failed to load vehicles');
+        setError(detail || t('failed_to_load_jobs'));
       }
     } finally {
       setLoading(false);
@@ -578,7 +578,7 @@ export const Cars: React.FC = () => {
                           required
                           value={formData.car_number}
                           onChange={(e) => setFormData(prev => ({...prev, car_number: e.target.value}))}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                           placeholder="ABC-1234"
                         />
                       </div>
@@ -591,7 +591,7 @@ export const Cars: React.FC = () => {
                           type="text" 
                           value={formData.company_code}
                           onChange={(e) => setFormData(prev => ({...prev, company_code: e.target.value}))}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                           placeholder="CODE"
                         />
                       </div>

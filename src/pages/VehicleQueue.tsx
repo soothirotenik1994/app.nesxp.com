@@ -188,7 +188,7 @@ export const VehicleQueue: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
+              <tr className="bg-white border-b border-gray-100">
                 <th className="px-6 py-4 text-sm font-bold text-gray-500">ลำดับ</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500">ข้อมูลรถ</th>
                 <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">งาน กทม.<br/><span className="text-xs font-normal text-gray-400">(≤ {bkkMaxDistance} กม.)</span></th>
@@ -213,7 +213,7 @@ export const VehicleQueue: React.FC = () => {
                 </tr>
               ) : (
                 filteredQueue.map((item, index) => (
-                  <tr key={item.car.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={item.car.id} className="hover:bg-white transition-colors">
                     <td className="px-6 py-4">
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",

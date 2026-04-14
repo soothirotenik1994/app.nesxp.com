@@ -12,6 +12,7 @@ export const STATIC_API_KEY = getStaticKey();
 
 export const api = axios.create({
   baseURL: DIRECTUS_URL,
+  timeout: 30000, // 30 seconds timeout
 });
 
 // Set auth token if available

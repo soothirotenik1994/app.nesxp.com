@@ -162,7 +162,7 @@ export const DriverRatingManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-10 h-10 text-blue-600 animate-spin" />
           <p className="text-slate-500 font-medium">{t('loading')}...</p>
@@ -173,7 +173,7 @@ export const DriverRatingManagement: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-white p-4">
         <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Star className="w-8 h-8 text-red-600" />
@@ -227,7 +227,7 @@ export const DriverRatingManagement: React.FC = () => {
           </button>
           <button 
             onClick={fetchData}
-            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-white transition-colors shadow-sm"
           >
             <RefreshCw className="w-5 h-5 text-slate-600" />
           </button>
@@ -313,7 +313,7 @@ export const DriverRatingManagement: React.FC = () => {
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
               <ClipboardList className="w-5 h-5 text-slate-600" />
             </div>
             <div>
@@ -329,7 +329,7 @@ export const DriverRatingManagement: React.FC = () => {
               placeholder="ค้นหาพนักงาน หรือเลขที่งาน..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
         </div>
@@ -337,7 +337,7 @@ export const DriverRatingManagement: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/50">
+              <tr className="bg-white">
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">เลขที่งาน</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">พนักงานขับรถ</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">คะแนน</th>
@@ -352,7 +352,7 @@ export const DriverRatingManagement: React.FC = () => {
                   const driver = (typeof report.driver_id === 'object' ? report.driver_id : null) || 
                                  (typeof report.member_id === 'object' ? report.member_id : null);
                   return (
-                    <tr key={report.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={report.id} className="hover:bg-white transition-colors">
                       <td className="px-6 py-4">
                         <span className="font-mono text-xs font-bold text-primary">{report.case_number || '-'}</span>
                       </td>
@@ -439,7 +439,7 @@ export const DriverRatingManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
+              <div className="p-4 bg-white rounded-2xl flex items-center gap-4">
                 <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center">
                   <UserIcon className="w-6 h-6 text-slate-400" />
                 </div>
@@ -483,7 +483,7 @@ export const DriverRatingManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 bg-slate-50 flex justify-end">
+            <div className="p-6 bg-white flex justify-end">
               <button 
                 onClick={() => setSelectedRating(null)}
                 className="px-8 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors shadow-sm"

@@ -672,7 +672,7 @@ export const Dashboard: React.FC = () => {
                 placeholder={t('search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
           </div>
@@ -704,7 +704,7 @@ export const Dashboard: React.FC = () => {
                       key={v.carNumber}
                       onClick={() => handleZoomToVehicle(v)}
                       className={clsx(
-                        "grid grid-cols-12 items-center px-6 py-4 transition-all cursor-pointer hover:bg-slate-50",
+                        "grid grid-cols-12 items-center px-6 py-4 transition-all cursor-pointer hover:bg-white",
                         isSelected ? "bg-blue-50 border-l-4 border-primary" : "bg-white"
                       )}
                     >

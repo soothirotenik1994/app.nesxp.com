@@ -39,6 +39,11 @@ export const LineCallback: React.FC = () => {
         
         // Get config from backend
         const configResponse = await axios.get('/api/line/config');
+        
+        if (!configResponse.data || typeof configResponse.data !== 'object' || !configResponse.data.redirectUri) {
+          throw new Error('Invalid server configuration received');
+        }
+
         const { redirectUri } = configResponse.data;
 
         // Exchange code for token via our server proxy
@@ -189,7 +194,7 @@ export const LineCallback: React.FC = () => {
   }, [searchParams, navigate, t]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl text-center">
         {error ? (
           <>

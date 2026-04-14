@@ -26,7 +26,7 @@ export const DashboardStats: React.FC<StatsProps> = ({
       icon: Car,
       color: 'bg-[#003399]',
       textColor: 'text-[#003399]',
-      unit: 'คัน'
+      unit: t('units')
     },
     {
       name: t('online_vehicles'),
@@ -34,7 +34,7 @@ export const DashboardStats: React.FC<StatsProps> = ({
       icon: Signal,
       color: 'bg-[#003399]',
       textColor: 'text-[#003399]',
-      unit: 'คัน'
+      unit: t('units')
     },
     {
       name: t('offline_vehicles'),
@@ -42,7 +42,7 @@ export const DashboardStats: React.FC<StatsProps> = ({
       icon: Activity,
       color: 'bg-[#ED1C24]',
       textColor: 'text-[#ED1C24]',
-      unit: 'คัน'
+      unit: t('units')
     },
     {
       name: t('total_members'),
@@ -50,7 +50,7 @@ export const DashboardStats: React.FC<StatsProps> = ({
       icon: Users,
       color: 'bg-[#ED1C24]',
       textColor: 'text-[#ED1C24]',
-      unit: 'คน'
+      unit: t('people_unit')
     }
   ];
 

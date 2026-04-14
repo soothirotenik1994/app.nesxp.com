@@ -213,7 +213,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                     {String(member.display_name || 'U').charAt(0).toUpperCase()}
                   </div>
                 )}
-                <label className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-slate-50 transition-colors border border-slate-100">
+                <label className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-white transition-colors border border-slate-100">
                   <Camera className="w-4 h-4 text-primary" />
                   <input 
                     type="file" 
@@ -245,7 +245,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                     required
                     value={formData.first_name}
                     onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -257,7 +257,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                     required
                     value={formData.last_name}
                     onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
                   />
                 </div>
               </div>
@@ -272,7 +272,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
                 />
               </div>
 
@@ -286,7 +286,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                   required
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
                 />
               </div>
 

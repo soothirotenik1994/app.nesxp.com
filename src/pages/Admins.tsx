@@ -341,7 +341,7 @@ export const Admins: React.FC = () => {
                 </tr>
               ) : (
                 filteredAdmins.map((admin) => (
-                  <tr key={admin.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={admin.id} className="hover:bg-white transition-colors group">
                     {visibleColumns.includes('name') && (
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -568,14 +568,14 @@ export const Admins: React.FC = () => {
                   <option value="inactive">{t('inactive')}</option>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('line_uid')}</label>
-                <div className="w-full bg-slate-100 border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-mono break-all">
-                  {formData.line_user_id 
-                    ? (members.find(m => String(m.id) === String(formData.line_user_id))?.line_user_id || formData.line_user_id) 
-                    : t('not_linked')}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('line_uid')}</label>
+                  <div className="w-full bg-white border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-mono break-all">
+                    {formData.line_user_id 
+                      ? (members.find(m => String(m.id) === String(formData.line_user_id))?.line_user_id || formData.line_user_id) 
+                      : t('not_linked')}
+                  </div>
                 </div>
-              </div>
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button"

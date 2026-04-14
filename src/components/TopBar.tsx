@@ -117,7 +117,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
 
               {showNotifications && (
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-200 z-[1100]">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
                     <h3 className="font-bold text-slate-900 flex items-center gap-2">
                       <Bell className="w-4 h-4 text-primary" />
                       {t('system_notifications')}
@@ -136,7 +136,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
                   <div className="max-h-[400px] overflow-y-auto">
                     {alerts.length === 0 ? (
                       <div className="p-8 text-center">
-                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3">
                           <CheckCircle className="w-6 h-6 text-slate-300" />
                         </div>
                         <p className="text-slate-500 text-sm">{t('no_notifications')}</p>
@@ -146,7 +146,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
                         {alerts.map((alert) => (
                           <div 
                             key={alert.id}
-                            className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer relative group ${!alert.isRead ? 'bg-blue-50/30' : ''}`}
+                            className={`p-4 hover:bg-white transition-colors cursor-pointer relative group ${!alert.isRead ? 'bg-blue-50/30' : ''}`}
                             onClick={() => markAsRead(alert.id)}
                           >
                             <div className="flex gap-3">

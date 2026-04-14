@@ -39,7 +39,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             {message}
           </div>
         </div>
-        <div className="p-6 bg-slate-50 flex gap-3">
+        <div className="p-6 bg-white flex gap-3">
           <button
             onClick={onCancel}
             className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors"

@@ -59,7 +59,7 @@ export const NotificationMailbox: React.FC = () => {
               notifications.map(n => (
                 <div 
                   key={n.id} 
-                  className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 ${!n.read ? 'bg-blue-50' : ''}`}
+                  className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-white ${!n.read ? 'bg-blue-50' : ''}`}
                   onClick={() => markAsRead(n.id)}
                 >
                   <p className={`text-sm ${n.type === 'error' ? 'text-red-600 font-bold' : 'text-slate-700'}`}>

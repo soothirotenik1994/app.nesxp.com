@@ -105,7 +105,7 @@ export const ApiSettings: React.FC = () => {
 
       {/* Overview Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
               <Zap className="w-5 h-5" />
@@ -118,7 +118,7 @@ export const ApiSettings: React.FC = () => {
         </div>
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+            <div className="p-4 bg-white rounded-xl border border-slate-100 space-y-2">
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
                 <Globe className="w-4 h-4" />
               </div>
@@ -127,7 +127,7 @@ export const ApiSettings: React.FC = () => {
                 The tracking API is public and only requires a valid Case Number to retrieve status.
               </p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+            <div className="p-4 bg-white rounded-xl border border-slate-100 space-y-2">
               <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
                 <Shield className="w-4 h-4" />
               </div>
@@ -136,7 +136,7 @@ export const ApiSettings: React.FC = () => {
                 Only non-sensitive fields (status, origin, destination, times) are exposed via this API.
               </p>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+            <div className="p-4 bg-white rounded-xl border border-slate-100 space-y-2">
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
                 <Code className="w-4 h-4" />
               </div>
@@ -234,7 +234,7 @@ export const ApiSettings: React.FC = () => {
               placeholder="Enter Case Number (e.g. NES-2026-001)"
               value={testCaseNumber}
               onChange={(e) => setTestCaseNumber(e.target.value)}
-              className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
             <button 
               onClick={handleTestApi}

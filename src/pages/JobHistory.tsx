@@ -144,12 +144,12 @@ export const JobHistory: React.FC = () => {
     let routesText = '';
     if (report.routes && report.routes.length > 0) {
       routesText = report.routes.map((route, index) => `
-เส้นทางที่ ${index + 1}:
-📍 ต้นทาง : ${route.origin || '-'}
-🔗 ลิงก์ต้นทาง : ${route.origin_url || '-'}
-📍 ปลายทาง : ${route.destination || '-'}
-🔗 ลิงก์ปลายทาง : ${route.destination_url || '-'}
-ระยะทาง : ${route.distance !== undefined ? route.distance + ' km' : '-'}`).join('\n');
+${t('route_index', { index: index + 1 })}:
+📍 ${t('origin_label')} : ${route.origin || '-'}
+🔗 ${t('origin_url_label')} : ${route.origin_url || '-'}
+📍 ${t('destination_label')} : ${route.destination || '-'}
+🔗 ${t('destination_url_label')} : ${route.destination_url || '-'}
+${t('distance_label')} : ${route.distance !== undefined ? route.distance + ' km' : '-'}`).join('\n');
     } else {
       routesText = `📍 ${t('origin')} : ${report.origin || '-'}
 📍 ${t('destination')} : ${report.destination || '-'}`;
@@ -362,7 +362,7 @@ ${!isCustomer ? `
                   const car = typeof report.car_id === 'object' ? report.car_id : null;
                   
                   return (
-                    <tr key={report.id} className="hover:bg-slate-50 transition-colors group">
+                    <tr key={report.id} className="hover:bg-white transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold text-slate-700">
@@ -469,7 +469,7 @@ ${!isCustomer ? `
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-white transition-colors"
             >
               <ChevronRight className="w-5 h-5 rotate-180" />
             </button>
@@ -482,7 +482,7 @@ ${!isCustomer ? `
                     "w-10 h-10 rounded-xl font-bold text-sm transition-all",
                     currentPage === page 
                       ? "bg-primary text-white shadow-lg shadow-blue-100" 
-                      : "text-slate-500 hover:bg-slate-50"
+                      : "text-slate-500 hover:bg-white"
                   )}
                 >
                   {page}
@@ -492,7 +492,7 @@ ${!isCustomer ? `
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+              className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-white transition-colors"
             >
               <ChevronRight className="w-5 h-5" />
             </button>

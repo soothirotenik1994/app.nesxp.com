@@ -48,10 +48,11 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.1",
     "react-select": "^5.10.2",
-    "react-signature-canvas": "^1.1.0-alpha.2",
+    "react-signature-canvas": "^1.0.6",
     "react-webcam": "^7.2.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
+    "trim-canvas": "^0.1.2",
     "tsx": "^4.21.0",
     "xlsx": "^0.18.5"
   },

@@ -160,7 +160,7 @@ export const SystemSettings: React.FC = () => {
       {activeTab === 'general' ? (
         <>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
               <Globe className="w-5 h-5" />
@@ -182,7 +182,7 @@ export const SystemSettings: React.FC = () => {
                 type="text" 
                 value={formData.websiteName}
                 onChange={(e) => setFormData({...formData, websiteName: e.target.value})}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="NES Tracking"
               />
             </div>
@@ -196,7 +196,7 @@ export const SystemSettings: React.FC = () => {
                   type="text" 
                   value={formData.websiteLogo}
                   onChange={(e) => setFormData({...formData, websiteLogo: e.target.value})}
-                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                   placeholder="https://example.com/logo.png"
                 />
                 <input 
@@ -231,7 +231,7 @@ export const SystemSettings: React.FC = () => {
                   type="text" 
                   value={formData.websiteBackground}
                   onChange={(e) => setFormData({...formData, websiteBackground: e.target.value})}
-                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                   placeholder="https://example.com/background.jpg"
                 />
                 <input 
@@ -267,7 +267,7 @@ export const SystemSettings: React.FC = () => {
               type="text" 
               value={formData.appUrl}
               onChange={(e) => setFormData({...formData, appUrl: e.target.value})}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
               placeholder="https://your-app-url.com"
             />
             <p className="text-[10px] text-slate-400">Used for generating deep links and LINE notifications</p>
@@ -275,7 +275,7 @@ export const SystemSettings: React.FC = () => {
           
           <div className="flex gap-6">
             {formData.websiteLogo && (
-              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 inline-block">
+              <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 inline-block">
                 <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Logo Preview</p>
                 <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
                   <img 
@@ -292,7 +292,7 @@ export const SystemSettings: React.FC = () => {
             )}
             
             {formData.websiteBackground && (
-              <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 inline-block">
+              <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 inline-block">
                 <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Background Preview</p>
                 <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
                   <img 
@@ -312,7 +312,7 @@ export const SystemSettings: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
               <Settings className="w-5 h-5" />
@@ -324,7 +324,7 @@ export const SystemSettings: React.FC = () => {
           </div>
         </div>
         <div className="p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
             <div>
               <h3 className="font-semibold text-slate-900">ระบบจัดลำดับคิวรถอัตโนมัติ (Queue System)</h3>
               <p className="text-sm text-slate-500 mt-1">
@@ -342,7 +342,7 @@ export const SystemSettings: React.FC = () => {
             </label>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
             <div>
               <h3 className="font-semibold text-slate-900">ระยะทางสูงสุดสำหรับงาน กทม./ปริมณฑล (กิโลเมตร)</h3>
               <p className="text-sm text-slate-500 mt-1">
@@ -361,7 +361,7 @@ export const SystemSettings: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
             <div>
               <h3 className="font-semibold text-slate-900">ระบบติดตามพัสดุ (Tracking System)</h3>
               <p className="text-sm text-slate-500 mt-1">
@@ -382,7 +382,7 @@ export const SystemSettings: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
               <Settings className="w-5 h-5" />
@@ -405,7 +405,7 @@ export const SystemSettings: React.FC = () => {
                 type="text" 
                 value={formData.directusUrl}
                 onChange={(e) => setFormData({...formData, directusUrl: e.target.value})}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="https://your-directus-instance.com"
               />
             </div>
@@ -419,7 +419,7 @@ export const SystemSettings: React.FC = () => {
                 type="password" 
                 value={formData.staticApiKey}
                 onChange={(e) => setFormData({...formData, staticApiKey: e.target.value})}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="Enter your Directus static token"
               />
             </div>
@@ -433,7 +433,7 @@ export const SystemSettings: React.FC = () => {
                 type="password" 
                 value={formData.googleMapsApiKey}
                 onChange={(e) => setFormData({...formData, googleMapsApiKey: e.target.value})}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                 placeholder="Enter your Google Maps API Key"
               />
               <p className="text-[10px] text-slate-400">ใช้สำหรับคำนวณระยะทางจริงและจัดลำดับเส้นทางอัตโนมัติ (Route Optimization)</p>
@@ -452,7 +452,7 @@ export const SystemSettings: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <div className="p-6 bg-white border-t border-slate-100 flex justify-end">
           <button
             onClick={handleSave}
             disabled={isSaving}

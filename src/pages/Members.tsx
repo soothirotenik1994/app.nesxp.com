@@ -56,7 +56,7 @@ const MemberRow = React.memo(({
   }, [member.id, member.car_users, allCars, allPermissions]);
 
   return (
-    <tr className="hover:bg-slate-50/50 transition-colors group">
+    <tr className="hover:bg-white transition-colors group">
       {visibleColumns.includes('name') && (
         <td className="px-6 py-4">
           <div className="flex items-center gap-3">
@@ -71,14 +71,14 @@ const MemberRow = React.memo(({
                   const parent = (e.target as HTMLImageElement).parentElement;
                   if (parent) {
                     const fallback = document.createElement('div');
-                    fallback.className = "w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200";
+                    fallback.className = "w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200";
                     fallback.innerText = String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase() + String(member.last_name || '').charAt(0).toUpperCase();
                     parent.appendChild(fallback);
                   }
                 }}
               />
             ) : (
-              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
                 {String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase()}
                 {String(member.last_name || '').charAt(0).toUpperCase()}
               </div>
@@ -182,7 +182,7 @@ const MemberRow = React.memo(({
             <button 
               onClick={() => onSwitchAccount(member)}
               className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors"
-              title={t('switch_account') || 'สลับบัญชี'}
+              title={t('switch_account')}
             >
               <UserCheck className="w-5 h-5" />
             </button>
@@ -705,14 +705,14 @@ export const Members: React.FC = () => {
                     onClick={() => setShowColumnSettings(false)}
                   />
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-[61] animate-in fade-in zoom-in duration-200">
-                    <div className="px-4 py-2 border-b border-slate-50 mb-1">
+                    <div className="px-4 py-2 border-b border-white mb-1">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('show_hide_columns')}</p>
                     </div>
                     {columns.map(col => (
                       <button
                         key={col.id}
                         onClick={() => toggleColumn(col.id)}
-                        className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors group"
+                        className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-white transition-colors group"
                       >
                         <span className={clsx(
                           "text-sm font-medium transition-colors",
@@ -884,7 +884,7 @@ export const Members: React.FC = () => {
                         required
                         value={formData.first_name}
                         onChange={(e) => setFormData({...formData, first_name: e.target.value})}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -894,7 +894,7 @@ export const Members: React.FC = () => {
                         required
                         value={formData.last_name}
                         onChange={(e) => setFormData({...formData, last_name: e.target.value})}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
                   </div>
@@ -908,7 +908,7 @@ export const Members: React.FC = () => {
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
                   </div>
@@ -922,7 +922,7 @@ export const Members: React.FC = () => {
                         required
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
                   </div>

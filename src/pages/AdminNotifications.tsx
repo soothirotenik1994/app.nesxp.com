@@ -55,7 +55,7 @@ export const AdminNotifications: React.FC = () => {
         ) : (
           <div className="divide-y divide-slate-100">
             {notifications.map(n => (
-              <div key={n.id} className={`p-4 flex items-start justify-between gap-4 ${n.is_read ? 'bg-white' : 'bg-slate-50'}`}>
+              <div key={n.id} className={`p-4 flex items-start justify-between gap-4 ${n.is_read ? 'bg-white' : 'bg-white'}`}>
                 <div className="flex items-start gap-3">
                   {n.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5" />}
                   <div>

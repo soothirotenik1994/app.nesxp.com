@@ -246,7 +246,7 @@ export const Login: React.FC = () => {
         backgroundPosition: 'center',
       } : {}}
     >
-      <div className={clsx("max-w-md w-full", !websiteBackground && "bg-slate-50")}>
+      <div className={clsx("max-w-md w-full", !websiteBackground && "bg-white")}>
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 overflow-hidden p-2">
             <img 
@@ -304,7 +304,7 @@ export const Login: React.FC = () => {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="example@email.com"
                     />
                   </div>
@@ -321,7 +321,7 @@ export const Login: React.FC = () => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="••••••••"
                     />
                   </div>
@@ -369,9 +369,15 @@ export const Login: React.FC = () => {
                     try {
                       const response = await axios.get('/api/line/config');
                       
-                      // Check if the response is HTML (meaning the backend is not running and we got the SPA fallback)
-                      if (typeof response.data === 'string' && response.data.includes('<html')) {
-                        setError('Backend Server Error: The Node.js backend is not running. Please ensure you have deployed the backend server.');
+                      console.log('LINE Config Response:', response.data);
+
+                      // Check if the response is valid JSON config
+                      if (!response.data || typeof response.data !== 'object' || !response.data.channelId) {
+                        if (typeof response.data === 'string' && response.data.includes('<html')) {
+                          setError('Backend Server Error: The Node.js backend is not running correctly (received HTML instead of JSON).');
+                        } else {
+                          setError('LINE Configuration Error: Received invalid response from server.');
+                        }
                         return;
                       }
 
@@ -412,7 +418,7 @@ export const Login: React.FC = () => {
                       required
                       value={caseNumber}
                       onChange={(e) => setCaseNumber(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="THXXXXXXXXXX"
                     />
                   </div>
@@ -429,7 +435,7 @@ export const Login: React.FC = () => {
                       required
                       value={trackingPhone}
                       onChange={(e) => setTrackingPhone(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
+                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="08X-XXX-XXXX"
                     />
                   </div>

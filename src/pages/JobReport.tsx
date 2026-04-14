@@ -74,7 +74,7 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
       <div className="flex items-center justify-between relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white -translate-y-1/2 z-0" />
         {steps.map((step, idx) => {
           const isActive = idx <= currentIdx && !isCancelled;
           const isCurrent = idx === currentIdx && !isCancelled;
@@ -83,7 +83,7 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
             <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
               <div className={clsx(
                 "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100" : "bg-slate-100 text-slate-400",
+                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100" : "bg-white text-slate-400",
                 isCurrent && "ring-4 ring-blue-50"
               )}>
                 {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
@@ -284,7 +284,7 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'error',
         title: t('error'),
-        message: 'กรุณาพิมพ์ชื่อสถานที่ก่อนค้นหา'
+        message: t('search_location_placeholder')
       });
       setShowStatusModal(true);
       return;
@@ -322,7 +322,7 @@ export const JobReport: React.FC = () => {
         setStatusConfig({
           type: 'success',
           title: t('success'),
-          message: `พบพิกัด: ${response.data.display_name}`
+          message: t('location_found', { location: response.data.display_name })
         });
         setShowStatusModal(true);
       }
@@ -337,7 +337,7 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'error',
         title: t('error'),
-        message: 'ไม่พบพิกัดจากชื่อสถานที่นี้ กรุณาลองใช้ลิงก์ Google Maps แทน'
+        message: t('location_not_found')
       });
       setShowStatusModal(true);
     }
@@ -365,7 +365,7 @@ export const JobReport: React.FC = () => {
             points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '' });
             points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '' });
           } else {
-            throw new Error(`เที่ยวที่ ${i+1}: กรุณาระบุลิงก์ Google Maps อย่างน้อย 2 จุด (จุดรับและจุดส่ง)`);
+            throw new Error(t('route_points_error', { index: i + 1 }));
           }
         }
 
@@ -384,7 +384,7 @@ export const JobReport: React.FC = () => {
             if (response.data && response.data.distance !== undefined) {
               routeDistance = response.data.distance;
             } else {
-              throw new Error(`ไม่สามารถคำนวณระยะทางสำหรับเที่ยวที่ ${i+1} ได้`);
+              throw new Error(t('route_calc_failed', { index: i + 1 }));
             }
           } catch (urlErr: any) {
             console.error(`URL calculation failed for route ${i+1}:`, urlErr);
@@ -421,18 +421,18 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'success',
         title: t('success'),
-        message: `คำนวณระยะทางรวมสำเร็จ: ${finalDistance} km`
+        message: t('calculate_distance_success', { distance: finalDistance })
       });
       setShowStatusModal(true);
     } catch (error: any) {
       console.error('Calculate distance error:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'เกิดข้อผิดพลาดในการคำนวณระยะทาง';
+      const errorMessage = error.response?.data?.error || error.message || t('calculate_distance_error');
       
       let displayMessage = errorMessage;
       if (errorMessage === 'Location not found') {
-        displayMessage = 'ไม่พบพิกัดสำหรับชื่อสถานที่ที่ระบุ กรุณาตรวจสอบความถูกต้องของชื่อสถานที่';
+        displayMessage = t('location_not_found_error');
       } else if (errorMessage === 'Network Error' || errorMessage.includes('Network Error')) {
-        displayMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง';
+        displayMessage = t('network_error');
       }
 
       setStatusConfig({
@@ -533,7 +533,7 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'success',
         title: t('success'),
-        message: `จัดลำดับเส้นทางและคำนวณระยะทางสำเร็จ! ระยะทางรวม: ${finalDistance} km`
+        message: t('route_optimize_success', { distance: finalDistance })
       });
       setShowStatusModal(true);
     } catch (error: any) {
@@ -541,7 +541,7 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'error',
         title: t('error'),
-        message: error.response?.data?.error || error.message || 'เกิดข้อผิดพลาดในการจัดลำดับเส้นทาง'
+        message: error.response?.data?.error || error.message || t('route_optimize_error')
       });
       setShowStatusModal(true);
     } finally {
@@ -2599,6 +2599,7 @@ export const JobReport: React.FC = () => {
   };
 
   const executeSave = async () => {
+    console.log('executeSave: START');
     setShowConfirmModal(false);
     setSubmitting(true);
     setError('');
@@ -2609,19 +2610,10 @@ export const JobReport: React.FC = () => {
       const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
       const currentMemberId = typeof formData.member_id === 'object' && formData.member_id ? (formData.member_id as any).id : formData.member_id;
 
-      const getSafeId = (val: any) => {
-        if (!val) return '';
-        if (typeof val === 'object') return String(val.id || '');
-        return String(val);
-      };
-
-      console.log('handleSubmit: Extracted IDs:', { currentCustomerId, currentCarId, currentMemberId });
+      console.log('executeSave: Extracted IDs:', { currentCustomerId, currentCarId, currentMemberId });
       
-      if (!currentCustomerId) {
-        console.warn('handleSubmit: currentCustomerId is empty! Customer notifications might fail.');
-      }
-
       // 1. Upload new photos to Directus if any
+      console.log('executeSave: Starting photo uploads...');
       const pickupPhotoIds: string[] = [];
       const deliveryPhotoIds: string[] = [];
       const documentPhotoIds: string[] = [];
@@ -2630,6 +2622,7 @@ export const JobReport: React.FC = () => {
       const uploadPhotos = async (photos: any[], targetArray: string[]) => {
         for (const photoObj of photos) {
           try {
+            console.log(`executeSave: Uploading photo: ${photoObj.file.name}`);
             const fileId = await directusApi.uploadFile(photoObj.file);
             targetArray.push(fileId);
             
@@ -2643,7 +2636,7 @@ export const JobReport: React.FC = () => {
             }
           } catch (uploadErr: any) {
             if (uploadErr.response?.status === 401) return;
-            console.error('Error uploading file:', uploadErr.response?.data || uploadErr.message);
+            console.error('executeSave: Error uploading file:', uploadErr.response?.data || uploadErr.message);
             const detail = uploadErr.response?.data?.errors?.[0]?.message || uploadErr.message;
             throw new Error(`Failed to upload photo: ${detail}`);
           }
@@ -2653,17 +2646,40 @@ export const JobReport: React.FC = () => {
       await uploadPhotos(pickupPhotos, pickupPhotoIds);
       await uploadPhotos(deliveryPhotos, deliveryPhotoIds);
       await uploadPhotos(documentPhotos, documentPhotoIds);
+      console.log('executeSave: Photo uploads completed');
 
       // Capture signature if pad is not empty
       let signatureFileId = '';
       if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
-        const signatureDataUrl = signaturePadRef.current.getTrimmedCanvas().toDataURL('image/png');
-        const blob = await (await fetch(signatureDataUrl)).blob();
-        const file = new File([blob], `signature-${Date.now()}.png`, { type: 'image/png' });
-        signatureFileId = await directusApi.uploadFile(file);
+        try {
+          console.log('executeSave: Capturing signature...');
+          const canvas = signaturePadRef.current.getTrimmedCanvas();
+          const signatureDataUrl = canvas.toDataURL('image/png');
+          
+          // Convert data URL to blob manually to avoid potential fetch issues with large data URLs
+          const arr = signatureDataUrl.split(',');
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          
+          const file = new File([blob], `signature-${Date.now()}.png`, { type: 'image/png' });
+          console.log('executeSave: Uploading signature file...');
+          signatureFileId = await directusApi.uploadFile(file);
+          console.log('executeSave: Signature upload successful, ID:', signatureFileId);
+        } catch (sigErr: any) {
+          console.error('executeSave: Error capturing/uploading signature:', sigErr);
+          throw new Error(`Failed to process signature: ${sigErr.message}`);
+        }
       }
 
       // 1.6 Mandatory photos check for drivers
+      console.log('executeSave: Performing validation checks...');
       if (!isAdmin && id && formData.status === 'completed') {
         // Require at least one photo for each category: pickup, delivery
         const totalPickupPhotos = pickupPhotos.length + existingPickupPhotos.length;
@@ -3951,7 +3967,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           </div>
           <button 
             onClick={() => navigate(-1)}
-            className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"
+            className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-white transition-all shadow-sm"
           >
             <X className="w-6 h-6" />
           </button>
@@ -4269,7 +4285,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -4431,7 +4447,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, customer_contact_name: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -4447,7 +4463,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, customer_contact_phone: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -4457,7 +4473,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                <Truck className="w-4 h-4 text-primary" /> เส้นทางการเดินทาง ({formData.routes.length})
+                <Truck className="w-4 h-4 text-primary" /> {t('travel_route')} ({formData.routes.length})
               </h4>
               {(!id || isAdmin) && (
                 <button
@@ -4487,7 +4503,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   }}
                   className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 px-3 py-1.5 bg-primary/10 rounded-lg transition-colors"
                 >
-                  <Plus className="w-3 h-3" /> เพิ่มเส้นทาง
+                  <Plus className="w-3 h-3" /> {t('add_route')}
                 </button>
               )}
             </div>
@@ -4512,13 +4528,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm">
                       {index + 1}
                     </div>
-                    <span className="font-bold text-slate-700">เส้นทางที่ {index + 1}</span>
+                    <span className="font-bold text-slate-700">{t('route_index', { index: index + 1 })}</span>
                     {route.distance !== undefined && (
                       <div className={clsx(
                         "ml-auto px-3 py-1 rounded-full text-xs font-bold",
                         route.route_type === 'upcountry' ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"
                       )}>
-                        {route.distance} km • {route.route_type === 'upcountry' ? 'ต่างจังหวัด' : 'กรุงเทพปริมณฑล'}
+                        {route.distance} km • {route.route_type === 'upcountry' ? t('upcountry') : t('bangkok_vicinity')}
                       </div>
                     )}
                   </div>
@@ -4528,7 +4544,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <h5 className="font-bold text-slate-700 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-primary" /> จุดรับสินค้า (Pickups)
+                            <MapPin className="w-4 h-4 text-primary" /> {t('pickup_points')}
                           </h5>
                           {(!id || isAdmin) && (
                             <button
@@ -4540,7 +4556,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               }}
                               className="text-xs text-primary hover:text-primary-dark font-medium flex items-center gap-1"
                             >
-                              <Plus className="w-3 h-3" /> เพิ่มจุดรับ
+                              <Plus className="w-3 h-3" /> {t('add_pickup')}
                             </button>
                           )}
                         </div>
@@ -4562,12 +4578,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ชื่อสถานที่จุดรับ {pIndex + 1}</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('location_name_pickup', { index: pIndex + 1 })}</label>
                                 <input 
                                   type="text" 
                                   required
                                   disabled={!!id && !isAdmin}
-                                  placeholder="ระบุชื่อสถานที่..."
+                                  placeholder={t('enter_location_placeholder')}
                                   value={pickup.name || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4581,12 +4597,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ลิงก์ Google Map</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
                                 <input 
                                   type="text" 
                                   required
                                   disabled={!!id && !isAdmin}
-                                  placeholder="วางลิงก์ Google Map..."
+                                  placeholder={t('enter_google_map_link')}
                                   value={pickup.url || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4600,11 +4616,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ชื่อผู้ติดต่อ (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
-                                  placeholder="ชื่อผู้ติดต่อ..."
+                                  placeholder={t('contact_name')}
                                   value={pickup.contact_name || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4617,17 +4633,33 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">เบอร์โทร (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('phone_optional')}</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
-                                  placeholder="เบอร์โทร..."
+                                  placeholder={t('contact_phone')}
                                   value={pickup.contact_phone || ''}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].pickups[pIndex].contact_phone = val;
+                                    setFormData({ ...formData, routes: newRoutes });
+                                  }}
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
+                                <input 
+                                  type="time" 
+                                  disabled={!!id && !isAdmin}
+                                  value={pickup.time || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const newRoutes = [...formData.routes];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    newRoutes[index].pickups[pIndex].time = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -4642,7 +4674,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <h5 className="font-bold text-slate-700 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-red-500" /> จุดส่งสินค้า (Deliveries)
+                            <MapPin className="w-4 h-4 text-red-500" /> {t('delivery_points')}
                           </h5>
                           {(!id || isAdmin) && (
                             <button
@@ -4654,7 +4686,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               }}
                               className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
                             >
-                              <Plus className="w-3 h-3" /> เพิ่มจุดส่ง
+                              <Plus className="w-3 h-3" /> {t('add_delivery')}
                             </button>
                           )}
                         </div>
@@ -4676,12 +4708,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ชื่อสถานที่จุดส่ง {dIndex + 1}</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('location_name_delivery', { index: dIndex + 1 })}</label>
                                 <input 
                                   type="text" 
                                   required
                                   disabled={!!id && !isAdmin}
-                                  placeholder="ระบุชื่อสถานที่..."
+                                  placeholder={t('enter_location_placeholder')}
                                   value={delivery.name || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4695,12 +4727,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ลิงก์ Google Map</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
                                 <input 
                                   type="text" 
                                   required
                                   disabled={!!id && !isAdmin}
-                                  placeholder="วางลิงก์ Google Map..."
+                                  placeholder={t('enter_google_map_link')}
                                   value={delivery.url || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4714,11 +4746,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">ชื่อผู้ติดต่อ (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
-                                  placeholder="ชื่อผู้ติดต่อ..."
+                                  placeholder={t('contact_name')}
                                   value={delivery.contact_name || ''}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -4731,17 +4763,33 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">เบอร์โทร (ถ้ามี)</label>
+                                <label className="text-xs font-semibold text-slate-500">{t('phone_optional')}</label>
                                 <input 
                                   type="text" 
                                   disabled={!!id && !isAdmin}
-                                  placeholder="เบอร์โทร..."
+                                  placeholder={t('contact_phone')}
                                   value={delivery.contact_phone || ''}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
                                     if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
                                     newRoutes[index].deliveries[dIndex].contact_phone = val;
+                                    setFormData({ ...formData, routes: newRoutes });
+                                  }}
+                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
+                                <input 
+                                  type="time" 
+                                  disabled={!!id && !isAdmin}
+                                  value={delivery.time || ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    const newRoutes = [...formData.routes];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    newRoutes[index].deliveries[dIndex].time = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
@@ -5032,7 +5080,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, vehicle_type: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -5056,7 +5104,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 }}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary appearance-none transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               >
                 <option value="">{t('select_member')}</option>
@@ -5093,7 +5141,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               onChange={e => setFormData({...formData, phone: e.target.value})}
               className={clsx(
                 "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
               )}
             />
           </div>
@@ -5249,7 +5297,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onChange={e => setFormData({...formData, notes: e.target.value})}
                 className={clsx(
                   "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                  (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                 )}
               />
             </div>
@@ -5459,7 +5507,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-white transition-colors"
               >
                 แก้ไขข้อมูล
               </button>

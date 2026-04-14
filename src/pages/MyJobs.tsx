@@ -270,7 +270,7 @@ export const MyJobs: React.FC = () => {
 
       {reports.length === 0 ? (
         <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto">
             {profileMissing ? (
               <AlertCircle className="w-8 h-8 text-slate-300" />
             ) : (
@@ -370,7 +370,7 @@ export const MyJobs: React.FC = () => {
                     return (
                       <tr 
                         key={report.id} 
-                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                        className="hover:bg-white transition-colors cursor-pointer group"
                         onClick={() => navigate(`/jobs/edit/${report.id}`)}
                       >
                         <td className="px-6 py-4">
@@ -460,7 +460,7 @@ export const MyJobs: React.FC = () => {
                             </div>
                           </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="p-1.5 bg-slate-50 rounded-lg group-hover:bg-primary group-hover:text-white transition-all inline-block">
+                          <div className="p-1.5 bg-white rounded-lg group-hover:bg-primary group-hover:text-white transition-all inline-block">
                             <ChevronRight className="w-4 h-4" />
                           </div>
                         </td>
@@ -477,7 +477,7 @@ export const MyJobs: React.FC = () => {
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-white transition-colors"
               >
                 <ChevronRight className="w-5 h-5 rotate-180" />
               </button>
@@ -490,7 +490,7 @@ export const MyJobs: React.FC = () => {
                       "w-10 h-10 rounded-xl font-bold text-sm transition-all",
                       currentPage === page 
                         ? "bg-primary text-white shadow-lg shadow-blue-100" 
-                        : "text-slate-500 hover:bg-slate-50"
+                        : "text-slate-500 hover:bg-white"
                     )}
                   >
                     {page}
@@ -500,7 +500,7 @@ export const MyJobs: React.FC = () => {
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-slate-50 transition-colors"
+                className="p-2 rounded-xl border border-slate-200 disabled:opacity-30 hover:bg-white transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>

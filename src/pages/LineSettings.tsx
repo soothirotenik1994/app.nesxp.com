@@ -268,7 +268,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-6 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
               <MessageSquare className="w-5 h-5" />
@@ -281,7 +281,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100">
             <div className="space-y-0.5">
               <label className="text-base font-semibold text-slate-900">
                 {t('enable_line_notifications')}
@@ -331,7 +331,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                 type="password"
                 value={channelAccessToken}
                 onChange={(e) => setChannelAccessToken(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="Enter your LINE Channel Access Token..."
               />
             </div>
@@ -343,7 +343,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                 type="password"
                 value={channelSecret}
                 onChange={(e) => setChannelSecret(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="Enter your LINE Channel Secret..."
               />
             </div>
@@ -365,7 +365,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                 value={notificationTemplate}
                 onChange={(e) => setNotificationTemplate(e.target.value)}
                 rows={5}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="Enter template using {{variable}} syntax..."
               />
               <p className="text-xs text-slate-500">
@@ -376,7 +376,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
         </div>
 
         <div className="p-6 space-y-6 border-t border-slate-100">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+          <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-2 text-slate-700 font-semibold">
               <Send className="w-4 h-4" />
               <h3>Test LINE Configuration</h3>
@@ -410,7 +410,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                   />
                   <button 
                   onClick={() => memberLineId && setTestLineId(memberLineId)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white px-2 py-1 rounded-lg border border-slate-100 hover:bg-white hover:text-slate-600 transition-colors"
                     title="Click to use this ID"
                   >
                     <User className="w-3 h-3" />
@@ -438,7 +438,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <div className="p-6 bg-white border-t border-slate-100 flex justify-end">
           <button
             onClick={handleSave}
             disabled={isSaving}

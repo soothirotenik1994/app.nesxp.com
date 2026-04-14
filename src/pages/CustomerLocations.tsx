@@ -63,7 +63,7 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
         isOverlay && "shadow-xl border-primary/30 ring-2 ring-primary/10"
       )}
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-slate-50 rounded-md text-slate-400">
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-white rounded-md text-slate-400">
         <GripVertical className="w-4 h-4" />
       </div>
       
@@ -129,7 +129,7 @@ const DroppableContainer = ({ id, items, title, onRemove, onAdd, icon: Icon, emp
         ref={setNodeRef}
         className={clsx(
           "flex-1 p-2 rounded-xl border-2 border-dashed transition-all overflow-y-auto max-h-[350px]",
-          isOver ? "bg-primary/5 border-primary/30 ring-4 ring-primary/5" : "bg-slate-50/50 border-slate-200"
+          isOver ? "bg-primary/5 border-primary/30 ring-4 ring-primary/5" : "bg-white/50 border-slate-200"
         )}
       >
         <SortableContext items={items.map((i: any) => String(i.id))} strategy={verticalListSortingStrategy}>
@@ -756,7 +756,7 @@ export const CustomerLocations: React.FC = () => {
                           required
                           value={formData.company_name}
                           onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                           placeholder={t('company_name')}
                         />
                       </div>
@@ -769,7 +769,7 @@ export const CustomerLocations: React.FC = () => {
                           type="text" 
                           value={formData.company_code}
                           onChange={(e) => setFormData({...formData, company_code: e.target.value})}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                           placeholder="CODE"
                         />
                       </div>
@@ -783,7 +783,7 @@ export const CustomerLocations: React.FC = () => {
                         type="text" 
                         value={formData.tax_id}
                         onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                         placeholder={t('tax_id')}
                       />
                     </div>
@@ -793,7 +793,7 @@ export const CustomerLocations: React.FC = () => {
                         type="text" 
                         value={formData.branch}
                         onChange={(e) => setFormData({...formData, branch: e.target.value})}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                         placeholder={t('branch')}
                       />
                     </div>
@@ -807,7 +807,7 @@ export const CustomerLocations: React.FC = () => {
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                         placeholder={t('phone')}
                       />
                     </div>
@@ -821,7 +821,7 @@ export const CustomerLocations: React.FC = () => {
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                         placeholder={t('email')}
                       />
                     </div>
@@ -834,7 +834,7 @@ export const CustomerLocations: React.FC = () => {
                       <textarea 
                         value={formData.address}
                         onChange={(e) => setFormData({...formData, address: e.target.value})}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary min-h-[100px] transition-all resize-none"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary min-h-[100px] transition-all resize-none"
                         placeholder={t('address')}
                       />
                     </div>
@@ -872,7 +872,7 @@ export const CustomerLocations: React.FC = () => {
                           placeholder="ค้นหาสมาชิก..."
                           value={memberSearchTerm}
                           onChange={(e) => setMemberSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
+                          className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
                         />
                       </div>
 

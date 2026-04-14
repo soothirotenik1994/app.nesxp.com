@@ -301,7 +301,7 @@ export const Reports: React.FC = () => {
           </button>
           <button 
             onClick={fetchData}
-            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+            className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-white transition-colors shadow-sm"
           >
             <RefreshCw className="w-5 h-5 text-slate-600" />
           </button>
@@ -349,7 +349,7 @@ export const Reports: React.FC = () => {
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
             <Car className="w-6 h-6 text-slate-600" />
           </div>
           <div>
@@ -423,7 +423,7 @@ export const Reports: React.FC = () => {
 
       {/* Activity Log (Diligence Table) */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+        <div className="p-6 border-b border-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
               <Activity className="w-5 h-5 text-indigo-600" />
@@ -444,9 +444,9 @@ export const Reports: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('diligence_score')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-white">
               {userDiligence.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={user.id} className="hover:bg-white transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
