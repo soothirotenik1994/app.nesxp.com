@@ -42,7 +42,7 @@ export const Layout: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden transition-colors duration-300">
+    <div className="flex h-screen bg-[#f8fafc] overflow-hidden transition-colors duration-300">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

@@ -72,9 +72,9 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const isCancelled = status === 'cancelled' || status === 'cancel_pending';
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
       <div className="flex items-center justify-between relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 dark:bg-slate-800 -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
         {steps.map((step, idx) => {
           const isActive = idx <= currentIdx && !isCancelled;
           const isCurrent = idx === currentIdx && !isCancelled;
@@ -83,14 +83,14 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
             <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
               <div className={clsx(
                 "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100 dark:shadow-blue-900/20" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600",
-                isCurrent && "ring-4 ring-blue-50 dark:ring-blue-900/20"
+                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100" : "bg-slate-100 text-slate-400",
+                isCurrent && "ring-4 ring-blue-50"
               )}>
                 {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
               </div>
               <span className={clsx(
                 "text-[10px] font-bold uppercase tracking-wider",
-                isActive ? "text-primary" : "text-slate-400 dark:text-slate-500"
+                isActive ? "text-primary" : "text-slate-400"
               )}>
                 {step.label}
               </span>
@@ -869,16 +869,16 @@ export const JobReport: React.FC = () => {
     onRemoveExisting: (index: number) => void,
     isProcessing?: boolean
   ) => (
-    <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 text-center">{title}</h4>
+    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="p-3 border-b border-slate-200 bg-white">
+        <h4 className="text-sm font-bold text-slate-700 text-center">{title}</h4>
       </div>
       
       <div className="p-3 flex-1 space-y-3">
         {/* Gallery Grid */}
         <div className="grid grid-cols-2 gap-2">
           {existingPhotos.map((fileId, i) => (
-            <div key={`existing-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 group">
+            <div key={`existing-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
               <img 
                 src={directusApi.getFileUrl(fileId, { key: 'system-large-contain' })} 
                 alt="existing" 
@@ -895,7 +895,7 @@ export const JobReport: React.FC = () => {
             </div>
           ))}
           {photos.map((p, i) => (
-            <div key={`new-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 group">
+            <div key={`new-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
               <img 
                 src={p.preview} 
                 alt="preview" 
@@ -916,7 +916,7 @@ export const JobReport: React.FC = () => {
         {/* Upload Buttons */}
         <div className="flex flex-col gap-2">
           {isProcessing ? (
-            <div className="flex items-center justify-center py-4 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+            <div className="flex items-center justify-center py-4 bg-white rounded-xl border border-dashed border-slate-300">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
             </div>
           ) : (
@@ -931,7 +931,7 @@ export const JobReport: React.FC = () => {
                     setShowWebcam(true);
                   }
                 }}
-                className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all border border-emerald-100 dark:border-emerald-800 active:scale-[0.98]"
+                className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100 active:scale-[0.98]"
               >
                 <Camera className="w-5 h-5" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">{t('take_photo', 'ถ่ายภาพ')}</span>
@@ -944,7 +944,7 @@ export const JobReport: React.FC = () => {
                   onChange={onUpload} 
                 />
               </button>
-              <label className="flex flex-col items-center justify-center gap-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 active:scale-[0.98]">
+              <label className="flex flex-col items-center justify-center gap-1 py-3 bg-slate-100 text-slate-600 rounded-xl cursor-pointer hover:bg-slate-200 transition-all border border-slate-200 active:scale-[0.98]">
                 <Plus className="w-5 h-5" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">{t('upload_photo_btn', 'อัปโหลด')}</span>
                 <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
@@ -3855,7 +3855,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
         {icon} {label}
       </label>
-      <div className={clsx("text-sm font-bold bg-slate-50/50 px-4 py-3 rounded-2xl border border-slate-100 whitespace-pre-wrap", valueClassName || "text-slate-700")}>
+      <div className={clsx("text-sm font-bold bg-white px-4 py-3 rounded-2xl border border-slate-100 whitespace-pre-wrap", valueClassName || "text-slate-700")}>
         {value || '-'}
       </div>
     </div>
@@ -3891,7 +3891,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             {t('report_preview')}
           </label>
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 max-h-60 overflow-y-auto">
+          <div className="p-4 bg-white rounded-2xl border border-slate-100 max-h-60 overflow-y-auto">
             <pre className="text-xs text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
               {generateReportText()}
             </pre>
@@ -4066,7 +4066,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           {formData.notes && (
             <div className="pt-6 border-t border-slate-50">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('notes')}</p>
-              <p className="text-sm text-slate-600 italic leading-relaxed bg-slate-50 p-4 rounded-2xl">
+              <p className="text-sm text-slate-600 italic leading-relaxed bg-white p-4 rounded-2xl">
                 "{formData.notes}"
               </p>
             </div>
@@ -4546,7 +4546,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.pickups || [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }]).map((pickup: any, pIndex: number) => (
-                          <div key={`pickup-${pIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                          <div key={`pickup-${pIndex}`} className="p-4 bg-white rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.pickups?.length > 1) && (
                               <button
                                 type="button"
@@ -4660,7 +4660,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.deliveries || [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }]).map((delivery: any, dIndex: number) => (
-                          <div key={`delivery-${dIndex}`} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
+                          <div key={`delivery-${dIndex}`} className="p-4 bg-white rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.deliveries?.length > 1) && (
                               <button
                                 type="button"
@@ -4757,7 +4757,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
             {(!id || isAdmin) && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -5013,7 +5013,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 }}
               />
               {formData.car_id && (
-                <div className="mt-2 p-3 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-1 border border-slate-100">
+                <div className="mt-2 p-3 bg-white rounded-xl text-xs text-slate-600 space-y-1 border border-slate-100">
                   <p><strong>{t('current_mileage')}:</strong> {formData.current_mileage || '-'}</p>
                   <p><strong>{t('next_maintenance_date')}:</strong> {formData.next_maintenance_date ? new Date(formData.next_maintenance_date).toLocaleDateString() : '-'}</p>
                   <p><strong>{t('next_maintenance_mileage')}:</strong> {formData.next_maintenance_mileage || '-'}</p>
@@ -5122,7 +5122,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   onChange={e => setFormData({...formData, standby_time: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('standby_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    (!isEditable || isFieldLocked('standby_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                   )}
                 />
               </div>
@@ -5137,7 +5137,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   onChange={e => setFormData({...formData, departure_time: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('departure_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    (!isEditable || isFieldLocked('departure_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                   )}
                 />
               </div>
@@ -5160,7 +5160,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   }}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('arrival_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    (!isEditable || isFieldLocked('arrival_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                   )}
                 />
               </div>
@@ -5192,7 +5192,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   onChange={e => setFormData({...formData, mileage_end: e.target.value})}
                   className={clsx(
                     "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('mileage_end')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-slate-50 border-slate-200 focus:bg-white"
+                    (!isEditable || isFieldLocked('mileage_end')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
                   )}
                 />
               </div>
@@ -5265,7 +5265,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   <img 
                     src={formData.signature.startsWith('http') ? formData.signature : directusApi.getFileUrl(formData.signature)} 
                     alt="Signature" 
-                    className="w-full h-40 object-contain bg-slate-50 border border-slate-200 rounded-2xl"
+                    className="w-full h-40 object-contain bg-white border border-slate-200 rounded-2xl"
                     referrerPolicy="no-referrer"
                   />
                   {isAdmin && (
@@ -5279,7 +5279,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="relative bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden h-40">
+                  <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-40">
                     <SignaturePad 
                       ref={signaturePadRef}
                       canvasProps={{
@@ -5303,7 +5303,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       placeholder={t('receiver_name', 'ชื่อผู้รับสินค้า')}
                       value={formData.signature_name}
                       onChange={e => setFormData({...formData, signature_name: e.target.value})}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                     />
                   </div>
                 </div>
@@ -5408,7 +5408,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-              <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+              <div className="bg-white p-4 rounded-xl space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-500">ประเภทงาน:</span>
                   <span className="text-sm font-semibold text-slate-900">{formData.job_type === 'round_trip' ? 'ไป-กลับ' : 'เที่ยวเดียว'}</span>
@@ -5534,7 +5534,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               <textarea
                 value={cancelReasonInput}
                 onChange={(e) => setCancelReasonInput(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none"
                 rows={3}
                 placeholder={t('enter_cancel_reason')}
               />

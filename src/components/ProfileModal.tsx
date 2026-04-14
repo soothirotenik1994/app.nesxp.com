@@ -26,10 +26,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
     picture_url: ''
   });
 
+  const [imgError, setImgError] = useState(false);
+
   useEffect(() => {
     const fetchMember = async () => {
       if (!lineUserId || !isOpen) return;
       setLoading(true);
+      setImgError(false);
       console.log('Fetching member for lineUserId:', lineUserId);
       try {
         const isAdmin = localStorage.getItem('is_admin') === 'true';
@@ -197,12 +200,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                 )}
               </div>
               <div className="relative inline-block">
-                {member.picture_url ? (
+                {member.picture_url && !imgError ? (
                   <img 
                     src={directusApi.getFileUrl(member.picture_url)} 
                     alt={member.display_name} 
                     className="w-24 h-24 rounded-full border-4 border-white mx-auto shadow-lg object-cover"
                     referrerPolicy="no-referrer"
+                    onError={() => setImgError(true)}
                   />
                 ) : (
                   <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto border-4 border-white/30 text-white text-3xl font-bold">

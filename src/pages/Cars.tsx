@@ -79,7 +79,7 @@ const CarCard = React.memo(({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+          <div className="w-full h-full flex items-center justify-center bg-white">
             <CarIcon className="w-16 h-16 text-slate-200" />
           </div>
         )}
@@ -450,7 +450,7 @@ export const Cars: React.FC = () => {
               placeholder={t('search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
             />
           </div>
           <div className="text-sm text-slate-500">
@@ -520,7 +520,7 @@ export const Cars: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <CarIcon className="w-6 h-6 text-primary" />
@@ -539,7 +539,7 @@ export const Cars: React.FC = () => {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">{t('vehicle_image')}</label>
-                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100">
                       <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-white shadow-sm bg-white flex items-center justify-center shrink-0">
                         {formData.car_image ? (
                           <img 
@@ -605,7 +605,7 @@ export const Cars: React.FC = () => {
                         <select 
                           value={formData.brand_id}
                           onChange={(e) => setFormData(prev => ({...prev, brand_id: e.target.value}))}
-                          className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none font-medium"
+                          className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none font-medium"
                         >
                           <option value="">{t('select_brand')}</option>
                           {carBrands.map(brand => (
@@ -627,7 +627,7 @@ export const Cars: React.FC = () => {
                         type="text" 
                         value={formData.vehicle_type}
                         onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                         placeholder="Sedan, SUV..."
                       />
                     </div>
@@ -640,7 +640,7 @@ export const Cars: React.FC = () => {
                       <select 
                         value={formData.status}
                         onChange={(e) => setFormData(prev => ({...prev, status: e.target.value as any}))}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none font-medium"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none font-medium"
                       >
                         <option value="active">{t('active')}</option>
                         <option value="inactive">{t('inactive')}</option>
@@ -654,7 +654,7 @@ export const Cars: React.FC = () => {
                       rows={2}
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none transition-all"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary resize-none transition-all"
                       placeholder={t('description')}
                     />
                   </div>
@@ -662,7 +662,7 @@ export const Cars: React.FC = () => {
 
                 {/* Right Column: Driver & Maintenance */}
                 <div className="space-y-6">
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                  <div className="p-6 bg-white rounded-2xl border border-slate-100 space-y-4">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                       <User className="w-4 h-4 text-primary" />
                       {t('driver_info')}
@@ -828,7 +828,7 @@ export const Cars: React.FC = () => {
                       type="text" 
                       name="brandName"
                       required
-                      className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                      className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Toyota"
                     />
                     <button 
@@ -850,7 +850,7 @@ export const Cars: React.FC = () => {
                     <p className="text-sm text-slate-400 italic">{t('no_data')}</p>
                   ) : (
                     carBrands.map(brand => (
-                      <div key={brand.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                      <div key={brand.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 group">
                         <span className="font-semibold text-slate-700">{brand.name}</span>
                         <button 
                           type="button"

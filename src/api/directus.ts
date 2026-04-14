@@ -350,10 +350,17 @@ export const directusApi = {
     if (!id) return '';
 
     if (id.startsWith('http')) return id;
+    
     const baseUrl = DIRECTUS_URL.replace(/\/$/, '');
-    let url = `${baseUrl}/assets/${id}?access_token=${STATIC_API_KEY}`;
+    const token = localStorage.getItem('admin_token') || STATIC_API_KEY;
+    
+    let url = `${baseUrl}/assets/${id}`;
+    if (token) {
+      url += `?access_token=${token}`;
+    }
+    
     if (options?.key) {
-      url += `&key=${options.key}`;
+      url += `${url.includes('?') ? '&' : '?'}key=${options.key}`;
     }
     return url;
   },

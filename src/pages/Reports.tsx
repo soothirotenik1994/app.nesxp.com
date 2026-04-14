@@ -282,14 +282,14 @@ export const Reports: React.FC = () => {
               type="date" 
               value={dateRange.start}
               onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-              className="text-sm outline-none bg-transparent"
+              className="text-sm outline-none bg-white"
             />
             <span className="mx-2 text-slate-300">{t('to')}</span>
             <input 
               type="date" 
               value={dateRange.end}
               onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-              className="text-sm outline-none bg-transparent"
+              className="text-sm outline-none bg-white"
             />
           </div>
           <button
@@ -437,7 +437,7 @@ export const Reports: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/50">
+              <tr className="bg-white">
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('user_activity')}</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">{t('updates_count')}</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('last_active')}</th>

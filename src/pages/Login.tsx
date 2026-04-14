@@ -22,9 +22,9 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const isCancelled = status === 'cancelled' || status === 'cancel_pending';
 
   return (
-    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6">
+    <div className="bg-white p-6 rounded-2xl border border-slate-200 mb-6 shadow-sm">
       <div className="flex items-center justify-between relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
         {steps.map((step, idx) => {
           const isActive = idx <= currentIdx && !isCancelled;
           const isCurrent = idx === currentIdx && !isCancelled;
@@ -40,7 +40,7 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
               </div>
               <span className={clsx(
                 "text-[10px] font-bold uppercase tracking-wider",
-                isActive ? "text-emerald-600" : "text-slate-400"
+                isActive ? "text-primary" : "text-slate-400"
               )}>
                 {step.label}
               </span>
@@ -248,7 +248,7 @@ export const Login: React.FC = () => {
     >
       <div className={clsx("max-w-md w-full", !websiteBackground && "bg-slate-50")}>
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 p-2 overflow-hidden">
+          <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 overflow-hidden p-2">
             <img 
               src={websiteLogo} 
               alt={websiteName} 

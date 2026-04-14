@@ -66,6 +66,16 @@ const MemberRow = React.memo(({
                 alt={member.display_name} 
                 className="w-10 h-10 rounded-full border border-slate-200 object-cover"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  const parent = (e.target as HTMLImageElement).parentElement;
+                  if (parent) {
+                    const fallback = document.createElement('div');
+                    fallback.className = "w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200";
+                    fallback.innerText = String(member.first_name || member.display_name || 'U').charAt(0).toUpperCase() + String(member.last_name || '').charAt(0).toUpperCase();
+                    parent.appendChild(fallback);
+                  }
+                }}
               />
             ) : (
               <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold border border-slate-200">
@@ -665,7 +675,7 @@ export const Members: React.FC = () => {
               placeholder={t('search_members')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -743,7 +753,7 @@ export const Members: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-wider font-bold">
+              <tr className="bg-white text-slate-500 text-xs uppercase tracking-wider font-bold">
                 {visibleColumns.includes('name') && <th className="px-6 py-4">{t('name')}</th>}
                 {visibleColumns.includes('contact') && <th className="px-6 py-4">{t('contact_info')}</th>}
                 {visibleColumns.includes('role') && <th className="px-6 py-4">{t('role')}</th>}
@@ -819,7 +829,7 @@ export const Members: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <UserPlus className="w-6 h-6 text-primary" />
@@ -838,7 +848,7 @@ export const Members: React.FC = () => {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">{t('profile_picture')}</label>
-                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100">
                       <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-sm bg-white flex items-center justify-center shrink-0">
                         {formData.picture_url ? (
                           <img 
@@ -940,7 +950,7 @@ export const Members: React.FC = () => {
                         placeholder={editingMember ? t('leave_blank') : ""}
                         value={formData.password}
                         onChange={(e) => setFormData({...formData, password: e.target.value})}
-                        className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                       <button
                         type="button"
@@ -963,7 +973,7 @@ export const Members: React.FC = () => {
                         value={formData.confirm_password}
                         onChange={(e) => setFormData({...formData, confirm_password: e.target.value})}
                         className={clsx(
-                          "w-full pl-10 pr-10 py-2.5 bg-slate-50 border rounded-xl outline-none focus:ring-2 transition-all",
+                          "w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl outline-none focus:ring-2 transition-all",
                           formData.password && formData.confirm_password && formData.password !== formData.confirm_password 
                             ? "border-red-300 focus:ring-red-500" 
                             : "border-slate-200 focus:ring-primary"
@@ -1019,7 +1029,7 @@ export const Members: React.FC = () => {
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">{t('registration_source')}</label>
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                    <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
                       <span className="text-sm text-slate-500 font-medium">{t('source')}</span>
                       <div className={clsx(
                         "px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider",
@@ -1032,7 +1042,7 @@ export const Members: React.FC = () => {
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                    <div className="p-3 bg-white border border-slate-100 rounded-xl">
                       <div className="text-xs font-mono text-slate-400 break-all leading-relaxed">
                         {formData.line_user_id || t('not_linked')}
                       </div>
@@ -1063,7 +1073,7 @@ export const Members: React.FC = () => {
                         placeholder={t('search_placeholder')}
                         value={vehicleSearchTerm}
                         onChange={(e) => setVehicleSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
                     
@@ -1104,7 +1114,7 @@ export const Members: React.FC = () => {
                       editingMemberCars.map((car: any) => (
                         <div 
                           key={car.id}
-                          className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group hover:border-red-200 hover:bg-red-50/30 transition-all"
+                          className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl group hover:border-red-200 hover:bg-red-50/30 transition-all"
                         >
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
@@ -1126,7 +1136,7 @@ export const Members: React.FC = () => {
                         </div>
                       ))
                     ) : (
-                      <div className="col-span-full p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      <div className="col-span-full p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
                         <CarIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <p className="text-sm text-slate-500 italic">{t('no_assigned_vehicles')}</p>
                       </div>

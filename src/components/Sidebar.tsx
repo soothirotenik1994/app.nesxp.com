@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           {/* Logo */}
           <div className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center p-1 overflow-hidden shadow-inner border border-white/10">
+              <div className="w-14 h-14 bg-white backdrop-blur-md rounded-xl flex items-center justify-center overflow-hidden shadow-inner border border-white/10 p-1">
                 <img 
                   src={websiteLogo} 
                   alt={websiteName} 
@@ -203,8 +203,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                     item.isSub && "ml-6 py-2 text-sm",
                     isActive 
-                      ? "bg-white/20 text-white shadow-lg shadow-black/10" 
-                      : "text-white/60 hover:bg-white/10 hover:text-white"
+                      ? "bg-white/10 text-white shadow-sm" 
+                      : "text-white/70 hover:bg-white/5 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
@@ -235,8 +235,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                         className={cn(
                           "flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all duration-200 group",
                           isAnySubActive 
-                            ? "bg-white/20 text-white shadow-lg shadow-black/10" 
-                            : "text-white/60 hover:bg-white/10 hover:text-white"
+                            ? "bg-white/10 text-white shadow-sm" 
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
                         )}
                       >
                         <div className="flex items-center gap-3">
@@ -259,8 +259,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                         item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white shadow-lg shadow-black/10" 
-                          : "text-white/60 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/10 text-white shadow-sm" 
+                          : "text-white/70 hover:bg-white/5 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
@@ -285,8 +285,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                         item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white shadow-lg shadow-black/10" 
-                          : "text-white/60 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/10 text-white shadow-sm" 
+                          : "text-white/70 hover:bg-white/5 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >

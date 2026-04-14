@@ -564,7 +564,7 @@ export const CustomerLocations: React.FC = () => {
               placeholder={t('search_customers')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
             />
           </div>
           <div className="text-sm text-slate-500">
@@ -594,7 +594,7 @@ export const CustomerLocations: React.FC = () => {
             </div>
           ) : (
             filteredLocations.map((loc) => (
-              <div key={loc.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
+              <div key={loc.id} className="bg-white p-5 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 group-hover:border-blue-200 transition-colors">
                     <Building2 className="w-6 h-6 text-slate-400 group-hover:text-primary" />
@@ -723,7 +723,7 @@ export const CustomerLocations: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <Building2 className="w-6 h-6 text-primary" />

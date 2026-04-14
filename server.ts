@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import axios from "axios";
 import cors from "cors";
 import puppeteer from "puppeteer";
@@ -1026,7 +1027,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) 
+      ? path.join(process.cwd(), 'dist')
+      : path.join(process.cwd(), 'build');
+    
+    console.log(`Production mode: Serving static files from ${distPath}`);
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

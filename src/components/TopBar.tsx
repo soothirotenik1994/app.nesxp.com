@@ -77,16 +77,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-[1000] transition-colors duration-200">
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-[1000] transition-colors duration-200">
       <div className="flex items-center gap-4">
         <button 
           onClick={onMenuClick}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg lg:hidden"
+          className="p-2 hover:bg-slate-100 rounded-lg lg:hidden"
         >
-          <Menu className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+          <Menu className="w-6 h-6 text-slate-600" />
         </button>
-        <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 hidden sm:block">
-          {t('vehicle_tracking_management')}
+        <h1 className="text-lg font-semibold text-slate-800 hidden sm:block">
+          ระบบจัดการติดตามยานพาหนะ
         </h1>
       </div>
 
@@ -95,30 +95,30 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
           <>
             <Link 
               to="/jobs/new"
-              className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium shadow-lg shadow-primary/20"
+              className="flex items-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-lg hover:bg-[#002266] transition-colors text-sm font-bold shadow-lg shadow-blue-900/20"
             >
               <PlusCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('new_job_assignment')}</span>
+              <span className="hidden sm:inline">มอบหมายงานใหม่</span>
             </Link>
 
             <div className="relative" ref={notificationRef}>
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 relative transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 relative transition-colors"
                 title={t('notifications')}
               >
                 <Bell className="w-6 h-6" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                  <span className="absolute top-1.5 right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in duration-200 z-[1100]">
-                  <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-200 z-[1100]">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
                       <Bell className="w-4 h-4 text-primary" />
                       {t('system_notifications')}
                     </h3>
@@ -136,30 +136,30 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
                   <div className="max-h-[400px] overflow-y-auto">
                     {alerts.length === 0 ? (
                       <div className="p-8 text-center">
-                        <div className="w-12 h-12 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <CheckCircle className="w-6 h-6 text-slate-300 dark:text-slate-700" />
+                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <CheckCircle className="w-6 h-6 text-slate-300" />
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">{t('no_notifications')}</p>
+                        <p className="text-slate-500 text-sm">{t('no_notifications')}</p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-50 dark:divide-slate-700">
+                      <div className="divide-y divide-slate-50">
                         {alerts.map((alert) => (
                           <div 
                             key={alert.id}
-                            className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer relative group ${!alert.isRead ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+                            className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer relative group ${!alert.isRead ? 'bg-blue-50/30' : ''}`}
                             onClick={() => markAsRead(alert.id)}
                           >
                             <div className="flex gap-3">
                               <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                alert.message.includes('error') ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                alert.message.includes('error') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
                               }`}>
                                 <AlertTriangle className="w-4 h-4" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-sm leading-relaxed ${!alert.isRead ? 'font-semibold text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
+                                <p className={`text-sm leading-relaxed ${!alert.isRead ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
                                   {alert.message}
                                 </p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
+                                <p className="text-[10px] text-slate-400 mt-1 font-medium">
                                   {format(new Date(alert.timestamp), 'MMM d, HH:mm')}
                                 </p>
                               </div>
@@ -178,16 +178,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
           </>
         )}
         
-        <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2"></div>
+        <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
 
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{userInfo.role}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{userInfo.name}</p>
+            <p className="text-sm font-bold text-slate-900">{userInfo.role}</p>
+            <p className="text-xs text-slate-500">{userInfo.name}</p>
           </div>
           <button 
             onClick={onProfileClick}
-            className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors overflow-hidden"
+            className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 hover:bg-slate-200 transition-colors overflow-hidden"
             title={t('profile')}
           >
             {userInfo.picture ? (
@@ -196,14 +196,24 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
                 alt="Profile" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  const parent = (e.target as HTMLImageElement).parentElement;
+                  if (parent) {
+                    const fallback = document.createElement('div');
+                    fallback.className = "w-full h-full flex items-center justify-center text-slate-400";
+                    fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                    parent.appendChild(fallback);
+                  }
+                }}
               />
             ) : (
-              <User className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+              <User className="w-6 h-6 text-slate-600" />
             )}
           </button>
           <button 
             onClick={handleLogout}
-            className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+            className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
             title={t('logout')}
           >
             <LogOut className="w-5 h-5" />

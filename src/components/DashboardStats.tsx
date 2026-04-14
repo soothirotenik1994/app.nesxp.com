@@ -24,29 +24,33 @@ export const DashboardStats: React.FC<StatsProps> = ({
       name: t('total_vehicles'),
       value: totalVehicles,
       icon: Car,
-      color: 'bg-primary',
-      textColor: 'text-primary'
+      color: 'bg-[#003399]',
+      textColor: 'text-[#003399]',
+      unit: 'คัน'
     },
     {
       name: t('online_vehicles'),
       value: onlineVehicles,
       icon: Signal,
-      color: 'bg-primary',
-      textColor: 'text-primary'
+      color: 'bg-[#003399]',
+      textColor: 'text-[#003399]',
+      unit: 'คัน'
     },
     {
       name: t('offline_vehicles'),
       value: offlineVehicles,
       icon: Activity,
-      color: 'bg-secondary',
-      textColor: 'text-secondary'
+      color: 'bg-[#ED1C24]',
+      textColor: 'text-[#ED1C24]',
+      unit: 'คัน'
     },
     {
       name: t('total_members'),
       value: totalMembers,
       icon: Users,
-      color: 'bg-secondary',
-      textColor: 'text-secondary'
+      color: 'bg-[#ED1C24]',
+      textColor: 'text-[#ED1C24]',
+      unit: 'คน'
     }
   ];
 
@@ -72,7 +76,7 @@ export const DashboardStats: React.FC<StatsProps> = ({
               {stat.value.toLocaleString()}
             </div>
             <div className="text-xs font-medium text-slate-400">
-              {t('units') || 'Units'}
+              {stat.unit}
             </div>
           </div>
         </div>
