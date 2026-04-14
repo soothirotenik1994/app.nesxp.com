@@ -10,6 +10,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Verify environment variables
+  console.log('Backend: Starting server...');
+  console.log('Backend: Directus URL:', process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com');
+  console.log('Backend: Static Token configured:', !!(process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN));
+
   const getLineSettingsFromDirectus = async () => {
     try {
       const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
@@ -814,40 +819,45 @@ async function startServer() {
 
   // --- Public Tracking API ---
   app.get('/api/track/:case_number', async (req, res) => {
+    const { case_number } = req.params;
     try {
-      const { case_number } = req.params;
       console.log(`Backend: Tracking request received for case: ${case_number}`);
       
-      if (!case_number) {
-        console.warn('Backend: Tracking request missing case number');
-        return res.status(400).json({ error: 'Case number is required' });
+      if (!case_number || case_number === '{case_number}') {
+        return res.status(400).json({ error: 'Valid case number is required' });
       }
 
       const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
-      const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const directusUrl = (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      
+      console.log(`Backend: Querying Directus at ${directusUrl} for case ${case_number}`);
       
       // Query Directus for the job report with the matching case_number
+      // Use case-insensitive matching if possible, or just exact match as before
       const response = await axios.get(`${directusUrl}/items/work_reports`, {
         params: {
           filter: {
             case_number: {
-              _eq: case_number
+              _eq: case_number.trim()
             }
           },
           // Only fetch fields that are safe to expose publicly
           fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,car_id.car_number,driver_id.first_name,driver_id.last_name'
         },
         headers: {
-          'Authorization': `Bearer ${staticToken}`
-        }
+          'Authorization': `Bearer ${staticToken.trim()}`
+        },
+        timeout: 10000
       });
 
       const jobs = response.data.data;
       console.log(`Backend: Directus returned ${jobs?.length || 0} jobs for case: ${case_number}`);
 
       if (!jobs || jobs.length === 0) {
-        console.warn(`Backend: Tracking number not found in Directus: ${case_number}`);
-        return res.status(404).json({ error: 'Tracking number not found' });
+        return res.status(404).json({ 
+          error: 'Tracking number not found',
+          message: `No record found for case number: ${case_number}. Please check the number and try again.`
+        });
       }
 
       // Return the first matching job
@@ -856,14 +866,18 @@ async function startServer() {
         data: jobs[0]
       });
     } catch (error: any) {
-      const errorDetail = error.response?.data || error.message;
-      console.error('Tracking API error:', errorDetail);
-      res.status(500).json({ 
+      const errorStatus = error.response?.status || 500;
+      const errorData = error.response?.data || error.message;
+      console.error(`Tracking API error (${errorStatus}):`, JSON.stringify(errorData));
+      
+      res.status(errorStatus).json({ 
         error: 'Failed to fetch tracking information',
-        details: errorDetail,
+        message: error.response?.status === 401 ? 'Invalid API credentials' : (error.response?.data?.errors?.[0]?.message || error.message),
+        details: errorData,
         debug: {
-          directusUrl: (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, ''),
-          hasToken: !!(process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN)
+          case_number,
+          directusUrl: (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, ''),
+          tokenPrefix: (process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0').substring(0, 5)
         }
       });
     }

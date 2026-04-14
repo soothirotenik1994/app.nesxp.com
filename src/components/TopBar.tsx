@@ -91,14 +91,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <button 
-          onClick={toggleTheme}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"
-          title={theme === 'light' ? t('dark_mode') : t('light_mode')}
-        >
-          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </button>
-
         {isAdmin && (
           <>
             <Link 

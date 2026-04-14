@@ -163,14 +163,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       )}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[9999] w-64 bg-primary dark:bg-slate-900 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 border-r border-white/5 dark:border-slate-800",
+        "fixed inset-y-0 left-0 z-[9999] w-64 bg-primary text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 border-r border-white/5 shadow-2xl lg:shadow-none",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center p-1 overflow-hidden shadow-inner">
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center p-1 overflow-hidden shadow-inner border border-white/10">
                 <img 
                   src={websiteLogo} 
                   alt={websiteName} 
@@ -180,19 +180,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight leading-none">{websiteName}</span>
-                <span className="text-[10px] font-medium text-white/50 uppercase mt-1 tracking-widest">
+                <span className="text-[10px] font-bold text-white/40 uppercase mt-1.5 tracking-widest">
                   {userRole}
                 </span>
               </div>
             </div>
-            <button className="lg:hidden" onClick={() => setIsOpen(false)}>
+            <button className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setIsOpen(false)}>
               <X className="w-6 h-6" />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">{t('logistics')}</div>
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <div className="px-4 py-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">{t('logistics')}</div>
             {logisticsItems.map((item: any) => {
               const isActive = location.pathname === item.path;
               return (
@@ -200,23 +200,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                   key={item.name}
                   to={item.path}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                     item.isSub && "ml-6 py-2 text-sm",
                     isActive 
-                      ? "bg-white/20 text-white" 
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                      ? "bg-white/20 text-white shadow-lg shadow-black/10" 
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
-                  <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
-                  <span className="font-medium">{item.name}</span>
+                  <item.icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", item.isSub && "w-4 h-4")} />
+                  <span className="font-semibold">{item.name}</span>
                 </Link>
               );
             })}
 
             {isAdmin && menuItems.length > 0 && (
               <>
-                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('management')}</div>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/30 uppercase tracking-widest mt-6">{t('management')}</div>
                 {menuItems.map((item: any) => {
                   const isActive = location.pathname === item.path;
                   const isMaintenanceParent = item.key === 'maintenance';
@@ -233,18 +233,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                         key={item.name}
                         onClick={() => setMaintenanceExpanded(!maintenanceExpanded)}
                         className={cn(
-                          "flex items-center justify-between w-full px-4 py-3 rounded-xl transition-colors",
+                          "flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all duration-200 group",
                           isAnySubActive 
-                            ? "bg-white/20 text-white" 
-                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                            ? "bg-white/20 text-white shadow-lg shadow-black/10" 
+                            : "text-white/60 hover:bg-white/10 hover:text-white"
                         )}
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className="w-5 h-5" />
-                          <span className="font-medium">{item.name}</span>
+                          <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
+                          <span className="font-semibold">{item.name}</span>
                         </div>
                         <ChevronRight className={cn(
-                          "w-4 h-4 transition-transform duration-200",
+                          "w-4 h-4 transition-transform duration-300",
                           maintenanceExpanded && "rotate-90"
                         )} />
                       </button>
@@ -256,16 +256,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                       key={item.name}
                       to={item.path}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                         item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white" 
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/20 text-white shadow-lg shadow-black/10" 
+                          : "text-white/60 hover:bg-white/10 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
-                      <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
-                      <span className="font-medium">{item.name}</span>
+                      <item.icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", item.isSub && "w-4 h-4")} />
+                      <span className="font-semibold">{item.name}</span>
                     </Link>
                   );
                 })}
@@ -274,7 +274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
             {isAdmin && settingsItems.length > 0 && (
               <>
-                <div className="px-4 py-2 text-[10px] font-bold text-white/40 uppercase tracking-widest mt-4">{t('system_settings')}</div>
+                <div className="px-4 py-2 text-[10px] font-bold text-white/30 uppercase tracking-widest mt-6">{t('system_settings')}</div>
                 {settingsItems.map((item: any) => {
                   const isActive = location.pathname === item.path;
                   return (
@@ -282,16 +282,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                       key={item.name}
                       to={item.path}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                         item.isSub && "ml-6 py-2 text-sm",
                         isActive 
-                          ? "bg-white/20 text-white" 
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/20 text-white shadow-lg shadow-black/10" 
+                          : "text-white/60 hover:bg-white/10 hover:text-white"
                       )}
                       onClick={() => setIsOpen(false)}
                     >
-                      <item.icon className={cn("w-5 h-5", item.isSub && "w-4 h-4")} />
-                      <span className="font-medium">{item.name}</span>
+                      <item.icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", item.isSub && "w-4 h-4")} />
+                      <span className="font-semibold">{item.name}</span>
                     </Link>
                   );
                 })}
@@ -300,11 +300,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-white/10 space-y-2">
+          <div className="p-4 border-t border-white/10 bg-black/10 dark:bg-black/20 space-y-2">
             {isSwitchedAccount && (
               <button 
                 onClick={handleBackToAdmin}
-                className="flex items-center gap-3 px-4 py-3 w-full bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-colors shadow-lg shadow-emerald-900/20 mb-2"
+                className="flex items-center gap-3 px-4 py-3 w-full bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-all shadow-lg shadow-emerald-900/40 mb-2 active:scale-95"
               >
                 <Shield className="w-5 h-5" />
                 <span className="font-bold text-sm">{t('back_to_admin')}</span>
@@ -312,10 +312,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
             )}
             <button 
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 w-full text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-colors"
+              className="flex items-center gap-3 px-4 py-3 w-full text-white/60 hover:bg-white/10 hover:text-white rounded-xl transition-all group active:scale-95"
             >
-              <LogOut className="w-5 h-5" />
-              <span className="font-medium">{t('logout')}</span>
+              <LogOut className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+              <span className="font-semibold">{t('logout')}</span>
             </button>
           </div>
         </div>

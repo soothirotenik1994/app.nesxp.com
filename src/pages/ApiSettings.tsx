@@ -24,9 +24,22 @@ export const ApiSettings: React.FC = () => {
   const [testResult, setTestResult] = useState<any>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
 
   const appUrl = window.location.origin;
   const trackingEndpoint = `${appUrl}/api/track/{case_number}`;
+
+  React.useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        await axios.get('/api/health');
+        setServerStatus('online');
+      } catch (e) {
+        setServerStatus('offline');
+      }
+    };
+    checkHealth();
+  }, []);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -41,15 +54,21 @@ export const ApiSettings: React.FC = () => {
     setTestResult(null);
     setTestError(null);
     try {
-      const response = await axios.get(`/api/track/${trimmedCaseNumber}`);
+      // Use encodeURIComponent to handle special characters in case numbers
+      const response = await axios.get(`/api/track/${encodeURIComponent(trimmedCaseNumber)}`);
       setTestResult(response.data);
     } catch (error: any) {
       console.error('API Test Error:', error);
       const errorData = error.response?.data;
-      if (errorData && errorData.details) {
-        setTestError(`${errorData.error}: ${typeof errorData.details === 'object' ? JSON.stringify(errorData.details) : errorData.details}`);
+      
+      if (error.response?.status === 404) {
+        setTestError(errorData?.message || `Tracking number "${trimmedCaseNumber}" not found in the system. Please verify the case number.`);
+      } else if (errorData) {
+        const message = errorData.message || errorData.error || error.message;
+        const details = errorData.details ? (typeof errorData.details === 'object' ? JSON.stringify(errorData.details) : errorData.details) : '';
+        setTestError(details ? `${message} (${details})` : message);
       } else {
-        setTestError(errorData?.error || error.message || 'Failed to fetch tracking data');
+        setTestError(error.message || 'Failed to fetch tracking data');
       }
     } finally {
       setIsTesting(false);
@@ -68,7 +87,19 @@ export const ApiSettings: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">API Connection Settings</h1>
-          <p className="text-slate-500">Connect your external websites or services to the NES Tracking system</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-slate-500">Connect your external websites or services to the NES Tracking system</p>
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center gap-1.5">
+              <div className={clsx(
+                "w-2 h-2 rounded-full",
+                serverStatus === 'online' ? "bg-emerald-500" : serverStatus === 'offline' ? "bg-red-500" : "bg-slate-300 animate-pulse"
+              )} />
+              <span className="text-xs font-medium text-slate-400">
+                Server: {serverStatus === 'online' ? 'Online' : serverStatus === 'offline' ? 'Offline' : 'Checking...'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

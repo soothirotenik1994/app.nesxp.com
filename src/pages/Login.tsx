@@ -246,73 +246,6 @@ export const Login: React.FC = () => {
         backgroundPosition: 'center',
       } : {}}
     >
-      <button 
-        onClick={() => setShowSettings(true)}
-        className="absolute top-4 right-4 p-3 bg-white/80 backdrop-blur shadow-sm rounded-full text-slate-500 hover:text-slate-900 transition-colors"
-        title="Server Settings"
-      >
-        <Settings className="w-5 h-5" />
-      </button>
-
-      {showSettings && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-primary" />
-                Server Settings
-              </h2>
-              <button 
-                onClick={() => setShowSettings(false)}
-                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Directus URL
-                </label>
-                <input
-                  type="text"
-                  value={settingsUrl}
-                  onChange={(e) => setSettingsUrl(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-                  placeholder="https://data.nesxp.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Static API Key
-                </label>
-                <input
-                  type="text"
-                  value={settingsKey}
-                  onChange={(e) => setSettingsKey(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-                  placeholder="Enter API Key"
-                />
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveSettings}
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Save & Reload
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className={clsx("max-w-md w-full", !websiteBackground && "bg-slate-50")}>
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-3xl mb-4 shadow-xl shadow-slate-200 p-2 overflow-hidden">
@@ -371,7 +304,7 @@ export const Login: React.FC = () => {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="example@email.com"
                     />
                   </div>
@@ -388,7 +321,7 @@ export const Login: React.FC = () => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="••••••••"
                     />
                   </div>
@@ -479,7 +412,7 @@ export const Login: React.FC = () => {
                       required
                       value={caseNumber}
                       onChange={(e) => setCaseNumber(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="THXXXXXXXXXX"
                     />
                   </div>
@@ -496,7 +429,7 @@ export const Login: React.FC = () => {
                       required
                       value={trackingPhone}
                       onChange={(e) => setTrackingPhone(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-slate-900"
                       placeholder="08X-XXX-XXXX"
                     />
                   </div>
