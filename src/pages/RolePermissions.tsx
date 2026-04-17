@@ -27,7 +27,8 @@ import {
   UserCog,
   MessageSquare,
   Code,
-  ListOrdered
+  ListOrdered,
+  CreditCard
 } from 'lucide-react';
 import { directusApi } from '../api/directus';
 import { ROLE_PERMISSIONS } from '../config/menuPermissions';
@@ -54,6 +55,7 @@ const MENU_KEYS = [
   { key: 'members', label: 'members', icon: Users, group: 'management' },
   { key: 'vehicles', label: 'vehicles', icon: Car, group: 'management' },
   { key: 'locations', label: 'customer_locations', icon: MapPin, group: 'management' },
+  { key: 'expenses', label: 'expenses', icon: CreditCard, group: 'management' },
   { key: 'new_job', label: 'new_job_assignment', icon: FileText, group: 'management' },
   
   { key: 'maintenance', label: 'maintenance_dashboard', icon: RefreshCcw, group: 'maintenance' },

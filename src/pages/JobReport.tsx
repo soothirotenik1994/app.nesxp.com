@@ -1788,7 +1788,7 @@ export const JobReport: React.FC = () => {
         contents: [
           {
             type: "text",
-            text: "Nationwide Express Tracker",
+            text: t('app_name_line', 'Nationwide Express Tracker'),
             color: "#ffffff",
             weight: "bold",
             size: "md"
@@ -1923,7 +1923,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: t('company_label'),
+                    text: t('customer_label', 'ลูกค้า'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1951,7 +1951,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: t('status_label'),
+                    text: t('status_label', 'สถานะ'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -2036,7 +2036,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: t('driver_phone_label'),
+                    text: t('driver_phone_label', 'เบอร์ติดต่อคนขับ'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -2272,7 +2272,7 @@ export const JobReport: React.FC = () => {
         contents: [
           {
             type: "text",
-            text: "Nationwide Express Tracker",
+            text: t('app_name_line', 'Nationwide Express Tracker'),
             color: "#ffffff",
             weight: "bold",
             size: "md"
@@ -3187,7 +3187,7 @@ export const JobReport: React.FC = () => {
           title: t('save_success'),
           message: notifiedAdditionalWork ? t('additional_work_saved_msg') : t('report_saved_success'),
           action: () => {
-            navigate('/jobs/my');
+            navigate(isAdmin ? '/jobs/history' : '/jobs/my');
           }
         });
         setShowStatusModal(true);
@@ -3223,7 +3223,7 @@ export const JobReport: React.FC = () => {
           title: t('save_success'),
           message: t('report_saved'),
           action: () => {
-            navigate('/jobs/my');
+            navigate(isAdmin ? '/jobs/history' : '/jobs/my');
           }
         });
         setShowStatusModal(true);
@@ -3963,7 +3963,7 @@ export const JobReport: React.FC = () => {
           { status: 'deleted', timestamp: new Date().toISOString() }
         ]
       });
-      navigate('/jobs/my');
+      navigate(isAdmin ? '/jobs/history' : '/jobs/my');
     } catch (error: any) {
       if (error.response?.status === 401) return;
       console.error('Error deleting job:', error);
@@ -4018,7 +4018,8 @@ export const JobReport: React.FC = () => {
       setStatusConfig({
         type: 'success',
         title: t('job_cancelled'),
-        message: t('job_cancelled_success')
+        message: t('job_cancelled_success'),
+        action: () => navigate(isAdmin ? '/jobs/history' : '/jobs/my')
       });
       setShowStatusModal(true);
     } catch (error: any) {
@@ -4290,7 +4291,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             {t('create_new_report')}
           </button>
           <button 
-            onClick={() => navigate('/jobs/my')}
+            onClick={() => navigate(isAdmin ? '/jobs/history' : '/jobs/my')}
             className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all"
           >
             {t('back_to_all_jobs')}
@@ -6059,6 +6060,45 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     {members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id))?.display_name || '-'}
                   </span>
                 </div>
+
+                {formData.routes && formData.routes.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 mt-3 space-y-3">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('route_details')}</p>
+                    {formData.routes.map((route, rIdx) => (
+                      <div key={rIdx} className="p-3 bg-slate-50 rounded-xl space-y-2">
+                        <p className="text-xs font-bold text-primary">
+                          {t('route_number', { number: rIdx + 1 })}
+                          {route.distance && ` (${route.distance} ${t('km')})`}
+                        </p>
+                        
+                        {route.pickups && route.pickups.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">{t('pickup_points')}</p>
+                            {route.pickups.map((p, pIdx) => (
+                              <div key={pIdx} className="flex flex-col text-xs">
+                                <span className="font-semibold text-slate-700">📍 {p.name || '-'}</span>
+                                {p.time && <span className="text-slate-400 ml-5">{t('time')}: {formatFlexDateTime(p.time)}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {route.deliveries && route.deliveries.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">{t('delivery_points')}</p>
+                            {route.deliveries.map((d, dIdx) => (
+                              <div key={dIdx} className="flex flex-col text-xs">
+                                <span className="font-semibold text-slate-700">🏁 {d.name || '-'}</span>
+                                {d.time && <span className="text-slate-400 ml-5">{t('time')}: {formatFlexDateTime(d.time)}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {((formData.expense_items && formData.expense_items.length > 0) || formData.toll_fee || formData.fuel_cost || formData.other_expenses) && (
                   <div className="pt-3 border-t border-slate-100 mt-3 space-y-2">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('expenses')}</p>

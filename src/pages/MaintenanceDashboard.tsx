@@ -165,7 +165,7 @@ export const MaintenanceDashboard: React.FC = () => {
       fetchCars();
     } catch (err: any) {
       if (err.response?.status === 401) return;
-      setActionError(err.message || 'Failed to save vehicle');
+      setActionError(err.message || t('failed_to_save_vehicle'));
     } finally {
       setSubmitting(false);
     }

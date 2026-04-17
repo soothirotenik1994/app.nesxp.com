@@ -66,6 +66,31 @@ async function startServer() {
     }
   };
 
+  const getSystemSettingsFromDirectus = async () => {
+    try {
+      const staticToken = getStaticToken();
+      const directusUrl = getDirectusUrl();
+      const url = `${directusUrl}/items/system_settings`;
+      
+      console.log(`Backend: Fetching system settings from: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${staticToken}`
+        },
+        timeout: 5000
+      });
+      
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data[0];
+      }
+      return null;
+    } catch (error: any) {
+      console.error('Backend: Failed to fetch system settings from Directus:', error.message);
+      return null;
+    }
+  };
+
   const checkScheduledNotifications = async () => {
     try {
       const staticToken = getStaticToken();
@@ -760,15 +785,18 @@ async function startServer() {
   let lastLoginTime = 0;
   const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
-  const getSessionId = async () => {
+  const getSessionId = async (forceRefresh? : boolean) => {
     const now = Date.now();
-    if (sessionId && (now - lastLoginTime < SESSION_TIMEOUT)) {
+    if (!forceRefresh && sessionId && (now - lastLoginTime < SESSION_TIMEOUT)) {
       return sessionId;
     }
 
     try {
       console.log("Logging in to GPS provider...");
-      const gpsToken = process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+      const settings = await getSystemSettingsFromDirectus();
+      const gpsToken = settings?.gps_api_token || process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+      
+      console.log(`Backend: Using GPS API Token: ${gpsToken.substring(0, 5)}...`);
       const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`);
       if (response.data?.result?.sessionId) {
         sessionId = response.data.result.sessionId;
@@ -776,12 +804,47 @@ async function startServer() {
         console.log("Login successful, session ID obtained.");
         return sessionId;
       }
-      throw new Error("Session ID not found in login response");
+      throw new Error(response.data?.error?.message || response.data?.message || "Session ID not found in login response");
     } catch (error: any) {
       console.error("Login error:", error.message);
       return null;
     }
   };
+
+  // Endpoint to test GPS connection and clear cache
+  app.post("/api/gps/test-connection", async (req, res) => {
+    const { token } = req.body;
+    const testToken = token || process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
+    
+    try {
+      console.log(`Backend: Testing GPS connection with token: ${testToken.substring(0, 5)}...`);
+      const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${testToken}`);
+      
+      if (response.data?.result?.sessionId) {
+        // Clear existing session cache so the new token is used immediately for other requests
+        sessionId = null;
+        lastLoginTime = 0;
+        
+        return res.json({ 
+          success: true, 
+          message: "เชื่อมต่อสำเร็จ", 
+          sessionId: response.data.result.sessionId 
+        });
+      }
+      
+      res.status(400).json({ 
+        success: false, 
+        message: "Token ไม่ถูกต้อง หรือไม่สามารถสร้าง Session ได้",
+        details: response.data 
+      });
+    } catch (error: any) {
+      console.error("Test Connection Error:", error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: `ข้อผิดพลาดในการเชื่อมต่อ: ${error.message}` 
+      });
+    }
+  });
 
   // Proxy for Directus to avoid CORS
   app.all("/api/directus/*", async (req, res) => {

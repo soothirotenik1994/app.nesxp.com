@@ -179,7 +179,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
               contents: [
                 {
                   type: "text",
-                  text: "Nationwide Express Tracker",
+                  text: t('app_name_line', 'Nationwide Express Tracker'),
                   color: "#ffffff",
                   weight: "bold",
                   size: "md"

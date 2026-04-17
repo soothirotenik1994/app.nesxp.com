@@ -17,8 +17,13 @@ export const FleetMonitor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(() => {
+    return parseInt(localStorage.getItem('map_update_interval') || '10', 10);
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const updateInterval = useMemo(() => {
+    return parseInt(localStorage.getItem('map_update_interval') || '10', 10);
+  }, []);
 
   const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
   const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
@@ -74,7 +79,7 @@ export const FleetMonitor: React.FC = () => {
       const carsData = await directusApi.getCars();
       setCars(carsData);
       await fetchGpsData(carsData);
-      setCountdown(10);
+      setCountdown(updateInterval);
     } catch (err: any) {
       console.error('Error fetching monitor data:', err);
       setError(err.message || t('failed_connect_server'));
@@ -94,7 +99,7 @@ export const FleetMonitor: React.FC = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           fetchGpsData(cars);
-          return 10;
+          return updateInterval;
         }
         return prev - 1;
       });

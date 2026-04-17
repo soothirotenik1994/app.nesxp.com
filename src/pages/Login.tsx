@@ -486,7 +486,7 @@ export const Login: React.FC = () => {
                         try {
                           const response = await axios.get('/api/line/config');
                           if (!response.data || typeof response.data !== 'object' || !response.data.channelId) {
-                            setError('LINE Configuration Error');
+                            setError(t('line_config_error'));
                             return;
                           }
                           const { channelId, redirectUri } = response.data;
@@ -494,7 +494,7 @@ export const Login: React.FC = () => {
                           const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=profile%20openid%20email`;
                           window.location.href = url;
                         } catch (err) {
-                          setError('Failed to initialize LINE login.');
+                          setError(t('failed_init_line_login'));
                         }
                       }}
                       className="flex items-center justify-center gap-3 w-full py-4 bg-[#06C755] hover:bg-[#05b14c] text-white rounded-2xl font-body font-bold transition-all active:scale-[0.98]"
@@ -511,7 +511,7 @@ export const Login: React.FC = () => {
                       type="button"
                       onClick={() => {
                         if (!googleClientId) {
-                          setError('Google Client ID is missing.');
+                          setError(t('google_client_id_missing'));
                           return;
                         }
                         const redirectUri = `${window.location.origin}/google/callback`;
