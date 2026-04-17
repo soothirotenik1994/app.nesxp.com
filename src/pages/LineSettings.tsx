@@ -15,8 +15,8 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [testLineId, setTestLineId] = useState('');
-  const [testMessage, setTestMessage] = useState('🔔 ทดสอบระบบการแจ้งเตือน\n\nนี่คือข้อความทดสอบจากระบบ Nationwide Express Tracker');
-  const [notificationTemplate, setNotificationTemplate] = useState('🔔 มีงานใหม่มอบหมายให้คุณ\n\n🏢 ลูกค้า: {{customer_name}}\n📍 ต้นทาง: {{origin}}\n🏁 ปลายทาง: {{destination}}\n🚚 รถ: {{car_plate}}\n📅 วันที่: {{work_date}}');
+  const [testMessage, setTestMessage] = useState(t('line_test_message_default'));
+  const [notificationTemplate, setNotificationTemplate] = useState(t('line_notification_template_default'));
   const [memberLineId, setMemberLineId] = useState<string | null>(null);
   const [sampleCarImage, setSampleCarImage] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -132,12 +132,12 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       ];
 
       await lineService.sendPushMessage(testLineId, messages);
-      setTestStatus({ type: 'success', message: 'LINE text message sent successfully!' });
+      setTestStatus({ type: 'success', message: t('line_test_success_text') });
     } catch (error: any) {
       console.error('Failed to test LINE:', error);
       const details = error.response?.data?.details;
       const errorDetails = typeof details === 'object' ? JSON.stringify(details) : (details || error.message);
-      setTestStatus({ type: 'error', message: `Failed: ${errorDetails}` });
+      setTestStatus({ type: 'error', message: t('line_test_failed', { error: errorDetails }) });
     } finally {
       setIsTesting(false);
     }
@@ -150,16 +150,16 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
     try {
       // Parse template with dummy data
       let parsedText = notificationTemplate
-        .replace('{{customer_name}}', 'เนชั่นไวด์ เอ็กซ์เพรส เซอร์วิส จำกัด')
-        .replace('{{origin}}', 'กรุงเทพฯ')
-        .replace('{{destination}}', 'เชียงใหม่')
+        .replace('{{customer_name}}', t('company_name_dummy', 'เนชั่นไวด์ เอ็กซ์เพรส เซอร์วิส จำกัด'))
+        .replace('{{origin}}', t('origin_dummy', 'กรุงเทพฯ'))
+        .replace('{{destination}}', t('destination_dummy', 'เชียงใหม่'))
         .replace('{{car_plate}}', 'ผบ-4104')
         .replace('{{work_date}}', '2026-03-14');
 
       const messages = [
         {
           type: "flex",
-          altText: "มีงานใหม่มอบหมายให้คุณ (ทดสอบเทมเพลต)",
+          altText: t('new_job_assigned_test'),
           contents: {
             type: "bubble",
             hero: {
@@ -193,7 +193,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
               contents: [
                 {
                   type: "text",
-                  text: "มีงานใหม่มอบหมายให้คุณ",
+                  text: t('new_job_assigned'),
                   weight: "bold",
                   size: "xl",
                   margin: "md",
@@ -234,7 +234,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                   color: "#e54d42",
                   action: {
                     type: "uri",
-                    label: "เข้าสู่ระบบ",
+                    label: t('enter_website_label'),
                     uri: "https://app.nesxp.com/"
                   }
                 }
@@ -246,12 +246,12 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
       ];
 
       await lineService.sendPushMessage(testLineId, messages);
-      setTestStatus({ type: 'success', message: 'LINE template test sent successfully!' });
+      setTestStatus({ type: 'success', message: t('line_test_success_template') });
     } catch (error: any) {
       console.error('Failed to test template:', error);
       const details = error.response?.data?.details;
       const errorDetails = typeof details === 'object' ? JSON.stringify(details) : (details || error.message);
-      setTestStatus({ type: 'error', message: `Failed: ${errorDetails}` });
+      setTestStatus({ type: 'error', message: t('line_test_failed', { error: errorDetails }) });
     } finally {
       setIsTestingTemplate(false);
     }
@@ -275,7 +275,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">{t('line_notifications')}</h2>
-              <p className="text-sm text-slate-500">Manage how the system sends LINE notifications to members</p>
+              <p className="text-sm text-slate-500">{t('line_settings_desc')}</p>
             </div>
           </div>
         </div>
@@ -307,15 +307,15 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100 text-amber-800">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
-              <p className="font-semibold">Important Note</p>
+              <p className="font-semibold">{t('important_note')}</p>
               <p className="opacity-90">
-                LINE notifications are configured via system environment variables.
+                {t('line_env_config_note')}
               </p>
               {isConfigured !== null && (
                 <div className="mt-2 flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   <span className="font-medium">
-                    Status: {isConfigured ? 'Configured' : 'Not Configured (Missing Secret)'}
+                    {t('status')}: {isConfigured ? t('configured') : t('not_configured')}
                   </span>
                 </div>
               )}
@@ -325,32 +325,32 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">
-                LINE Channel Access Token
+                {t('line_token')}
               </label>
               <input
                 type="password"
                 value={channelAccessToken}
                 onChange={(e) => setChannelAccessToken(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                placeholder="Enter your LINE Channel Access Token..."
+                placeholder={t('enter_line_token_placeholder')}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700">
-                LINE Channel Secret
+                {t('line_secret')}
               </label>
               <input
                 type="password"
                 value={channelSecret}
                 onChange={(e) => setChannelSecret(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                placeholder="Enter your LINE Channel Secret..."
+                placeholder={t('enter_line_secret_placeholder')}
               />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700">
-                  Notification Template (Assignment)
+                  {t('notification_template_assignment')}
                 </label>
                 <button
                   onClick={handleTestTemplate}
@@ -358,7 +358,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                   className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
                 >
                   {isTestingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                  Test Template
+                  {t('test_template')}
                 </button>
               </div>
               <textarea
@@ -366,10 +366,10 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                 onChange={(e) => setNotificationTemplate(e.target.value)}
                 rows={5}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                placeholder="Enter template using {{variable}} syntax..."
+                placeholder={t('enter_template_placeholder')}
               />
               <p className="text-xs text-slate-500">
-                Variables: {"{{customer_name}}"}, {"{{origin}}"}. {"{{destination}}"}. {"{{car_plate}}"}. {"{{work_date}}"}
+                {t('variables')}: {"{{customer_name}}"}, {"{{origin}}"}. {"{{destination}}"}. {"{{car_plate}}"}. {"{{work_date}}"}
               </p>
             </div>
           </div>
@@ -379,31 +379,31 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
           <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-2 text-slate-700 font-semibold">
               <Send className="w-4 h-4" />
-              <h3>Test LINE Configuration</h3>
+              <h3>{t('test_line_config')}</h3>
             </div>
             
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Test Message Content
+                {t('test_message_content')}
               </label>
               <textarea
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
                 rows={3}
                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary text-sm"
-                placeholder="Enter message to send for testing..."
+                placeholder={t('enter_test_message_placeholder')}
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Recipient LINE User ID
+                {t('recipient_line_id')}
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1 relative">
                   <input
                     type="text"
-                    placeholder="LINE User ID (e.g. U1234567890abcdef...)"
+                    placeholder={t('line_id_placeholder')}
                     value={testLineId}
                     onChange={(e) => setTestLineId(e.target.value)}
                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary pr-32"
@@ -411,10 +411,10 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                   <button 
                   onClick={() => memberLineId && setTestLineId(memberLineId)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-white px-2 py-1 rounded-lg border border-slate-100 hover:bg-white hover:text-slate-600 transition-colors"
-                    title="Click to use this ID"
+                    title={t('click_to_use_id')}
                   >
                     <User className="w-3 h-3" />
-                    <span>Member: {memberLineId ? `${memberLineId.substring(0, 8)}...` : 'N/A'}</span>
+                    <span>{t('member_label')} {memberLineId ? `${memberLineId.substring(0, 8)}...` : 'N/A'}</span>
                   </button>
                 </div>
                 <button
@@ -423,7 +423,7 @@ export const LineSettings: React.FC<LineSettingsProps> = ({ hideHeader = false }
                   className="px-6 py-2 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-900 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Test Send
+                  {t('test_send')}
                 </button>
               </div>
             </div>

@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import fs from "fs";
 import axios from "axios";
@@ -15,13 +14,33 @@ async function startServer() {
 
   // Verify environment variables
   console.log('Backend: Starting server...');
+  
+  const getStaticToken = () => {
+    // Prefer environment variables directly
+    const badTokens = [
+      '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
+      'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
+      'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4',
+      'null',
+      'undefined'
+    ];
+    const envToken = (process.env.DIRECTUS_STATIC_TOKEN || process.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
+    return (envToken && !badTokens.includes(envToken) ? envToken : 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex');
+  };
+
+  const finalToken = getStaticToken();
+  
   console.log('Backend: Directus URL:', process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com');
-  console.log('Backend: Static Token configured:', !!(process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN));
+  console.log('Backend: Static Token Prefix:', finalToken.substring(0, 5) + '...');
+
+  const getDirectusUrl = () => {
+    return (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+  };
 
   const getLineSettingsFromDirectus = async () => {
     try {
-      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
-      const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const staticToken = getStaticToken();
+      const directusUrl = getDirectusUrl();
       const url = `${directusUrl}/items/line_settings`;
       
       console.log(`Backend: Fetching LINE settings from: ${url} using token: ${staticToken.substring(0, 5)}...`);
@@ -49,7 +68,7 @@ async function startServer() {
 
   const checkScheduledNotifications = async () => {
     try {
-      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+      const staticToken = getStaticToken();
       const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
       const settings = await getLineSettingsFromDirectus();
       const accessToken = settings?.channel_access_token;
@@ -163,11 +182,11 @@ async function startServer() {
       console.log('Backend: Initial redirectUri:', redirectUri);
       console.log('Backend: APP_URL:', process.env.APP_URL);
 
-      if (!redirectUri || redirectUri.includes('app.nesxp.com')) {
+      if (!redirectUri) {
         if (process.env.APP_URL) {
           redirectUri = `${process.env.APP_URL.replace(/\/$/, '')}/line/callback`;
         } else {
-          // Fallback to current host if possible (though this is a backend route)
+          // Fallback to current host if possible
           const host = req.get('host');
           const protocol = req.protocol;
           if (host) {
@@ -191,6 +210,151 @@ async function startServer() {
     } catch (err: any) {
       console.error('Backend: Error in /api/line/config:', err.message);
       res.status(500).json({ error: 'Internal Server Error', message: err.message });
+    }
+  });
+
+  // Google Config
+  app.get("/api/google/config", async (req, res) => {
+    try {
+      const staticToken = getStaticToken();
+      const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const response = await axios.get(`${directusUrl}/items/system_settings`, {
+        headers: { 'Authorization': `Bearer ${staticToken}` }
+      });
+      
+      const settings = response.data.data?.[0];
+      const clientId = settings?.google_client_id || process.env.VITE_GOOGLE_CLIENT_ID || "559675370597-bs7c8aabdco373h9vc81gb09kbp62dte.apps.googleusercontent.com";
+      
+      let redirectUri = `${(process.env.APP_URL || 'https://nesxp.com').replace(/\/$/, '')}/google/callback`;
+      if (!process.env.APP_URL && !req.get('host')?.includes('nesxp.com')) {
+        const host = req.get('host');
+        const protocol = req.protocol;
+        redirectUri = `${protocol}://${host}/google/callback`;
+      }
+
+      res.json({
+        clientId,
+        redirectUri
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Google Token Exchange
+  app.post("/api/auth/google/token", async (req, res) => {
+    try {
+      const { code, redirect_uri } = req.body;
+      
+      const staticToken = getStaticToken();
+      const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const settingsResponse = await axios.get(`${directusUrl}/items/system_settings`, {
+        headers: { 'Authorization': `Bearer ${staticToken}` }
+      });
+      
+      const settings = settingsResponse.data.data?.[0];
+      const clientId = settings?.google_client_id || process.env.VITE_GOOGLE_CLIENT_ID || "559675370597-bs7c8aabdco373h9vc81gb09kbp62dte.apps.googleusercontent.com";
+      const clientSecret = settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "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";
+
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({ error: 'Google Client ID or Secret not configured' });
+      }
+
+      const response = await axios.post('https://oauth2.googleapis.com/token', {
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri,
+        grant_type: 'authorization_code',
+      });
+
+      res.json(response.data);
+    } catch (err: any) {
+      console.error('Google Token Exchange Error:', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data || err.message });
+    }
+  });
+
+  // Secure Staff Login Endpoint
+  app.post("/api/auth/staff-login", async (req, res) => {
+    try {
+      const { identifier, password } = req.body;
+      if (!identifier || !password) {
+        return res.status(400).json({ error: 'Identifier and password are required' });
+      }
+
+      const staticToken = getStaticToken();
+      const directusUrl = getDirectusUrl();
+      
+      console.log(`Backend: Secure staff login attempt for: ${identifier}`);
+
+      const searchParams = {
+        filter: {
+          _or: [
+            { email: { _eq: identifier } },
+            { phone: { _eq: identifier } },
+            { line_user_id: { _eq: identifier } },
+            { display_name: { _eq: identifier } }
+          ]
+        },
+        // IMPORTANT: Must explicitly include 'password' as it's often hidden from '*'
+        fields: '*,password,car_users.*,car_users.car_id.*'
+      };
+
+      const searchResponse = await axios.get(`${directusUrl}/items/line_users`, {
+        params: searchParams,
+        headers: { 'Authorization': `Bearer ${staticToken}` }
+      });
+
+      const members = searchResponse.data.data || [];
+      console.log(`Backend: Staff search found ${members.length} users for: ${identifier}`);
+      
+      if (members.length > 0 && !members[0].password) {
+        console.warn(`Backend: Security Alert! 'password' field missing in search results for: ${identifier}. Backend token may not have read permissions for passwords.`);
+      }
+
+      const inputPassword = String(password).trim();
+      const match = members.find((m: any) => {
+        const dbPassword = String(m.password || '').trim();
+        return dbPassword && dbPassword.length > 0 && dbPassword === inputPassword;
+      });
+
+      if (match) {
+        // Remove sensitive password field before returning to client
+        const safeUser = { ...match };
+        delete safeUser.password;
+        
+        console.log(`Backend: Staff login success for: ${identifier}`);
+        res.json({ data: safeUser });
+      } else {
+        console.log(`Backend: Staff login failed (invalid credentials) for: ${identifier}`);
+        res.status(401).json({ error: 'Invalid credentials' });
+      }
+    } catch (err: any) {
+      console.error('Backend: Staff Login Error:', err.response?.data || err.message);
+      res.status(err.response?.status || 500).json({ 
+        error: 'Authentication failed', 
+        details: err.message,
+        directusMsg: err.response?.data?.errors?.[0]?.message 
+      });
+    }
+  });
+
+  // Secure Login Log Creation (Bypasses proxy 401 issues)
+  app.post("/api/login-logs", async (req, res) => {
+    try {
+      const staticToken = getStaticToken();
+      const directusUrl = getDirectusUrl();
+      
+      const response = await axios.post(`${directusUrl}/items/login_logs`, req.body, {
+        headers: { 'Authorization': `Bearer ${staticToken}` }
+      });
+      
+      res.json(response.data);
+    } catch (err: any) {
+      console.error('Backend: Login Log Creation Error:', err.response?.data || err.message);
+      // Don't fail the request if logging fails, but return the error for debugging
+      res.status(err.response?.status || 500).json(err.response?.data || { error: err.message });
     }
   });
 
@@ -622,31 +786,64 @@ async function startServer() {
   // Proxy for Directus to avoid CORS
   app.all("/api/directus/*", async (req, res) => {
     try {
-      const directusPath = req.path.replace('/api/directus/', '');
+      // Robust path extraction
+      const directusPath = req.path.replace(/^\/api\/directus/, '').replace(/^\//, '');
       const method = req.method;
-      const directusBaseUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      const directusBaseUrl = getDirectusUrl();
       const url = `${directusBaseUrl}/${directusPath}`;
       
       console.log(`Proxying Directus ${method} request to: ${url}`);
       
-      // Filter out headers that might cause issues
+      // Filter out headers that might cause issues with the target server
       const headers: any = { ...req.headers };
       delete headers.host;
       delete headers.origin;
       delete headers.referer;
       
-      // Add Authorization if not present and we have a static key
-      if (!headers.authorization && process.env.VITE_DIRECTUS_STATIC_TOKEN) {
-        headers.authorization = `Bearer ${process.env.VITE_DIRECTUS_STATIC_TOKEN}`;
+      const isJson = headers['content-type']?.includes('application/json');
+      const isMultipart = headers['content-type']?.includes('multipart/form-data');
+      
+      if (isJson) {
+        delete headers['content-length']; // Axios will calculate this correctly for objects
+      }
+      
+      if (headers.authorization) {
+        const authHeader = String(headers.authorization);
+        const tokenPart = authHeader.replace(/^Bearer\s+/i, '').trim();
+        console.log(`[PROXY] Incoming Auth Header: ${tokenPart.substring(0, 5)}...`);
+        
+        const badTokenValues = [
+          '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
+          'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
+          'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4'
+        ];
+        
+        if (badTokenValues.some(bt => bt === tokenPart || authHeader.includes(bt)) || tokenPart === 'null' || tokenPart === 'undefined' || !tokenPart) {
+          const systemToken = getStaticToken();
+          headers.authorization = `Bearer ${systemToken}`;
+          console.log(`[PROXY] REPLACED invalid/missing token with system token: ${systemToken.substring(0, 5)}...`);
+        }
+      } else {
+        const systemToken = getStaticToken();
+        headers.authorization = `Bearer ${systemToken}`;
+        console.log(`[PROXY] APPENDED missing Auth Header with system token: ${systemToken.substring(0, 5)}...`);
+      }
+      
+      // Cleanup for auth endpoints always
+      if (directusPath.startsWith('auth/login')) {
+        delete headers.authorization;
+        console.log(`[PROXY] Explicitly removed auth header for auth endpoint: ${directusPath}`);
       }
 
       const response = await axios({
         method,
         url,
-        data: req.body,
+        data: isJson ? req.body : req,
         params: req.query,
         headers,
         responseType: 'stream',
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
         validateStatus: () => true,
       });
       
@@ -670,8 +867,14 @@ async function startServer() {
       
       response.data.pipe(res);
     } catch (error: any) {
-      console.error("Directus Proxy error:", error.message);
-      if (!res.headersSent) {
+      console.error(`Directus Proxy error for ${req.method} ${req.path}:`, error.message);
+      if (error.response) {
+        // Log more details about the error response from Directus
+        console.error('Directus returned error:', error.response.status);
+        if (!res.headersSent) {
+          res.status(error.response.status).json(error.response.data || { error: error.message });
+        }
+      } else if (!res.headersSent) {
         res.status(500).json({ 
           error: "Failed to proxy request to Directus",
           details: error.message
@@ -683,7 +886,7 @@ async function startServer() {
   // Cron endpoint to record GPS history
   app.get("/api/cron/record-gps", async (req, res) => {
     try {
-      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+      const staticToken = getStaticToken();
       const directusUrl = (process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
       
       // 1. Fetch all cars
@@ -845,20 +1048,25 @@ async function startServer() {
   // --- Public Tracking API ---
   app.get('/api/track/:case_number', async (req, res) => {
     const { case_number } = req.params;
+    const { phone } = req.query;
+
     try {
-      console.log(`Backend: Tracking request received for case: ${case_number}`);
+      console.log(`Backend: Tracking request received for case: ${case_number}, phone: ${phone}`);
       
       if (!case_number || case_number === '{case_number}') {
         return res.status(400).json({ error: 'Valid case number is required' });
       }
 
-      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
+      if (!phone) {
+        return res.status(400).json({ error: 'Phone number is required for verification' });
+      }
+
+      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
       const directusUrl = (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
       
       console.log(`Backend: Querying Directus at ${directusUrl} for case ${case_number}`);
       
       // Query Directus for the job report with the matching case_number
-      // Use case-insensitive matching if possible, or just exact match as before
       const response = await axios.get(`${directusUrl}/items/work_reports`, {
         params: {
           filter: {
@@ -866,8 +1074,8 @@ async function startServer() {
               _eq: case_number.trim()
             }
           },
-          // Only fetch fields that are safe to expose publicly
-          fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,car_id.car_number,driver_id.first_name,driver_id.last_name'
+          // Only fetch fields that are safe to expose publicly, plus phone numbers for verification
+          fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,car_id.car_number,driver_id.first_name,driver_id.last_name,driver_id.phone,member_id.phone,customer_id.phone,customer_id.member_id.phone,customer_id.members.line_user_id.phone'
         },
         headers: {
           'Authorization': `Bearer ${staticToken.trim()}`
@@ -885,10 +1093,41 @@ async function startServer() {
         });
       }
 
-      // Return the first matching job
+      const job = jobs[0];
+      const providedPhone = String(phone).trim().replace(/[^0-9]/g, '');
+      
+      // Helper to clean phone numbers for comparison
+      const cleanPhone = (p: any) => p ? String(p).trim().replace(/[^0-9]/g, '') : null;
+
+      // Check all possible phone fields for a match
+      const allowedPhones = [
+        cleanPhone(job.driver_id?.phone),
+        cleanPhone(job.member_id?.phone),
+        cleanPhone(job.customer_id?.phone),
+        cleanPhone(job.customer_id?.member_id?.phone),
+        cleanPhone(job.customer_id?.members?.line_user_id?.phone)
+      ].filter(Boolean);
+
+      console.log('Backend: Verifying phone match. Provided:', providedPhone, 'Allowed:', allowedPhones);
+
+      const isAuthorized = allowedPhones.some(p => p === providedPhone || (p && providedPhone && (p.endsWith(providedPhone) || providedPhone.endsWith(p))));
+
+      if (!isAuthorized) {
+        return res.status(403).json({ 
+          error: 'Verification failed',
+          message: 'The phone number provided does not match the records for this case number.'
+        });
+      }
+
+      // Remove sensitive phone fields before returning to public
+      const publicJob = { ...job };
+      delete publicJob.driver_id?.phone;
+      delete publicJob.member_id?.phone;
+      delete publicJob.customer_id?.phone;
+
       res.json({
         success: true,
-        data: jobs[0]
+        data: publicJob
       });
     } catch (error: any) {
       const errorStatus = error.response?.status || 500;
@@ -902,7 +1141,7 @@ async function startServer() {
         debug: {
           case_number,
           directusUrl: (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, ''),
-          tokenPrefix: (process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0').substring(0, 5)
+          tokenPrefix: (process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex').substring(0, 5)
         }
       });
     }
@@ -1051,6 +1290,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

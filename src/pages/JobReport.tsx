@@ -6,13 +6,16 @@ import Select from 'react-select';
 import { directusApi, api, DIRECTUS_URL, STATIC_API_KEY } from '../api/directus';
 import { lineService } from '../services/lineService';
 import { CountdownTimer } from '../components/CountdownTimer';
-import { Car, Member, CustomerLocation } from '../types';
+import { Car, Member, CustomerLocation, ExpenseItem } from '../types';
 import clsx from 'clsx';
 import EXIF from 'exif-js';
 import { 
   Calendar, 
   Building2, 
   MapPin, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Minus,
   Truck, 
   User, 
   Phone, 
@@ -38,7 +41,9 @@ import {
   Search,
   Link,
   PenTool,
-  Eraser
+  Eraser,
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import SignaturePad from 'react-signature-canvas';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -64,7 +69,6 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const steps = [
     { key: 'pending', label: t('status_pending') },
     { key: 'accepted', label: t('status_accepted') },
-    { key: 'arrived', label: t('status_arrived') },
     { key: 'completed', label: t('status_completed') }
   ];
 
@@ -194,6 +198,7 @@ export const JobReport: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [showWebcam, setShowWebcam] = useState(false);
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
   const [webcamType, setWebcamType] = useState<'pickup' | 'delivery' | 'document' | null>(null);
   const isMobile = useMemo(() => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent), []);
   const [submitted, setSubmitted] = useState(false);
@@ -226,6 +231,13 @@ export const JobReport: React.FC = () => {
     routes: [
       {
         type: 'outbound' as 'outbound' | 'return',
+        status: 'pending' as 'pending' | 'completed',
+        date: new Date().toISOString().slice(0, 10),
+        standby_time: '',
+        departure_time: '',
+        arrival_time: '',
+        mileage_start: '',
+        mileage_end: '',
         pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
         deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
         distance: undefined as number | undefined,
@@ -260,6 +272,11 @@ export const JobReport: React.FC = () => {
     signature_name: '' as string,
     photo_metadata: [] as any[],
     case_number: '',
+    toll_fee: '' as string | number,
+    fuel_cost: '' as string | number,
+    other_expenses: '' as string | number,
+    other_expenses_note: '',
+    expense_items: [] as ExpenseItem[],
     current_mileage: undefined as number | undefined,
     next_maintenance_date: undefined as string | undefined,
     next_maintenance_mileage: undefined as number | undefined,
@@ -272,6 +289,95 @@ export const JobReport: React.FC = () => {
   const [allReports, setAllReports] = useState<any[]>([]);
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
   const [isJobOverdue, setIsJobOverdue] = useState(false);
+  const [isUpdatingRouteStatus, setIsUpdatingRouteStatus] = useState(false);
+
+  const handleCompleteRoute = async (routeIndex: number) => {
+    if (!id || isUpdatingRouteStatus) return;
+    
+    setIsUpdatingRouteStatus(true);
+    try {
+      const newRoutes = [...formData.routes];
+      newRoutes[routeIndex].status = 'completed';
+      
+      // Update local state first
+      setFormData(prev => ({ ...prev, routes: newRoutes }));
+      
+      // Update database
+      await directusApi.updateWorkReport(id, { routes: newRoutes });
+      
+      // Send notification specifically for this route
+      await sendRouteCompletionNotification(routeIndex);
+      
+      setStatusConfig({
+        type: 'success',
+        title: t('success'),
+        message: t('additional_work_saved_msg')
+      });
+      setShowStatusModal(true);
+    } catch (err: any) {
+      console.error('Error completing route:', err);
+      setError(t('save_error')); 
+    } finally {
+      setIsUpdatingRouteStatus(false);
+    }
+  };
+
+  const sendRouteCompletionNotification = async (routeIndex: number) => {
+    try {
+      const currentCustomerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
+      const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
+      const currentMemberId = typeof formData.member_id === 'object' && formData.member_id ? (formData.member_id as any).id : formData.member_id;
+
+      if (!currentCustomerId) return;
+
+      const customerLoc = customers.find(c => String(c.id) === String(currentCustomerId));
+      if (!customerLoc) return;
+      
+      const memberIds = getCustomerMemberIds(customerLoc);
+      if (memberIds.length === 0) return;
+
+      const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
+      const driver = members.find(m => String(m.id) === String(currentMemberId));
+      
+      const statusText = t('route_delivered_notification', { number: routeIndex + 1 });
+      const statusColor = '#27ae60'; // Green
+      const displayId = formData.case_number || id;
+
+      for (const memberId of memberIds) {
+        try {
+          const member = members.find(m => String(m.id) === String(memberId));
+          if (!member) continue;
+
+          const customerLineId = resolveLineUserId(member.line_user_id);
+          if (!customerLineId) continue;
+
+          const flexContents = generateCustomerFlexMessage(
+            t('job_status_notification'),
+            statusText,
+            statusColor,
+            {
+              case_number: String(formData.case_number || id || 'N/A'),
+              customer_name: String(formData.customer_name || '-'),
+              origin: String(formData.origin || '-'),
+              destination: String(formData.destination || '-'),
+              routes: formData.routes,
+              car_number: String(selectedCar?.car_number || 'N/A'),
+              driver_name: String(driver ? `${driver.first_name} ${driver.last_name}` : '-'),
+              driver_phone: String(driver?.phone || '-'),
+              report_id: id
+            },
+            'completed'
+          );
+
+          await sendLineNotification(customerLineId, [{ type: "flex", altText: statusText, contents: flexContents }], statusText);
+        } catch (memberErr: any) {
+          console.error(`Failed to send LINE notification for route completion to member ${memberId}:`, memberErr);
+        }
+      }
+    } catch (error) {
+      console.error('Error in sendRouteCompletionNotification:', error);
+    }
+  };
 
   const handleSearchLocation = async (type: 'origin' | 'destination' | 'route_origin' | 'route_destination', routeIndex?: number) => {
     let query = '';
@@ -340,6 +446,107 @@ export const JobReport: React.FC = () => {
         message: t('location_not_found')
       });
       setShowStatusModal(true);
+    }
+  };
+
+  const handleAddExpense = () => {
+    setFormData(prev => ({
+      ...prev,
+      expense_items: [
+        ...(prev.expense_items || []),
+        { id: Math.random().toString(36).substr(2, 9), name: '', amount: 0 }
+      ]
+    }));
+  };
+
+  const handleUpdateExpense = (itemId: string, field: 'name' | 'amount', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      expense_items: (prev.expense_items || []).map(item => 
+        item.id === itemId ? { ...item, [field]: field === 'amount' ? (value === '' ? 0 : parseFloat(value)) : value } : item
+      )
+    }));
+  };
+
+  const handleRemoveExpense = (itemId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      expense_items: (prev.expense_items || []).filter(item => item.id !== itemId)
+    }));
+  };
+
+  const totalExpenses = useMemo(() => {
+    return (formData.expense_items || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [formData.expense_items]);
+
+  const handleCalculateRouteDistance = async (index: number) => {
+    setIsCalculatingDistance(true);
+    try {
+      const newRoutes = [...formData.routes];
+      const route = newRoutes[index];
+      
+      const points = [
+        ...(route.pickups || []).filter(p => p.url),
+        ...(route.deliveries || []).filter(d => d.url)
+      ];
+
+      if (points.length < 2) {
+        if (route.origin_url && route.destination_url) {
+          points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '' });
+          points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '' });
+        } else {
+          throw new Error(t('route_points_error', { index: index + 1 }));
+        }
+      }
+
+      const uniquePoints = points.filter((p, i) => i === 0 || p.url !== points[i - 1].url);
+
+      if (uniquePoints.length >= 2) {
+        const response = await axios.post('/api/calculate-distance', {
+          originUrl: uniquePoints[0].url,
+          destinationUrl: uniquePoints[uniquePoints.length - 1].url,
+          waypointUrls: uniquePoints.slice(1, -1).map(p => p.url),
+          apiKey: localStorage.getItem('google_maps_api_key')
+        });
+        
+        if (response.data && response.data.distance !== undefined) {
+          const dist = Math.round(response.data.distance * 10) / 10;
+          newRoutes[index] = {
+            ...route,
+            distance: dist,
+            route_type: dist > 250 ? 'upcountry' : 'bangkok_vicinity'
+          };
+          
+          // Recalculate total estimated distance
+          const total = newRoutes.reduce((sum, r) => sum + (r.distance || 0), 0);
+          
+          setFormData(prev => ({
+            ...prev,
+            routes: newRoutes,
+            estimated_distance: Math.round(total * 10) / 10
+          }));
+
+          setStatusConfig({
+            type: 'success',
+            title: t('success'),
+            message: t('route_optimize_success', { distance: dist })
+          });
+          setShowStatusModal(true);
+        } else {
+          throw new Error(t('route_calc_failed', { index: index + 1 }));
+        }
+      }
+    } catch (error: any) {
+      console.error('Calculate individual route distance error:', error);
+      const errorMessage = error.response?.data?.error || error.message || t('calculate_distance_error');
+      setStatusConfig({
+        type: 'error',
+        title: t('error'),
+        message: errorMessage
+      });
+      setShowStatusModal(true);
+    } finally {
+      setIsCalculatingDistance(false);
     }
   };
 
@@ -654,6 +861,30 @@ export const JobReport: React.FC = () => {
     return String(lineIdRaw);
   };
 
+  const formatFlexDateTime = (isoStr: string) => {
+    if (!isoStr) return '';
+    try {
+      // Handle HH:mm format (old) vs YYYY-MM-DDTHH:mm (new)
+      if (isoStr.length === 5 && isoStr.includes(':')) {
+        return isoStr;
+      }
+      const date = new Date(isoStr);
+      if (isNaN(date.getTime())) return isoStr;
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear() + 543; // Thai Year (optional choice for Thai apps, I'll go with full year)
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      
+      // Use standard Gregorian year if preferred or Thai year if user expects Buddhist Era
+      // Most corporate apps in Thailand use BE (Buddhist Era) +543
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch (e) {
+      return isoStr;
+    }
+  };
+
   const getCustomerMemberIds = (customerLoc: any): string[] => {
     if (!customerLoc) return [];
     const memberIds: string[] = [];
@@ -679,33 +910,19 @@ export const JobReport: React.FC = () => {
       });
     }
 
-    // 3. Fallback matching if no explicit members
-    if (memberIds.length === 0) {
-      const matchingMember = members.find(m => 
-        (m.role === 'customer' || m.role === 'general' || m.role === 'member') && 
-        (
-          (m.email && customerLoc.email && m.email.toLowerCase() === customerLoc.email.toLowerCase()) ||
-          (m.phone && customerLoc.phone && m.phone.replace(/\D/g, '') === customerLoc.phone.replace(/\D/g, '')) ||
-          (m.first_name && customerLoc.company_name.toLowerCase().includes(m.first_name.toLowerCase()) && m.first_name.length > 2) ||
-          (m.display_name && customerLoc.company_name.toLowerCase().includes(m.display_name.toLowerCase()) && m.display_name.length > 2)
-        )
-      );
-      if (matchingMember) {
-        memberIds.push(String(matchingMember.id));
-      }
-    }
-
     return memberIds;
   };
 
   const totalDistance = useMemo(() => {
-    const start = parseFloat(formData.mileage_start);
-    const end = parseFloat(formData.mileage_end);
-    if (!isNaN(start) && !isNaN(end)) {
-      return end - start;
-    }
-    return 0;
-  }, [formData.mileage_start, formData.mileage_end]);
+    return formData.routes.reduce((acc, route) => {
+      const start = parseFloat(route.mileage_start || '0');
+      const end = parseFloat(route.mileage_end || '0');
+      if (!isNaN(start) && !isNaN(end)) {
+        return acc + (end - start);
+      }
+      return acc;
+    }, 0);
+  }, [formData.routes]);
 
   const filteredCars = useMemo(() => {
     const memberId = localStorage.getItem('member_id');
@@ -755,9 +972,7 @@ export const JobReport: React.FC = () => {
     const isQueueSystemEnabled = localStorage.getItem('enable_queue_system') !== 'false';
     const bkkMaxDistance = parseInt(localStorage.getItem('bkk_max_distance') || '250', 10);
     
-    if (isQueueSystemEnabled && formData.estimated_distance !== undefined && formData.estimated_distance > 0) {
-      const isUpcountry = formData.estimated_distance > bkkMaxDistance;
-      
+    if (isQueueSystemEnabled) {
       const carsWithQueue = baseCars.map(car => {
         const carReports = allReports.filter(r => {
           const reportCarId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
@@ -769,7 +984,7 @@ export const JobReport: React.FC = () => {
 
         carReports.forEach(report => {
           const distance = report.estimated_distance || 0;
-          if (distance > 250) {
+          if (distance > bkkMaxDistance) {
             count_upcountry++;
           } else {
             count_bkk++;
@@ -787,24 +1002,28 @@ export const JobReport: React.FC = () => {
         return { ...car, _queue: { priority_score, recommendation, count_bkk, count_upcountry } };
       });
 
-      // Sort based on queue
-      if (isUpcountry) {
-        // For upcountry, higher priority score (more BKK jobs) goes first
-        carsWithQueue.sort((a, b) => b._queue.priority_score - a._queue.priority_score);
+      if (formData.estimated_distance !== undefined && formData.estimated_distance > 0) {
+        const isUpcountry = formData.estimated_distance > bkkMaxDistance;
         
-        // Filter to only show recommended ones if there are any
-        const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'upcountry');
-        if (recommended.length > 0) {
-          return recommended;
-        }
-      } else {
-        // For BKK, lower priority score (more upcountry jobs) goes first
-        carsWithQueue.sort((a, b) => a._queue.priority_score - b._queue.priority_score);
-        
-        // Filter to only show recommended ones if there are any
-        const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'bkk');
-        if (recommended.length > 0) {
-          return recommended;
+        // Sort based on queue
+        if (isUpcountry) {
+          // For upcountry, higher priority score (more BKK jobs) goes first
+          carsWithQueue.sort((a, b) => b._queue.priority_score - a._queue.priority_score);
+          
+          // Filter to only show recommended ones if there are any
+          const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'upcountry');
+          if (recommended.length > 0) {
+            return recommended;
+          }
+        } else {
+          // For BKK, lower priority score (more upcountry jobs) goes first
+          carsWithQueue.sort((a, b) => a._queue.priority_score - b._queue.priority_score);
+          
+          // Filter to only show recommended ones if there are any
+          const recommended = carsWithQueue.filter(c => c._queue.recommendation === 'bkk');
+          if (recommended.length > 0) {
+            return recommended;
+          }
         }
       }
       
@@ -934,7 +1153,7 @@ export const JobReport: React.FC = () => {
                 className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100 active:scale-[0.98]"
               >
                 <Camera className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{t('take_photo', 'ถ่ายภาพ')}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">{t('capture_photo')}</span>
                 <input 
                   id={`camera-input-${type}`}
                   type="file" 
@@ -946,7 +1165,7 @@ export const JobReport: React.FC = () => {
               </button>
               <label className="flex flex-col items-center justify-center gap-1 py-3 bg-slate-100 text-slate-600 rounded-xl cursor-pointer hover:bg-slate-200 transition-all border border-slate-200 active:scale-[0.98]">
                 <Plus className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{t('upload_photo_btn', 'อัปโหลด')}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">{t('upload_photo_btn')}</span>
                 <input type="file" accept="image/*" multiple className="hidden" onChange={onUpload} />
               </label>
             </>
@@ -1012,17 +1231,29 @@ export const JobReport: React.FC = () => {
         let reportsData: any[] = [];
 
         try {
-          const [c, m, cl, ar] = await Promise.all([
+          const [c, m, cl, ar, settings] = await Promise.all([
             directusApi.getCars(),
             directusApi.getMembers(),
             directusApi.getCustomerLocations(),
-            directusApi.getWorkReports()
+            directusApi.getWorkReports(),
+            directusApi.getSystemSettings()
           ]);
           carsData = c;
           membersData = m;
           customersData = cl;
           reportsData = ar;
           setAllReports(ar);
+
+          if (settings && settings.expense_categories) {
+            const cats = Array.isArray(settings.expense_categories) 
+              ? settings.expense_categories 
+              : (typeof settings.expense_categories === 'string' ? settings.expense_categories.split(',').filter(Boolean) : []);
+            setExpenseCategories(cats);
+          } else {
+            // Fallback to localStorage if Directus fetch fails or is empty
+            const localCats = (localStorage.getItem('expense_categories') || '').split(',').filter(Boolean);
+            if (localCats.length > 0) setExpenseCategories(localCats);
+          }
         } catch (fetchErr: any) {
           if (fetchErr.response?.status === 401) {
             // The axios interceptor will handle the redirect to login
@@ -1096,9 +1327,27 @@ export const JobReport: React.FC = () => {
             destination_lat: report.destination_lat,
             destination_lng: report.destination_lng,
             waypoints: report.waypoints || [],
-            routes: report.routes || [
+            routes: (report.routes && report.routes.length > 0) 
+              ? report.routes.map((r: any, idx: number) => ({ 
+                  ...r, 
+                  status: r.status || 'pending',
+                  date: r.date || formatTimeForInput(report.work_date || report.date_created).slice(0, 10),
+                  standby_time: formatTimeForInput(r.standby_time || (idx === 0 ? report.standby_time : '')),
+                  departure_time: formatTimeForInput(r.departure_time || (idx === 0 ? report.departure_time : '')),
+                  arrival_time: formatTimeForInput(r.arrival_time || (idx === report.routes.length - 1 ? report.arrival_time : '')),
+                  mileage_start: (r.mileage_start !== null && r.mileage_start !== undefined) ? r.mileage_start.toString() : (idx === 0 && report.mileage_start !== null ? report.mileage_start.toString() : ''),
+                  mileage_end: (r.mileage_end !== null && r.mileage_end !== undefined) ? r.mileage_end.toString() : (idx === report.routes.length - 1 && report.mileage_end !== null ? report.mileage_end.toString() : '')
+                }))
+              : [
               {
                 type: 'outbound' as 'outbound' | 'return',
+                status: 'pending' as 'pending' | 'completed',
+                date: formatTimeForInput(report.work_date || report.date_created).slice(0, 10),
+                standby_time: formatTimeForInput(report.standby_time),
+                departure_time: formatTimeForInput(report.departure_time),
+                arrival_time: formatTimeForInput(report.arrival_time),
+                mileage_start: report.mileage_start !== null && report.mileage_start !== undefined ? report.mileage_start.toString() : '',
+                mileage_end: report.mileage_end !== null && report.mileage_end !== undefined ? report.mileage_end.toString() : '',
                 pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
                 deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
                 origin: report.origin || '',
@@ -1132,6 +1381,11 @@ export const JobReport: React.FC = () => {
             signature_name: report.signature_name || '',
             photo_metadata: report.photo_metadata || [],
             case_number: report.case_number || '',
+            toll_fee: report.toll_fee !== null && report.toll_fee !== undefined ? report.toll_fee.toString() : '',
+            fuel_cost: report.fuel_cost !== null && report.fuel_cost !== undefined ? report.fuel_cost.toString() : '',
+            other_expenses: report.other_expenses !== null && report.other_expenses !== undefined ? report.other_expenses.toString() : '',
+            other_expenses_note: report.other_expenses_note || '',
+            expense_items: Array.isArray(report.expense_items) ? report.expense_items : [],
             current_mileage: report.car_id?.current_mileage,
             next_maintenance_date: report.car_id?.next_maintenance_date,
             next_maintenance_mileage: report.car_id?.next_maintenance_mileage,
@@ -1299,18 +1553,29 @@ export const JobReport: React.FC = () => {
   }, [formData.member_id, members]);
 
   const handleWebcamCapture = async (file: File) => {
-    if (!webcamType) return;
+    if (!webcamType) {
+      console.warn('Webcam capture called but webcamType is null');
+      setShowWebcam(false);
+      return;
+    }
     
-    // Create a mock event to reuse handlePhotoChange
-    const mockEvent = {
-      target: {
-        files: [file]
-      }
-    } as any;
-    
-    setShowWebcam(false);
-    await handlePhotoChange(mockEvent, webcamType);
-    setWebcamType(null);
+    try {
+      console.log(`Processing webcam capture for type: ${webcamType}`);
+      // Create a mock event to reuse handlePhotoChange
+      const mockEvent = {
+        target: {
+          files: [file]
+        }
+      } as any;
+      
+      setShowWebcam(false);
+      await handlePhotoChange(mockEvent, webcamType);
+    } catch (err) {
+      console.error('Error in handleWebcamCapture:', err);
+      setError(t('error_processing_photo'));
+    } finally {
+      setWebcamType(null);
+    }
   };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pickup' | 'delivery' | 'document') => {
@@ -1443,7 +1708,6 @@ export const JobReport: React.FC = () => {
     
     if (data.routes && data.routes.length > 0) {
       data.routes.forEach((route, index) => {
-        const routeLabel = data.routes && data.routes.length > 1 ? ` (เส้นทางที่ ${index + 1})` : '';
         routeContents.push(
           {
             type: "box",
@@ -1451,57 +1715,51 @@ export const JobReport: React.FC = () => {
             contents: [
               {
                 type: "text",
-                text: "📍",
+                text: t('route_summary', { 
+                  prefix: route.status === 'completed' ? '✅ ' : '📍 ', 
+                  number: index + 1, 
+                  origin: route.origin || '-', 
+                  destination: route.destination || '-', 
+                  status: route.status === 'completed' ? t('success_label') : '' 
+                }),
                 size: "sm",
-                flex: 1
-              },
-              {
-                type: "text",
-                text: `ต้นทาง${routeLabel}`,
-                size: "sm",
-                color: "#2c5494",
-                weight: "bold",
-                flex: 3
-              },
-              {
-                type: "text",
-                text: route.origin || '-',
-                size: "sm",
-                color: "#111111",
-                flex: 6,
-                wrap: true
-              }
-            ]
-          },
-          {
-            type: "box",
-            layout: "horizontal",
-            contents: [
-              {
-                type: "text",
-                text: "🏁",
-                size: "sm",
-                flex: 1
-              },
-              {
-                type: "text",
-                text: `ปลายทาง${routeLabel}`,
-                size: "sm",
-                color: "#2c5494",
-                weight: "bold",
-                flex: 3
-              },
-              {
-                type: "text",
-                text: route.destination || '-',
-                size: "sm",
-                color: "#111111",
-                flex: 6,
-                wrap: true
+                color: route.status === 'completed' ? "#27ae60" : "#111111",
+                flex: 9,
+                wrap: true,
+                weight: route.status === 'completed' ? "bold" : "regular"
               }
             ]
           }
         );
+
+        if (route.pickups && route.pickups.some((p: any) => p.time)) {
+          route.pickups.forEach((p: any, i: number) => {
+            if (p.time) {
+              routeContents.push({
+                type: "text",
+                text: `🕒 ${t('pickup_time')}: ${formatFlexDateTime(p.time)}`,
+                size: "xs",
+                color: "#666666",
+                margin: "xs",
+                wrap: true
+              });
+            }
+          });
+        }
+        if (route.deliveries && route.deliveries.some((d: any) => d.time)) {
+          route.deliveries.forEach((d: any, i: number) => {
+            if (d.time) {
+              routeContents.push({
+                type: "text",
+                text: `🕒 ${t('delivery_time')}: ${formatFlexDateTime(d.time)}`,
+                size: "xs",
+                color: "#666666",
+                margin: "xs",
+                wrap: true
+              });
+            }
+          });
+        }
       });
     } else {
       routeContents.push(
@@ -1511,52 +1769,10 @@ export const JobReport: React.FC = () => {
           contents: [
             {
               type: "text",
-              text: "📍",
-              size: "sm",
-              flex: 1
-            },
-            {
-              type: "text",
-              text: "ต้นทาง",
-              size: "sm",
-              color: "#2c5494",
-              weight: "bold",
-              flex: 3
-            },
-            {
-              type: "text",
-              text: data.origin || '-',
+              text: t('from_to_summary', { origin: data.origin || '-', destination: data.destination || '-' }),
               size: "sm",
               color: "#111111",
-              flex: 6,
-              wrap: true
-            }
-          ]
-        },
-        {
-          type: "box",
-          layout: "horizontal",
-          contents: [
-            {
-              type: "text",
-              text: "🏁",
-              size: "sm",
-              flex: 1
-            },
-            {
-              type: "text",
-              text: "ปลายทาง",
-              size: "sm",
-              color: "#2c5494",
-              weight: "bold",
-              flex: 3
-            },
-            {
-              type: "text",
-              text: data.destination || '-',
-              size: "sm",
-              color: "#111111",
-              flex: 6,
+              flex: 9,
               wrap: true
             }
           ]
@@ -1605,7 +1821,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "ต้นทาง",
+                    text: t('origin_label'),
                     size: "xs",
                     color: "#2c5494",
                     weight: "bold",
@@ -1621,7 +1837,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "ปลายทาง",
+                    text: t('destination_label'),
                     size: "xs",
                     color: "#aaaaaa",
                     align: "end",
@@ -1688,7 +1904,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: `เลขที่เคส ${data.case_number || '-'}`,
+                    text: `${t('case_number_prefix', 'เลขที่เคส')} ${data.case_number || '-'}`,
                     size: "sm",
                     color: "#111111",
                     flex: 9
@@ -1707,7 +1923,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "บริษัท",
+                    text: t('company_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1735,7 +1951,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "สถานะ",
+                    text: t('status_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1764,7 +1980,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "รถ",
+                    text: t('car_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1792,7 +2008,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "คนขับ",
+                    text: t('driver_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1820,7 +2036,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "เบอร์คนขับ",
+                    text: t('driver_phone_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1848,7 +2064,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: "วันที่",
+                    text: t('date_label'),
                     size: "sm",
                     color: "#2c5494",
                     weight: "bold",
@@ -1879,7 +2095,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: "ให้คะแนนบริการ",
+              label: t('rate_service_label'),
               uri: `${window.location.origin}/rate/${data.report_id}`
             },
             color: "#f39c12",
@@ -1891,7 +2107,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: t('login'),
+              label: t('enter_website_label'),
               uri: window.location.origin
             },
             color: "#e54d42"
@@ -1923,12 +2139,12 @@ export const JobReport: React.FC = () => {
 
     if (data.routes && data.routes.length > 0) {
       data.routes.forEach((route, index) => {
-        const routeLabel = data.routes && data.routes.length > 1 ? ` (เส้นทางที่ ${index + 1})` : '';
+        const routeLabel = data.routes && data.routes.length > 1 ? ` (${t('route_number', { number: index + 1 })})` : '';
         
         if (route.pickups && route.pickups.length > 0) {
           route.pickups.forEach((p: any, i: number) => {
             if (p.url) {
-              const label = route.pickups.length > 1 ? `📍 จุดรับที่ ${i + 1}${routeLabel}` : `📍 ต้นทาง${routeLabel}`;
+              const label = route.pickups.length > 1 ? t('pickup_point_with_number', { number: i + 1 }) + routeLabel : t('origin_label') + routeLabel;
               footerContents.push({
                 type: "button",
                 style: "secondary",
@@ -1949,7 +2165,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: `📍 ต้นทาง${routeLabel}`.substring(0, 20),
+              label: (t('origin_label') + routeLabel).substring(0, 20),
               uri: route.origin_url
             },
             margin: "sm"
@@ -1959,7 +2175,7 @@ export const JobReport: React.FC = () => {
         if (route.deliveries && route.deliveries.length > 0) {
           route.deliveries.forEach((d: any, i: number) => {
             if (d.url) {
-              const label = route.deliveries.length > 1 ? `🏁 จุดส่งที่ ${i + 1}${routeLabel}` : `🏁 ปลายทาง${routeLabel}`;
+              const label = route.deliveries.length > 1 ? t('delivery_point_with_number', { number: i + 1 }) + routeLabel : t('destination_label') + routeLabel;
               footerContents.push({
                 type: "button",
                 style: "secondary",
@@ -1980,7 +2196,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: `🏁 ปลายทาง${routeLabel}`.substring(0, 20),
+              label: (t('destination_label') + routeLabel).substring(0, 20),
               uri: route.destination_url
             },
             margin: "sm"
@@ -1995,7 +2211,7 @@ export const JobReport: React.FC = () => {
           height: "sm",
           action: {
             type: "uri",
-            label: "📍 แผนที่ต้นทาง",
+            label: t('origin_map'),
             uri: data.origin_url
           },
           margin: "sm"
@@ -2009,7 +2225,7 @@ export const JobReport: React.FC = () => {
           height: "sm",
           action: {
             type: "uri",
-            label: "🏁 แผนที่ปลายทาง",
+            label: t('destination_map'),
             uri: data.destination_url
           },
           margin: "sm"
@@ -2025,7 +2241,7 @@ export const JobReport: React.FC = () => {
               height: "sm",
               action: {
                 type: "uri",
-                label: `📍 จุดแวะพัก ${idx + 1}`,
+                label: t('waypoint_with_number', { number: idx + 1 }),
                 uri: wp.url
               },
               margin: "sm"
@@ -2041,7 +2257,7 @@ export const JobReport: React.FC = () => {
       height: "sm",
       action: {
         type: "uri",
-        label: t('login'),
+        label: t('enter_website_label'),
         uri: window.location.origin
       },
       color: "#e54d42",
@@ -2100,7 +2316,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: `เลขที่เคส ${data.case_number || '-'}`,
+                    text: `${t('case_number_prefix', 'เลขที่เคส')} ${data.case_number || '-'}`,
                     size: "sm",
                     color: "#111111",
                     flex: 9
@@ -2113,7 +2329,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "ทะเบียนรถ",
+                    text: t('registration_plate'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2134,7 +2350,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "ลูกค้า",
+                    text: t('customer_label'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2155,7 +2371,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "ผู้ติดต่อ",
+                    text: t('contact_person_label'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2176,7 +2392,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "เบอร์ติดต่อ",
+                    text: t('contact_phone_label'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2195,29 +2411,30 @@ export const JobReport: React.FC = () => {
                 const routeContents: any[] = [
                   {
                     type: "text",
-                    text: `เส้นทางที่ ${index + 1}`,
+                    text: `${t('route_number', { number: index + 1 })}${route.status === 'completed' ? ` ✅ ${t('success_label')}` : ''}`,
                     size: "xs",
-                    color: "#aaaaaa",
+                    color: route.status === 'completed' ? "#27ae60" : "#aaaaaa",
                     weight: "bold"
                   }
                 ];
 
                 if (route.pickups && route.pickups.length > 0) {
                   route.pickups.forEach((p: any, i: number) => {
+                    const timeStr = p.time ? ` 🕒 ${formatFlexDateTime(p.time)}` : '';
                     routeContents.push({
                       type: "box",
                       layout: "horizontal",
                       contents: [
                         {
                           type: "text",
-                          text: route.pickups.length > 1 ? `จุดรับที่ ${i + 1}` : "จุดรับ",
+                          text: route.pickups.length > 1 ? t('pickup_point_with_number', { number: i + 1 }) : t('pickup_point_label'),
                           size: "sm",
                           color: "#aaaaaa",
                           flex: 3
                         },
                         {
                           type: "text",
-                          text: p.name || '-',
+                          text: (p.name || '-') + timeStr,
                           size: "sm",
                           color: "#111111",
                           flex: 7,
@@ -2255,7 +2472,7 @@ export const JobReport: React.FC = () => {
                     contents: [
                       {
                         type: "text",
-                        text: "ต้นทาง",
+                        text: t('origin_label'),
                         size: "sm",
                         color: "#aaaaaa",
                         flex: 3
@@ -2280,7 +2497,7 @@ export const JobReport: React.FC = () => {
                       contents: [
                         {
                           type: "text",
-                          text: route.deliveries.length > 1 ? `จุดส่งที่ ${i + 1}` : "จุดส่ง",
+                          text: route.deliveries.length > 1 ? t('delivery_point_with_number', { number: i + 1 }) : t('delivery_point_label'),
                           size: "sm",
                           color: "#aaaaaa",
                           flex: 3
@@ -2317,6 +2534,28 @@ export const JobReport: React.FC = () => {
                         ]
                       });
                     }
+                    if (d.time) {
+                      routeContents.push({
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: " ",
+                            size: "sm",
+                            flex: 3
+                          },
+                          {
+                            type: "text",
+                            text: `🕒 ${t('delivery_time')}: ${formatFlexDateTime(d.time)}`,
+                            size: "xs",
+                            color: "#666666",
+                            flex: 7,
+                            wrap: true
+                          }
+                        ]
+                      });
+                    }
                   });
                 } else {
                   routeContents.push({
@@ -2325,7 +2564,7 @@ export const JobReport: React.FC = () => {
                     contents: [
                       {
                         type: "text",
-                        text: "ปลายทาง",
+                        text: t('destination_label'),
                         size: "sm",
                         color: "#aaaaaa",
                         flex: 3
@@ -2355,7 +2594,7 @@ export const JobReport: React.FC = () => {
                   contents: [
                     {
                       type: "text",
-                      text: "ต้นทาง",
+                      text: t('origin_label'),
                       size: "sm",
                       color: "#aaaaaa",
                       flex: 3
@@ -2376,7 +2615,7 @@ export const JobReport: React.FC = () => {
                   contents: [
                     {
                       type: "text",
-                      text: `จุดแวะพัก ${idx + 1}`,
+                      text: t('waypoint', { number: idx + 1 }),
                       size: "sm",
                       color: "#aaaaaa",
                       flex: 3
@@ -2397,7 +2636,7 @@ export const JobReport: React.FC = () => {
                   contents: [
                     {
                       type: "text",
-                      text: "ปลายทาง",
+                      text: t('destination_label'),
                       size: "sm",
                       color: "#aaaaaa",
                       flex: 3
@@ -2419,7 +2658,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "วันที่",
+                    text: t('date_label'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2440,7 +2679,7 @@ export const JobReport: React.FC = () => {
                 contents: [
                   {
                     type: "text",
-                    text: "คนขับ",
+                    text: t('driver_label'),
                     size: "sm",
                     color: "#aaaaaa",
                     flex: 3
@@ -2470,6 +2709,12 @@ export const JobReport: React.FC = () => {
   };
 
   const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'arrived' | 'completed', jobId?: string, targetCustomerId?: string) => {
+    // Only send for Accepted (In Transit) and Completed statuses for customers
+    if (status !== 'accepted' && status !== 'completed') {
+      console.log(`Skipping customer notification for status: ${status}`);
+      return;
+    }
+
     try {
       const currentCustomerId = targetCustomerId || (typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id);
       const currentCarId = typeof formData.car_id === 'object' && formData.car_id ? (formData.car_id as any).id : formData.car_id;
@@ -2507,14 +2752,9 @@ export const JobReport: React.FC = () => {
       const selectedCar = cars.find(c => String(c.id) === String(currentCarId));
       const driver = members.find(m => String(m.id) === String(currentMemberId));
       
-      const statusText = status === 'pending' ? t('status_pending_msg') :
-                        status === 'accepted' ? t('status_accepted_msg') :
-                        status === 'arrived' ? t('status_arrived_msg') :
-                        t('status_completed_msg');
+      const statusText = status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg');
       
-      const statusColor = status === 'completed' ? '#27ae60' : 
-                          status === 'arrived' ? '#f39c12' :
-                          status === 'accepted' ? '#2c5494' : '#e54d42'; 
+      const statusColor = status === 'completed' ? '#27ae60' : '#2c5494'; 
       const displayId = formData.case_number || currentReportId;
 
       // Send notification to each member
@@ -2693,20 +2933,24 @@ export const JobReport: React.FC = () => {
       }
 
       // 1.7 Mileage validation check
-      if (formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id)) {
+      const firstRoute = formData.routes[0];
+      if (formData.car_id && firstRoute?.mileage_start && parseFloat(firstRoute.mileage_start.toString()) < getLastMileage(formData.car_id)) {
         setError(t('mileage_less_than_previous', { mileage: getLastMileage(formData.car_id) }));
         setSubmitting(false);
         return;
       }
 
-      // 1.8 Time validation: Arrival cannot be before Departure
-      if (formData.departure_time && formData.arrival_time) {
-        const departure = new Date(formData.departure_time).getTime();
-        const arrival = new Date(formData.arrival_time).getTime();
-        if (arrival < departure) {
-          setError(t('arrival_before_departure_error'));
-          setSubmitting(false);
-          return;
+      // 1.8 Time validation: Arrival cannot be before Departure (per route)
+      for (let i = 0; i < formData.routes.length; i++) {
+        const route = formData.routes[i];
+        if (route.departure_time && route.arrival_time) {
+          const departure = new Date(route.departure_time).getTime();
+          const arrival = new Date(route.arrival_time).getTime();
+          if (arrival < departure) {
+            setError(`${t('route_index', { index: i + 1 })}: ${t('arrival_before_departure_error')}`);
+            setSubmitting(false);
+            return;
+          }
         }
       }
 
@@ -2724,29 +2968,69 @@ export const JobReport: React.FC = () => {
       };
 
       // Add fields only if they have values to support partial updates
-      const standby = formatTime(formData.standby_time);
+      const standby = formatTime(formData.routes[0]?.standby_time);
       if (standby) reportData.standby_time = standby;
 
-      const departure = formatTime(formData.departure_time);
+      const departure = formatTime(formData.routes[0]?.departure_time);
       if (departure) reportData.departure_time = departure;
 
-      const arrival = formatTime(formData.arrival_time);
+      const arrival = formatTime(formData.routes[formData.routes.length - 1]?.arrival_time);
       if (arrival) reportData.arrival_time = arrival;
 
-      if (formData.mileage_start !== '') {
-        const val = parseInt(formData.mileage_start.toString());
+      const mStart = formData.routes[0]?.mileage_start;
+      if (mStart !== undefined && mStart !== '') {
+        const val = parseInt(mStart.toString());
         if (!isNaN(val)) reportData.mileage_start = val;
       }
+
+      const mEnd = formData.routes[formData.routes.length - 1]?.mileage_end;
+      if (mEnd !== undefined && mEnd !== '') {
+        const val = parseInt(mEnd.toString());
+        if (!isNaN(val)) reportData.mileage_end = val;
+      }
       
-      if (formData.mileage_end !== '') {
-        const val = parseInt(formData.mileage_end.toString());
-        if (!isNaN(val)) {
-          reportData.mileage_end = val;
-        }
+      // Add routes data - always allow updates to routes (times/mileage)
+      if (formData.routes !== undefined) {
+        reportData.routes = formData.routes.map((route: any) => ({
+          ...route,
+          standby_time: route.standby_time ? formatTime(route.standby_time) : (route.standby_time === '' ? null : (route.standby_time || null)),
+          departure_time: route.departure_time ? formatTime(route.departure_time) : (route.departure_time === '' ? null : (route.departure_time || null)),
+          arrival_time: route.arrival_time ? formatTime(route.arrival_time) : (route.arrival_time === '' ? null : (route.arrival_time || null)),
+          mileage_start: (route.mileage_start !== undefined && route.mileage_start !== '') ? parseInt(route.mileage_start.toString()) : (route.mileage_start === '' ? null : route.mileage_start),
+          mileage_end: (route.mileage_end !== undefined && route.mileage_end !== '') ? parseInt(route.mileage_end.toString()) : (route.mileage_end === '' ? null : route.mileage_end),
+          pickups: route.pickups?.map((p: any) => ({
+            ...p,
+            time: p.time ? formatTime(p.time) : (p.time === '' ? null : (p.time || null))
+          })),
+          deliveries: route.deliveries?.map((d: any) => ({
+            ...d,
+            time: d.time ? formatTime(d.time) : (d.time === '' ? null : (d.time || null))
+          }))
+        }));
       }
 
       if (formData.notes) {
         reportData.notes = formData.notes;
+      }
+
+      if (formData.toll_fee !== undefined && formData.toll_fee !== '') {
+        const val = parseFloat(formData.toll_fee.toString());
+        if (!isNaN(val)) reportData.toll_fee = val;
+      }
+      if (formData.fuel_cost !== undefined && formData.fuel_cost !== '') {
+        const val = parseFloat(formData.fuel_cost.toString());
+        if (!isNaN(val)) reportData.fuel_cost = val;
+      }
+      if (formData.other_expenses !== undefined && formData.other_expenses !== '') {
+        const val = parseFloat(formData.other_expenses.toString());
+        if (!isNaN(val)) reportData.other_expenses = val;
+      }
+      if (formData.other_expenses_note !== undefined) {
+        reportData.other_expenses_note = formData.other_expenses_note;
+      }
+      
+      if (formData.expense_items !== undefined) {
+        reportData.expense_items = formData.expense_items;
       }
 
       if (signatureFileId) {
@@ -2775,7 +3059,6 @@ export const JobReport: React.FC = () => {
         if (formData.destination_url !== undefined) reportData.destination_url = formData.destination_url;
         if (formData.destination_lat !== undefined) reportData.destination_lat = formData.destination_lat;
         if (formData.destination_lng !== undefined) reportData.destination_lng = formData.destination_lng;
-        if (formData.routes !== undefined) reportData.routes = formData.routes;
         if (formData.estimated_distance !== undefined) reportData.estimated_distance = formData.estimated_distance;
         if (formData.phone !== undefined) reportData.phone = formData.phone;
         if (currentCarId && currentCarId !== '') reportData.car_id = currentCarId;
@@ -2902,13 +3185,9 @@ export const JobReport: React.FC = () => {
         setStatusConfig({
           type: 'success',
           title: t('save_success'),
-          message: notifiedAdditionalWork ? 'บันทึกรายงานและแจ้งเตือนคนขับเรื่องงานเพิ่มเติมสำเร็จ' : t('report_saved_success'),
+          message: notifiedAdditionalWork ? t('additional_work_saved_msg') : t('report_saved_success'),
           action: () => {
-            if (isAdmin) {
-              navigate('/jobs/history');
-            } else {
-              navigate('/jobs/my');
-            }
+            navigate('/jobs/my');
           }
         });
         setShowStatusModal(true);
@@ -2944,7 +3223,7 @@ export const JobReport: React.FC = () => {
           title: t('save_success'),
           message: t('report_saved'),
           action: () => {
-            setSubmitted(true);
+            navigate('/jobs/my');
           }
         });
         setShowStatusModal(true);
@@ -3004,28 +3283,28 @@ export const JobReport: React.FC = () => {
         
         const routesText = (formData.routes && formData.routes.length > 0) 
           ? (formData.routes || []).map((route, idx) => {
-              let text = `เส้นทางที่ ${idx + 1}:`;
+              let text = `${t('route_number', { number: idx + 1 })}`;
               if (route.pickups && route.pickups.length > 0) {
                 route.pickups.forEach((p: any, i: number) => {
-                  const label = route.pickups.length > 1 ? `จุดรับที่ ${i + 1}` : 'ต้นทาง';
+                  const label = route.pickups.length > 1 ? t('pickup_point', { number: i + 1 }) : t('origin_label');
                   text += `\n${label}: ${p.name || '-'}`;
                   if (p.url) text += `\n📍 ${p.url}`;
                   if (p.contact_name) text += `\n👤 ${p.contact_name}`;
                   if (p.contact_phone) text += `\n📞 ${p.contact_phone}`;
                 });
               } else {
-                text += `\nต้นทาง: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
+                text += `\n${t('origin_label')}: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
               }
               if (route.deliveries && route.deliveries.length > 0) {
                 route.deliveries.forEach((d: any, i: number) => {
-                  const label = route.deliveries.length > 1 ? `จุดส่งที่ ${i + 1}` : 'ปลายทาง';
+                  const label = route.deliveries.length > 1 ? t('delivery_point', { number: i + 1 }) : t('destination_label');
                   text += `\n${label}: ${d.name || '-'}`;
                   if (d.url) text += `\n🏁 ${d.url}`;
                   if (d.contact_name) text += `\n👤 ${d.contact_name}`;
                   if (d.contact_phone) text += `\n📞 ${d.contact_phone}`;
                 });
               } else {
-                text += `\nปลายทาง: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
+                text += `\n${t('destination_label')}: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
               }
               return text;
             }).join('\n\n')
@@ -3034,7 +3313,7 @@ export const JobReport: React.FC = () => {
         const messages = [
           {
             type: "text",
-            text: `${t('new_job_notification')}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\nระยะทางรวม: ${formData.estimated_distance || 0} km`
+            text: `${t('new_job_notification')}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\n${t('total_distance')}: ${formData.estimated_distance || 0} km`
           },
           {
             type: "flex",
@@ -3063,10 +3342,10 @@ export const JobReport: React.FC = () => {
       if (notificationsEnabled && lineId) {
         const selectedCar = cars.find(c => String(c.id) === String(carId));
         
-        let title = 'มีการเพิ่มจุดรับ/ส่ง (งานเพิ่มเติม)';
-        if (type === 'pickup') title = '🔔 มีการเพิ่มจุดรับสินค้าใหม่ (งานเพิ่มเติม)';
-        else if (type === 'delivery') title = '🔔 มีการเพิ่มจุดส่งสินค้าใหม่ (งานเพิ่มเติม)';
-        else title = '🔔 มีการเพิ่มจุดรับและจุดส่งใหม่ (งานเพิ่มเติม)';
+            let title = t('additional_job_notification');
+            if (type === 'pickup') title = t('new_pickup_point_notification');
+            else if (type === 'delivery') title = t('new_delivery_point_notification');
+            else title = t('new_both_points_notification');
         
         console.log(`Sending additional work notification: ${title} to ${lineId}`);
 
@@ -3090,28 +3369,28 @@ export const JobReport: React.FC = () => {
         
         const routesText = (formData.routes && formData.routes.length > 0) 
           ? (formData.routes || []).map((route, idx) => {
-              let text = `เส้นทางที่ ${idx + 1}:`;
+              let text = `${t('route_number', { number: idx + 1 })}`;
               if (route.pickups && route.pickups.length > 0) {
                 route.pickups.forEach((p: any, i: number) => {
-                  const label = route.pickups.length > 1 ? `จุดรับที่ ${i + 1}` : 'ต้นทาง';
+                  const label = route.pickups.length > 1 ? t('pickup_point', { number: i + 1 }) : t('origin_label');
                   text += `\n${label}: ${p.name || '-'}`;
                   if (p.url) text += `\n📍 ${p.url}`;
                   if (p.contact_name) text += `\n👤 ${p.contact_name}`;
                   if (p.contact_phone) text += `\n📞 ${p.contact_phone}`;
                 });
               } else {
-                text += `\nต้นทาง: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
+                text += `\n${t('origin_label')}: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
               }
               if (route.deliveries && route.deliveries.length > 0) {
                 route.deliveries.forEach((d: any, i: number) => {
-                  const label = route.deliveries.length > 1 ? `จุดส่งที่ ${i + 1}` : 'ปลายทาง';
+                  const label = route.deliveries.length > 1 ? t('delivery_point', { number: i + 1 }) : t('destination_label');
                   text += `\n${label}: ${d.name || '-'}`;
                   if (d.url) text += `\n🏁 ${d.url}`;
                   if (d.contact_name) text += `\n👤 ${d.contact_name}`;
                   if (d.contact_phone) text += `\n📞 ${d.contact_phone}`;
                 });
               } else {
-                text += `\nปลายทาง: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
+                text += `\n${t('destination_label')}: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
               }
               return text;
             }).join('\n\n')
@@ -3120,7 +3399,7 @@ export const JobReport: React.FC = () => {
         const messages = [
           {
             type: "text",
-            text: `${title}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\nระยะทางรวม: ${formData.estimated_distance || 0} km`
+            text: `${title}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n${t('contact_person_label')}: ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}\n${t('contact_phone_label')}: ${formData.customer_contact_phone || '-'}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('date_label')}: ${formData.work_date}\n${t('total_distance')}: ${formData.estimated_distance || 0} km`
           },
           {
             type: "flex",
@@ -3180,28 +3459,28 @@ export const JobReport: React.FC = () => {
 
       const routesText = (formData.routes && formData.routes.length > 0) 
         ? (formData.routes || []).map((route, idx) => {
-            let text = `เส้นทางที่ ${idx + 1}:`;
+            let text = `${t('route_number', { number: idx + 1 })}:`;
             if (route.pickups && route.pickups.length > 0) {
               route.pickups.forEach((p: any, i: number) => {
-                const label = route.pickups.length > 1 ? `จุดรับที่ ${i + 1}` : 'ต้นทาง';
+                const label = route.pickups.length > 1 ? t('pickup_point_with_number', { number: i + 1 }) : t('origin_label');
                 text += `\n${label}: ${p.name || '-'}`;
                 if (p.url) text += `\n📍 ${p.url}`;
                 if (p.contact_name) text += `\n👤 ${p.contact_name}`;
                 if (p.contact_phone) text += `\n📞 ${p.contact_phone}`;
               });
             } else {
-              text += `\nต้นทาง: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
+              text += `\n${t('origin_label')}: ${route.origin}${route.origin_url ? `\n📍 ${route.origin_url}` : ''}`;
             }
             if (route.deliveries && route.deliveries.length > 0) {
               route.deliveries.forEach((d: any, i: number) => {
-                const label = route.deliveries.length > 1 ? `จุดส่งที่ ${i + 1}` : 'ปลายทาง';
+                const label = route.deliveries.length > 1 ? t('delivery_point_with_number', { number: i + 1 }) : t('destination_label');
                 text += `\n${label}: ${d.name || '-'}`;
                 if (d.url) text += `\n🏁 ${d.url}`;
                 if (d.contact_name) text += `\n👤 ${d.contact_name}`;
                 if (d.contact_phone) text += `\n📞 ${d.contact_phone}`;
               });
             } else {
-              text += `\nปลายทาง: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
+              text += `\n${t('destination_label')}: ${route.destination}${route.destination_url ? `\n🏁 ${route.destination_url}` : ''}`;
             }
             return text;
           }).join('\n\n')
@@ -3210,7 +3489,7 @@ export const JobReport: React.FC = () => {
       const driverMessages = [
         {
           type: "text",
-          text: `🔔 ${t('job_status_notification')}: ${statusText}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\nระยะทางรวม: ${formData.estimated_distance || 0} km`
+          text: `🔔 ${t('job_status_notification')}: ${statusText}\n\n${t('case_id')}: ${formData.case_number || 'N/A'}\n${t('customer_label')}: ${formData.customer_name}\n\n${routesText}\n\n${t('car_label')}: ${selectedCar?.car_number || ''}\n${t('total_distance')}: ${formData.estimated_distance || 0} km`
         },
         {
           type: "flex",
@@ -3461,8 +3740,59 @@ export const JobReport: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const updatePayload: any = { status: 'completed' };
+      // Prepare the full dataset for completion, just like executeSave
+      const formatTime = (t: string) => {
+        if (!t) return null;
+        try { return new Date(t).toISOString(); } catch (e) { return null; }
+      };
+
+      const updatePayload: any = { 
+        status: 'completed',
+        notes: formData.notes,
+        signature: formData.signature,
+        signature_name: formData.signature_name
+      };
       
+      const standby = formatTime(formData.routes[0]?.standby_time);
+      if (standby) updatePayload.standby_time = standby;
+
+      const departure = formatTime(formData.routes[0]?.departure_time);
+      if (departure) updatePayload.departure_time = departure;
+
+      const arrival = formatTime(formData.routes[formData.routes.length - 1]?.arrival_time);
+      if (arrival) updatePayload.arrival_time = arrival;
+
+      const mStart = formData.routes[0]?.mileage_start;
+      if (mStart !== undefined && mStart !== '') {
+        const val = parseInt(mStart.toString());
+        if (!isNaN(val)) updatePayload.mileage_start = val;
+      }
+      
+      const mEnd = formData.routes[formData.routes.length - 1]?.mileage_end;
+      if (mEnd !== undefined && mEnd !== '') {
+        const val = parseInt(mEnd.toString());
+        if (!isNaN(val)) updatePayload.mileage_end = val;
+      }
+
+      if (formData.routes !== undefined) {
+        updatePayload.routes = formData.routes.map((route: any) => ({
+          ...route,
+          standby_time: formatTime(route.standby_time),
+          departure_time: formatTime(route.departure_time),
+          arrival_time: formatTime(route.arrival_time),
+          mileage_start: (route.mileage_start !== undefined && route.mileage_start !== '') ? parseInt(route.mileage_start.toString()) : (route.mileage_start === '' ? null : route.mileage_start),
+          mileage_end: (route.mileage_end !== undefined && route.mileage_end !== '') ? parseInt(route.mileage_end.toString()) : (route.mileage_end === '' ? null : route.mileage_end),
+          pickups: route.pickups?.map((p: any) => ({
+            ...p,
+            time: formatTime(p.time)
+          })),
+          deliveries: route.deliveries?.map((d: any) => ({
+            ...d,
+            time: formatTime(d.time)
+          }))
+        }));
+      }
+
       if (!isAdmin) {
         const geoResult = await verifyGeofence('completed');
         if (geoResult) {
@@ -3633,7 +3963,7 @@ export const JobReport: React.FC = () => {
           { status: 'deleted', timestamp: new Date().toISOString() }
         ]
       });
-      navigate('/jobs/history');
+      navigate('/jobs/my');
     } catch (error: any) {
       if (error.response?.status === 401) return;
       console.error('Error deleting job:', error);
@@ -3801,67 +4131,74 @@ export const JobReport: React.FC = () => {
     let routesText = '';
     if (formData.routes && formData.routes.length > 0) {
       routesText = formData.routes.map((route, index) => {
-        let routeDetails = `\nเส้นทางที่ ${index + 1}:`;
+        let routeDetails = `\n${t('route_number', { number: index + 1 })}:`;
         
         if (route.pickups && route.pickups.length > 0) {
           route.pickups.forEach((p: any, i: number) => {
-            const label = route.pickups.length > 1 ? `จุดรับที่ ${i + 1}` : 'ต้นทาง';
+            const label = route.pickups.length > 1 ? t('pickup_point', { number: i + 1 }) : t('origin_label');
             routeDetails += `\n📍 ${label} : ${p.name || '-'}`;
-            if (p.url) routeDetails += `\n🔗 ลิงก์${label} : ${p.url}`;
-            if (p.contact_name) routeDetails += `\n👤 ชื่อผู้ติดต่อ : ${p.contact_name}`;
-            if (p.contact_phone) routeDetails += `\n📞 เบอร์โทร : ${p.contact_phone}`;
+            if (p.url) routeDetails += `\n🔗 ${t('link_to', { label })} : ${p.url}`;
+            if (p.contact_name) routeDetails += `\n👤 ${t('contact_person_label')} : ${p.contact_name}`;
+            if (p.contact_phone) routeDetails += `\n📞 ${t('contact_phone_label')} : ${p.contact_phone}`;
           });
         } else {
-          routeDetails += `\n📍 ต้นทาง : ${route.origin || '-'}`;
-          routeDetails += `\n🔗 ลิงก์ต้นทาง : ${route.origin_url || '-'}`;
+          routeDetails += `\n📍 ${t('origin_label')} : ${route.origin || '-'}`;
+          routeDetails += `\n🔗 ${t('link_to', { label: t('origin_label') })} : ${route.origin_url || '-'}`;
         }
 
         if (route.deliveries && route.deliveries.length > 0) {
           route.deliveries.forEach((d: any, i: number) => {
-            const label = route.deliveries.length > 1 ? `จุดส่งที่ ${i + 1}` : 'ปลายทาง';
+            const label = route.deliveries.length > 1 ? t('delivery_point', { number: i + 1 }) : t('destination_label');
             routeDetails += `\n📍 ${label} : ${d.name || '-'}`;
-            if (d.url) routeDetails += `\n🔗 ลิงก์${label} : ${d.url}`;
-            if (d.contact_name) routeDetails += `\n👤 ชื่อผู้ติดต่อ : ${d.contact_name}`;
-            if (d.contact_phone) routeDetails += `\n📞 เบอร์โทร : ${d.contact_phone}`;
+            if (d.url) routeDetails += `\n🔗 ${t('link_to', { label })} : ${d.url}`;
+            if (d.contact_name) routeDetails += `\n👤 ${t('contact_person_label')} : ${d.contact_name}`;
+            if (d.contact_phone) routeDetails += `\n📞 ${t('contact_phone_label')} : ${d.contact_phone}`;
           });
         } else {
-          routeDetails += `\n📍 ปลายทาง : ${route.destination || '-'}`;
-          routeDetails += `\n🔗 ลิงก์ปลายทาง : ${route.destination_url || '-'}`;
+          routeDetails += `\n📍 ${t('destination_label')} : ${route.destination || '-'}`;
+          routeDetails += `\n🔗 ${t('link_to', { label: t('destination_label') })} : ${route.destination_url || '-'}`;
         }
         
-        routeDetails += `\nระยะทาง : ${route.distance !== undefined ? route.distance + ' km' : '-'}`;
+        routeDetails += `\n🗓️ ${t('date')} : ${route.date || '-'}`;
+        routeDetails += `\n🕒 ${t('standby_time')} : ${formatDisplayDT(route.standby_time || '')}`;
+        routeDetails += `\n🕒 ${t('departure_time')} : ${formatDisplayDT(route.departure_time || '')}`;
+        routeDetails += `\n🕒 ${t('arrival_time')} : ${formatDisplayDT(route.arrival_time || '')}`;
+        routeDetails += `\n📌 ${t('mileage_start')} : ${route.mileage_start || '-'}`;
+        routeDetails += `\n📌 ${t('mileage_end')} : ${route.mileage_end || '-'}`;
+        routeDetails += `\n📏 ${t('distance')} : ${route.distance !== undefined ? route.distance + ' km' : '-'}`;
+        
         return routeDetails;
       }).join('\n');
     } else {
-      routesText = `📍 ${t('origin')} : ${formData.origin || '-'}
-📍 ${t('destination')} : ${formData.destination || '-'}`;
+      routesText = `📍 ${t('origin_label')} : ${formData.origin || '-'}
+📍 ${t('destination_label')} : ${formData.destination || '-'}`;
     }
+    
+    const bkkMaxDistance = parseInt(localStorage.getItem('bkk_max_distance') || '250', 10);
+    const classification = formData.estimated_distance !== undefined 
+      ? ` (${formData.estimated_distance > bkkMaxDistance ? t('upcountry') : t('bangkok_vicinity')})`
+      : '';
     
     return `🆔 ${t('case_number')} : ${formData.case_number || '-'}
 📅 ${t('report_date')} : ${formData.work_date}
 📁 ${t('customer_name')} : ${formData.customer_name}
-👤 ${t('contact_name')} : ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}
-📞 ${t('contact_phone')} : ${formData.customer_contact_phone || '-'}
+👤 ${t('contact_person_label')} : ${getFormattedContactName(formData.customer_contact_name, formData.customer_id)}
+📞 ${t('contact_phone_label')} : ${formData.customer_contact_phone || '-'}
 ${routesText}
-${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')} รวม : ${formData.estimated_distance} ${t('km')}` : ''}
+${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')} ${t('total_distance')} : ${formData.estimated_distance} ${t('km')}${classification}` : ''}
 
-🚚 ${t('car_number')} : ${selectedCar?.car_number || currentCarId}
+🚚 ${t('car_plate')} : ${selectedCar?.car_number || currentCarId}
 
 👷 ${memberRoleLabel} : ${selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name} ${accountSource}` : currentMemberId}
 📞 ${t('phone')} : ${formData.phone}
 
-👉 ${t('standby_time')} : ${formatDisplayDT(formData.standby_time)}
-👉 ${t('departure_time')} : ${formatDisplayDT(formData.departure_time)}
-👉 ${t('arrival_time')} : ${formatDisplayDT(formData.arrival_time)}
-
-🍄 ${t('mileage_start')} : ${formData.mileage_start}
-🍄 ${t('mileage_end')} : ${formData.mileage_end}
+📏 ${t('total_distance')} (km) : ${totalDistance.toLocaleString()} km
 
 📌 ${t('notes')} : ${formData.notes || '-'}`;
   };
 
   const isCustomer = userRole.toLowerCase() === 'customer';
-  const isEditable = (!id || isAdmin || formData.status === 'accepted') && !isCustomer;
+  const isEditable = (!id || isAdmin || formData.status === 'accepted' || formData.status === 'arrived' || formData.status === 'pending') && !isCustomer;
   const isPendingCancel = formData.status === 'cancel_pending';
   const selectedMember = members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id));
   const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
@@ -3951,6 +4288,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-blue-800 transition-all shadow-lg shadow-blue-100"
           >
             {t('create_new_report')}
+          </button>
+          <button 
+            onClick={() => navigate('/jobs/my')}
+            className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all"
+          >
+            {t('back_to_all_jobs')}
           </button>
         </div>
       </div>
@@ -4156,7 +4499,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     )}
                   >
                     <CheckCircle2 className="w-5 h-5" />
-                    {isJobOverdue ? t('time_expired', 'หมดเวลารับงาน') : t('accept_job')}
+                    {isJobOverdue ? t('time_expired') : t('accept_job')}
                   </button>
                   {formData.acceptance_deadline && (
                     <CountdownTimer 
@@ -4326,6 +4669,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         }
                         return `${idx + 1}. -`;
                       }).join('\n');
+                    } else if (customerName) {
+                      formattedContactName = t('no_contact_found');
                     }
                   }
 
@@ -4485,6 +4830,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         ...formData.routes,
                         {
                           type: 'return',
+                          status: 'pending' as 'pending' | 'completed',
+                          date: new Date().toISOString().split('T')[0],
+                          standby_time: '',
+                          departure_time: '',
+                          arrival_time: '',
+                          mileage_start: '',
+                          mileage_end: '',
                           pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
                           deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
                           distance: undefined,
@@ -4529,12 +4881,175 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       {index + 1}
                     </div>
                     <span className="font-bold text-slate-700">{t('route_index', { index: index + 1 })}</span>
-                    {route.distance !== undefined && (
-                      <div className={clsx(
-                        "ml-auto px-3 py-1 rounded-full text-xs font-bold",
-                        route.route_type === 'upcountry' ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"
-                      )}>
-                        {route.distance} km • {route.route_type === 'upcountry' ? t('upcountry') : t('bangkok_vicinity')}
+                    
+                    {/* Route Time & Mileage */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> {t('date')}
+                        </label>
+                        <input 
+                          type="date"
+                          disabled={!isEditable}
+                          value={route.date || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].date = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {t('standby_time')}
+                        </label>
+                        <input 
+                          type="datetime-local"
+                          disabled={!isEditable}
+                          value={route.standby_time || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].standby_time = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {t('departure_time')}
+                        </label>
+                        <input 
+                          type="datetime-local"
+                          disabled={!isEditable}
+                          value={route.departure_time || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].departure_time = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {t('arrival_time')}
+                        </label>
+                        <input 
+                          type="datetime-local"
+                          disabled={!isEditable}
+                          value={route.arrival_time || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].arrival_time = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Gauge className="w-3 h-3" /> {t('mileage_start')}
+                        </label>
+                        <input 
+                          type="number"
+                          disabled={!isEditable}
+                          placeholder="0"
+                          value={route.mileage_start || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].mileage_start = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Gauge className="w-3 h-3" /> {t('mileage_end')}
+                        </label>
+                        <input 
+                          type="number"
+                          disabled={!isEditable}
+                          placeholder="0"
+                          value={route.mileage_end || ''}
+                          onChange={e => {
+                            const newRoutes = [...formData.routes];
+                            newRoutes[index].mileage_end = e.target.value;
+                            setFormData({ ...formData, routes: newRoutes });
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-primary" /> {t('estimated_distance')}
+                        </label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="number"
+                            disabled={!isEditable}
+                            placeholder="0"
+                            value={route.distance || ''}
+                            onChange={e => {
+                              const newRoutes = [...formData.routes];
+                              newRoutes[index].distance = parseFloat(e.target.value) || 0;
+                              // Update total estimated distance automatically
+                              const total = newRoutes.reduce((sum, r) => sum + (r.distance || 0), 0);
+                              setFormData({ 
+                                ...formData, 
+                                routes: newRoutes,
+                                estimated_distance: Math.round(total * 10) / 10
+                              });
+                            }}
+                            className="flex-1 px-3 py-2 bg-blue-50/50 border border-blue-100 rounded-xl text-xs font-bold text-blue-700 outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                          />
+                          {isEditable && (
+                            <button
+                              type="button"
+                              onClick={() => handleCalculateRouteDistance(index)}
+                              className="p-2 bg-primary/10 text-primary rounded-xl hover:bg-primary/20 transition-colors"
+                              title={t('search_location')}
+                            >
+                              <RefreshCw className={clsx("w-4 h-4", isCalculatingDistance && "animate-spin")} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Truck className="w-3 h-3" /> {t('distance')} ({t('mileage')})
+                        </label>
+                        <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700">
+                          {(() => {
+                            const start = parseFloat(route.mileage_start || '0');
+                            const end = parseFloat(route.mileage_end || '0');
+                            return (!isNaN(start) && !isNaN(end) && end >= start) ? (end - start).toLocaleString() : '0';
+                          })()} km
+                        </div>
+                      </div>
+
+                      {/* Mileage Warning for first route */}
+                      {index === 0 && formData.car_id && route.mileage_start && parseFloat(route.mileage_start.toString()) < getLastMileage(formData.car_id) && (
+                        <div className="col-span-1 md:col-span-2 lg:col-span-3 p-3 bg-red-50 rounded-xl border border-red-100 flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold text-red-800">{t('mileage_error')}</p>
+                            <p className="text-[9px] text-red-700">
+                              {t('mileage_less_than_previous', { mileage: getLastMileage(formData.car_id) })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {index < formData.routes.length - 1 && (
+                      <div className="flex justify-center -my-3 relative z-10">
+                        <div className="bg-primary/5 p-2 rounded-full border border-primary/20 backdrop-blur-sm">
+                          <ChevronDown className="w-4 h-4 text-primary animate-bounce-slow" />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -4652,7 +5167,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
-                                  type="time" 
+                                  type="datetime-local" 
                                   disabled={!!id && !isAdmin}
                                   value={pickup.time || ''}
                                   onChange={e => {
@@ -4782,7 +5297,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
-                                  type="time" 
+                                  type="datetime-local" 
                                   disabled={!!id && !isAdmin}
                                   value={delivery.time || ''}
                                   onChange={e => {
@@ -4800,6 +5315,31 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         ))}
                       </div>
                     </div>
+
+                  {id && (formData.status === 'accepted' || formData.status === 'arrived' || (isAdmin && formData.status !== 'completed')) && (
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                      {route.status === 'completed' ? (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-sm border border-emerald-100 italic">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {t('delivery_successful_per_route')}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleCompleteRoute(index)}
+                          disabled={isUpdatingRouteStatus}
+                          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 active:scale-95 disabled:opacity-50"
+                        >
+                          {isUpdatingRouteStatus ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          {t('delivery_successful_per_route')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -4851,9 +5391,21 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             )}
             
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
-                {t('estimated_distance')} ({t('km')})
-              </label>
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {t('estimated_distance')} ({t('km')})
+                </label>
+                {formData.estimated_distance !== undefined && formData.estimated_distance > 0 && (
+                  <span className={clsx(
+                    "text-[10px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-wider",
+                    formData.estimated_distance > parseInt(localStorage.getItem('bkk_max_distance') || '250', 10)
+                      ? "bg-purple-50 text-purple-600 border-purple-100"
+                      : "bg-blue-50 text-blue-600 border-blue-100"
+                  )}>
+                    {formData.estimated_distance > parseInt(localStorage.getItem('bkk_max_distance') || '250', 10) ? t('upcountry') : t('bangkok_vicinity')}
+                  </span>
+                )}
+              </div>
               <input
                 type="number"
                 step="0.1"
@@ -4887,7 +5439,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 </label>
                 {(!formData.estimated_distance || formData.estimated_distance === 0) && (
                   <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
-                    คำนวณระยะทางก่อนเพื่อดูคิวรถแนะนำ
+                    {t('calculate_distance_hint')}
                   </span>
                 )}
               </div>
@@ -4911,13 +5463,13 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                   let queueLabel = '';
                   if ((car as any)._queue) {
                     const q = (car as any)._queue;
-                    if (formData.estimated_distance && formData.estimated_distance > 250 && q.recommendation === 'upcountry') {
-                      queueLabel = ` ⭐ คิวงาน ตจว. (คะแนน: ${q.priority_score.toFixed(2)})`;
-                    } else if (formData.estimated_distance && formData.estimated_distance <= 250 && q.recommendation === 'bkk') {
-                      queueLabel = ` ⭐ คิวงาน กทม. (คะแนน: ${q.priority_score.toFixed(2)})`;
-                    } else {
-                      queueLabel = ` (คะแนน: ${q.priority_score.toFixed(2)})`;
-                    }
+                    const recommendationStr = q.recommendation === 'upcountry' 
+                      ? t('should_get_upcountry_job') 
+                      : q.recommendation === 'bkk' 
+                        ? t('should_get_bkk_job') 
+                        : t('normal_status');
+                    
+                    queueLabel = ` [${recommendationStr}]`;
                   }
 
                   return {
@@ -5061,10 +5613,60 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 }}
               />
               {formData.car_id && (
-                <div className="mt-2 p-3 bg-white rounded-xl text-xs text-slate-600 space-y-1 border border-slate-100">
-                  <p><strong>{t('current_mileage')}:</strong> {formData.current_mileage || '-'}</p>
-                  <p><strong>{t('next_maintenance_date')}:</strong> {formData.next_maintenance_date ? new Date(formData.next_maintenance_date).toLocaleDateString() : '-'}</p>
-                  <p><strong>{t('next_maintenance_mileage')}:</strong> {formData.next_maintenance_mileage || '-'}</p>
+                <div className="mt-2 p-3 bg-white rounded-xl text-xs text-slate-600 space-y-2 border border-slate-100 shadow-sm">
+                  {(() => {
+                    const carId = typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id;
+                    const selectedCar = filteredCars.find(c => String(c.id) === String(carId));
+                    const isQueueEnabled = localStorage.getItem('enable_queue_system') !== 'false';
+                    const q = (selectedCar as any)?._queue;
+                    
+                    if (!isQueueEnabled || !q) return null;
+
+                    const getRecommendationBadge = (recommendation: string) => {
+                      switch (recommendation) {
+                        case 'upcountry':
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">
+                              <ArrowUpRight className="w-3 h-3" />
+                              {t('should_get_upcountry_job')}
+                            </span>
+                          );
+                        case 'bkk':
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">
+                              <ArrowDownRight className="w-3 h-3" />
+                              {t('should_get_bkk_job')}
+                            </span>
+                          );
+                        default:
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">
+                              <Minus className="w-3 h-3" />
+                              {t('normal_status')}
+                            </span>
+                          );
+                      }
+                    };
+
+                    return (
+                      <div className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
+                        <span className="font-semibold text-slate-500">{t('next_queue_status')}:</span>
+                        {getRecommendationBadge(q.recommendation)}
+                      </div>
+                    );
+                  })()}
+                  <div className="flex justify-between py-1 border-b border-slate-50 last:border-0">
+                    <span className="font-semibold text-slate-500">{t('current_mileage')}:</span>
+                    <span className="font-bold text-slate-800">{formData.current_mileage || '-'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 last:border-0">
+                    <span className="font-semibold text-slate-500">{t('next_maintenance_date')}:</span>
+                    <span className="font-bold text-slate-800">{formData.next_maintenance_date ? new Date(formData.next_maintenance_date).toLocaleDateString() : '-'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 last:border-0">
+                    <span className="font-semibold text-slate-500">{t('next_maintenance_mileage')}:</span>
+                    <span className="font-bold text-slate-800">{formData.next_maintenance_mileage || '-'}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -5148,127 +5750,6 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
         </div>
 
-        {/* Time & Mileage Section */}
-        {id && (
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-50 rounded-lg">
-                <Clock className="w-5 h-5 text-purple-600" />
-              </div>
-              <h3 className="font-bold text-slate-800">{t('time')} {t('and')} {t('mileage')}</h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> {t('standby_time')}
-                </label>
-                <input 
-                  type="datetime-local" 
-                  disabled={!isEditable || isFieldLocked('standby_time')}
-                  value={formData.standby_time || ''}
-                  onChange={e => setFormData({...formData, standby_time: e.target.value})}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('standby_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> {t('departure_time')}
-                </label>
-                <input 
-                  type="datetime-local" 
-                  disabled={!isEditable || isFieldLocked('departure_time')}
-                  value={formData.departure_time || ''}
-                  onChange={e => setFormData({...formData, departure_time: e.target.value})}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('departure_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> {t('arrival_time')}
-                </label>
-                <input 
-                  type="datetime-local" 
-                  disabled={!isEditable || isFieldLocked('arrival_time')}
-                  value={formData.arrival_time || ''}
-                  onChange={e => {
-                    const arrivalTime = e.target.value;
-                    if (formData.departure_time && arrivalTime && new Date(arrivalTime) < new Date(formData.departure_time)) {
-                      setError(t('arrival_before_departure'));
-                    } else {
-                      setError('');
-                    }
-                    setFormData({...formData, arrival_time: arrivalTime});
-                  }}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('arrival_time')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4" /> {t('mileage_start')}
-                </label>
-                <input 
-                  type="number" 
-                  disabled={true}
-                  placeholder="0"
-                  value={formData.mileage_start || ''}
-                  onChange={e => setFormData({...formData, mileage_start: e.target.value})}
-                  className="w-full px-4 py-3 border rounded-2xl outline-none transition-all bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4" /> {t('mileage_end')}
-                </label>
-                <input 
-                  type="number" 
-                  disabled={!isEditable || isFieldLocked('mileage_end')}
-                  placeholder="0"
-                  value={formData.mileage_end || ''}
-                  onChange={e => setFormData({...formData, mileage_end: e.target.value})}
-                  className={clsx(
-                    "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                    (!isEditable || isFieldLocked('mileage_end')) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
-                  )}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Truck className="w-4 h-4" /> {t('total_distance')}
-                </label>
-                <div className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 font-bold flex items-center justify-between">
-                  <span>{totalDistance.toLocaleString()}</span>
-                  <span className="text-xs text-slate-400 font-normal">km</span>
-                </div>
-              </div>
-            </div>
-
-            {formData.car_id && formData.mileage_start && parseFloat(formData.mileage_start) < getLastMileage(formData.car_id) && (
-              <div className="p-4 bg-red-50 rounded-2xl border border-red-200 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-red-800">{t('mileage_error')}</p>
-                  <p className="text-xs text-red-700">
-                    {t('mileage_less_than_previous', { mileage: getLastMileage(formData.car_id) })}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Photos & Notes Section */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
@@ -5285,6 +5766,110 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               {renderPhotoSection(t('photo_document'), documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'), (i) => removeExistingPhoto(i, 'document'), processingPhotos)}
             </div>
 
+            {/* Expenses Section */}
+            <div className="p-4 bg-slate-50 rounded-3xl space-y-4 border border-slate-100">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-primary" />
+                  {t('expenses')}
+                </h3>
+                <button
+                  type="button"
+                  disabled={!!id && !isAdmin}
+                  onClick={handleAddExpense}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-xl text-xs font-bold hover:bg-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" />
+                  {t('add_expense')}
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {(formData.expense_items || []).map((item, index) => (
+                  <div key={item.id} className="grid grid-cols-12 gap-3 items-end animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="col-span-6 flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('expense_name')}</label>
+                      {expenseCategories.length > 0 ? (
+                        <div className="relative">
+                          <select 
+                            disabled={!!id && !isAdmin}
+                            value={item.name}
+                            onChange={e => handleUpdateExpense(item.id, 'name', e.target.value)}
+                            className={clsx(
+                              "w-full px-4 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm appearance-none",
+                              (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-white border-slate-200 focus:border-primary"
+                            )}
+                          >
+                            <option value="">{t('select_expense_category', 'เลือกรายการ')}</option>
+                            {expenseCategories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                            <option value={t('other')}>{t('other')}</option>
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                      ) : (
+                        <input 
+                          type="text"
+                          disabled={!!id && !isAdmin}
+                          value={item.name}
+                          onChange={e => handleUpdateExpense(item.id, 'name', e.target.value)}
+                          className={clsx(
+                            "w-full px-4 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm",
+                            (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-white border-slate-200 focus:border-primary"
+                          )}
+                          placeholder={t('expense_name')}
+                        />
+                      )}
+                    </div>
+                    <div className="col-span-5 flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('expense_amount')}</label>
+                      <div className="relative">
+                        <input 
+                          type="number"
+                          step="0.01"
+                          disabled={!!id && !isAdmin}
+                          value={item.amount || ''}
+                          onChange={e => handleUpdateExpense(item.id, 'amount', e.target.value)}
+                          className={clsx(
+                            "w-full pl-4 pr-10 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm",
+                            (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-white border-slate-200 focus:border-primary"
+                          )}
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{t('baht')}</span>
+                      </div>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center pb-1">
+                      <button
+                        type="button"
+                        disabled={!!id && !isAdmin}
+                        onClick={() => handleRemoveExpense(item.id)}
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {(formData.expense_items || []).length === 0 && (
+                  <div className="text-center py-6 border-2 border-dashed border-slate-100 rounded-2xl">
+                    <p className="text-sm text-slate-400">{t('no_expenses')}</p>
+                  </div>
+                )}
+
+                {(formData.expense_items || []).length > 0 && (
+                  <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-500">{t('total_expenses')}</span>
+                    <span className="text-lg font-black text-primary">
+                      {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })} {t('baht')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <FileText className="w-4 h-4" /> {t('notes')}
@@ -5292,7 +5877,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               <textarea 
                 rows={4}
                 disabled={!!id && !isAdmin}
-                placeholder={t('notes_placeholder', 'ระบุหมายเหตุหรือรายละเอียดเพิ่มเติม...')}
+                placeholder={t('notes_placeholder')}
                 value={formData.notes || ''}
                 onChange={e => setFormData({...formData, notes: e.target.value})}
                 className={clsx(
@@ -5305,7 +5890,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             {/* Signature Section */}
             <div className="space-y-4">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <PenTool className="w-4 h-4" /> {t('signature', 'ลายเซ็นผู้รับสินค้า')}
+                <PenTool className="w-4 h-4" /> {t('signature')}
               </label>
               
               {formData.signature ? (
@@ -5338,7 +5923,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       type="button"
                       onClick={() => signaturePadRef.current?.clear()}
                       className="absolute bottom-2 right-2 p-2 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
-                      title={t('clear', 'ล้าง')}
+                      title={t('clear')}
                     >
                       <Eraser className="w-4 h-4" />
                     </button>
@@ -5348,7 +5933,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
                       type="text"
-                      placeholder={t('receiver_name', 'ชื่อผู้รับสินค้า')}
+                      placeholder={t('receiver_name')}
                       value={formData.signature_name}
                       onChange={e => setFormData({...formData, signature_name: e.target.value})}
                       className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -5362,26 +5947,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
         {/* Action Buttons */}
         <div className="space-y-4">
-          {!isAdmin && formData.status === 'accepted' && (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleArriveAtJob}
-                className="flex-1 bg-amber-500 text-white py-4 rounded-2xl font-bold text-lg hover:bg-amber-600 transition-colors shadow-lg shadow-amber-100"
-              >
-                {t('status_arrived')}
-              </button>
-              <button
-                type="button"
-                onClick={handleCompleteJob}
-                className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
-              >
-                {t('job_completed_msg')}
-              </button>
-            </div>
-          )}
-
-          {!isAdmin && formData.status === 'arrived' && (
+          {!isAdmin && (formData.status === 'accepted' || formData.status === 'arrived') && (
             <button
               type="button"
               onClick={handleCompleteJob}
@@ -5399,7 +5965,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             {submitting || processingPhotos ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {processingPhotos ? t('processing_photos', 'กำลังประมวลผลรูปภาพ...') : t('loading')}
+                {processingPhotos ? t('processing_photos') : t('loading')}
               </>
             ) : (
               <>
@@ -5449,7 +6015,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-900">ยืนยันข้อมูลรายงาน</h3>
+              <h3 className="text-xl font-bold text-slate-900">{t('confirm_report_data')}</h3>
               <button onClick={() => setShowConfirmModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -5458,47 +6024,80 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
               <div className="bg-white p-4 rounded-xl space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ประเภทงาน:</span>
-                  <span className="text-sm font-semibold text-slate-900">{formData.job_type === 'round_trip' ? 'ไป-กลับ' : 'เที่ยวเดียว'}</span>
+                  <span className="text-sm text-slate-500">{t('job_type_label')}:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.job_type === 'round_trip' ? t('round_trip') : t('one_way')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">วันที่:</span>
+                  <span className="text-sm text-slate-500">{t('date_label')}:</span>
                   <span className="text-sm font-semibold text-slate-900">{formData.work_date}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ลูกค้า:</span>
+                  <span className="text-sm text-slate-500">{t('customer_label')}:</span>
                   <span className="text-sm font-semibold text-slate-900">{formData.customer_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ต้นทาง:</span>
+                  <span className="text-sm text-slate-500">{t('origin_label')}:</span>
                   <span className="text-sm font-semibold text-slate-900 text-right max-w-[200px] truncate">{formData.origin}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ปลายทาง:</span>
+                  <span className="text-sm text-slate-500">{t('destination_label')}:</span>
                   <span className="text-sm font-semibold text-slate-900 text-right max-w-[200px] truncate">{formData.destination}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ระยะทางประเมิน:</span>
-                  <span className="text-sm font-semibold text-slate-900">{formData.estimated_distance || 0} กม.</span>
+                  <span className="text-sm text-slate-500">{t('estimated_distance_label')}:</span>
+                  <span className="text-sm font-semibold text-slate-900">{formData.estimated_distance || 0} {t('km')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">ทะเบียนรถ:</span>
+                  <span className="text-sm text-slate-500">{t('registration_plate')}:</span>
                   <span className="text-sm font-semibold text-slate-900">
                     {cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id))?.car_number || '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">พนักงานขับรถ:</span>
+                  <span className="text-sm text-slate-500">{t('driver_name')}:</span>
                   <span className="text-sm font-semibold text-slate-900">
                     {members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id))?.display_name || '-'}
                   </span>
                 </div>
+                {((formData.expense_items && formData.expense_items.length > 0) || formData.toll_fee || formData.fuel_cost || formData.other_expenses) && (
+                  <div className="pt-3 border-t border-slate-100 mt-3 space-y-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('expenses')}</p>
+                    {formData.expense_items && formData.expense_items.map((item, idx) => (
+                      <div key={item.id} className="flex justify-between">
+                        <span className="text-sm text-slate-500">{item.name || `${t('expense_name')} ${idx + 1}`}:</span>
+                        <span className="text-sm font-semibold text-slate-900">{item.amount.toLocaleString()} {t('baht')}</span>
+                      </div>
+                    ))}
+                    {formData.toll_fee && !formData.expense_items?.length && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-500">{t('toll_fee')}:</span>
+                        <span className="text-sm font-semibold text-slate-900">{formData.toll_fee} {t('baht')}</span>
+                      </div>
+                    )}
+                    {formData.fuel_cost && !formData.expense_items?.length && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-500">{t('fuel_cost')}:</span>
+                        <span className="text-sm font-semibold text-slate-900">{formData.fuel_cost} {t('baht')}</span>
+                      </div>
+                    )}
+                    {formData.other_expenses && !formData.expense_items?.length && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-500">{t('other_expenses')}:</span>
+                        <span className="text-sm font-semibold text-slate-900">{formData.other_expenses} {t('baht')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t border-slate-50 border-dashed">
+                      <span className="text-sm font-bold text-slate-700">{t('total_expenses')}:</span>
+                      <span className="text-sm font-black text-primary">{(totalExpenses || (Number(formData.toll_fee || 0) + Number(formData.fuel_cost || 0) + Number(formData.other_expenses || 0))).toLocaleString()} {t('baht')}</span>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800">
-                  กรุณาตรวจสอบข้อมูลให้ถูกต้องก่อนกดยืนยันบันทึกรายงาน
+                  {t('check_info_correct')}
                 </p>
               </div>
             </div>
@@ -5509,14 +6108,14 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                 onClick={() => setShowConfirmModal(false)}
                 className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-white transition-colors"
               >
-                แก้ไขข้อมูล
+                {t('edit_info')}
               </button>
               <button
                 type="button"
                 onClick={executeSave}
                 className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
               >
-                ยืนยันบันทึก
+                {t('confirm_save')}
               </button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { directusApi } from '../api/directus';
 import { Member } from '../types';
-import { Loader2, User, Phone, Mail, Save, CheckCircle2, Camera, X } from 'lucide-react';
+import { Loader2, User, Phone, Mail, Save, CheckCircle2, Camera, X, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface ProfileModalProps {
@@ -23,8 +23,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
     last_name: '',
     phone: '',
     email: '',
-    picture_url: ''
+    picture_url: '',
+    password: ''
   });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [imgError, setImgError] = useState(false);
 
@@ -58,7 +62,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
             last_name: adminMember.last_name,
             phone: adminMember.phone,
             email: adminMember.email,
-            picture_url: adminMember.picture_url || ''
+            picture_url: adminMember.picture_url || '',
+            password: ''
           });
         } else {
           const members = await directusApi.getMembers();
@@ -73,7 +78,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
               last_name: found.last_name || '',
               phone: found.phone || '',
               email: found.email || '',
-              picture_url: found.picture_url || ''
+              picture_url: found.picture_url || '',
+              password: ''
             });
           }
         }
@@ -130,16 +136,33 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
     setSubmitting(true);
     setSuccess(false);
     setError(null);
+
+    if (newPassword && newPassword !== confirmPassword) {
+      setError(t('passwords_do_not_match'));
+      return;
+    }
+
     try {
       const isAdmin = localStorage.getItem('is_admin') === 'true';
+      const updateData: any = { ...formData };
+      if (newPassword) {
+        updateData.password = newPassword;
+      } else {
+        delete updateData.password;
+      }
+
       if (isAdmin) {
-        await directusApi.updateAdmin(member.id, {
+        const adminUpdateData: any = {
           first_name: formData.first_name,
           last_name: formData.last_name,
           email: formData.email
-        });
+        };
+        if (newPassword) {
+          adminUpdateData.password = newPassword;
+        }
+        await directusApi.updateAdmin(member.id, adminUpdateData);
       } else {
-        await directusApi.updateMember(member.id, formData);
+        await directusApi.updateMember(member.id, updateData);
       }
       
       localStorage.setItem('user_name', `${formData.first_name} ${formData.last_name}`);
@@ -288,6 +311,45 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
                 />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 mb-4">{t('change_password')}</h3>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      {t('new_password')}
+                    </label>
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder={t('leave_blank')}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      {t('confirm_password')}
+                    </label>
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder={t('leave_blank')}
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+                    />
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs font-bold text-primary hover:text-blue-800 transition-colors"
+                  >
+                    {showPassword ? t('hide_password') : t('show_password')}
+                  </button>
+                </div>
               </div>
 
               <button 

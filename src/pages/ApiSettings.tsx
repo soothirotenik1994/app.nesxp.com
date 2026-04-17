@@ -27,7 +27,9 @@ export const ApiSettings: React.FC = () => {
   const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
 
   const appUrl = window.location.origin;
-  const trackingEndpoint = `${appUrl}/api/track/{case_number}`;
+  const trackingEndpoint = `${appUrl}/api/track/{case_number}?phone={phone_number}`;
+
+  const [testPhone, setTestPhone] = useState('');
 
   React.useEffect(() => {
     const checkHealth = async () => {
@@ -49,13 +51,16 @@ export const ApiSettings: React.FC = () => {
 
   const handleTestApi = async () => {
     const trimmedCaseNumber = testCaseNumber.trim();
-    if (!trimmedCaseNumber) return;
+    const trimmedPhone = testPhone.trim();
+    if (!trimmedCaseNumber || !trimmedPhone) return;
     setIsTesting(true);
     setTestResult(null);
     setTestError(null);
     try {
       // Use encodeURIComponent to handle special characters in case numbers
-      const response = await axios.get(`/api/track/${encodeURIComponent(trimmedCaseNumber)}`);
+      const response = await axios.get(`/api/track/${encodeURIComponent(trimmedCaseNumber)}`, {
+        params: { phone: trimmedPhone }
+      });
       setTestResult(response.data);
     } catch (error: any) {
       console.error('API Test Error:', error);
@@ -75,9 +80,9 @@ export const ApiSettings: React.FC = () => {
     }
   };
 
-  const curlExample = `curl -X GET "${appUrl}/api/track/NES-2026-001"`;
+  const curlExample = `curl -X GET "${appUrl}/api/track/NES-2026-001?phone=0812345678"`;
   
-  const jsExample = `fetch("${appUrl}/api/track/NES-2026-001")
+  const jsExample = `fetch("${appUrl}/api/track/NES-2026-001?phone=0812345678")
   .then(response => response.json())
   .then(data => console.log(data))
   .catch(error => console.error('Error:', error));`;
@@ -122,9 +127,9 @@ export const ApiSettings: React.FC = () => {
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
                 <Globe className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-slate-900">No Auth Required</h3>
+              <h3 className="font-bold text-slate-900">Phone Verification</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                The tracking API is public and only requires a valid Case Number to retrieve status.
+                The tracking API requires both a valid Case Number and the associated Phone Number to retrieve status.
               </p>
             </div>
             <div className="p-4 bg-white rounded-xl border border-slate-100 space-y-2">
@@ -228,7 +233,7 @@ export const ApiSettings: React.FC = () => {
           </div>
         </div>
         <div className="p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input 
               type="text" 
               placeholder="Enter Case Number (e.g. NES-2026-001)"
@@ -236,15 +241,22 @@ export const ApiSettings: React.FC = () => {
               onChange={(e) => setTestCaseNumber(e.target.value)}
               className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
-            <button 
-              onClick={handleTestApi}
-              disabled={isTesting || !testCaseNumber}
-              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isTesting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-              Test API
-            </button>
+            <input 
+              type="text" 
+              placeholder="Enter Phone Number (e.g. 0812345678)"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            />
           </div>
+          <button 
+            onClick={handleTestApi}
+            disabled={isTesting || !testCaseNumber || !testPhone}
+            className="w-full px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isTesting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+            Test API
+          </button>
 
           {testError && (
             <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-600">

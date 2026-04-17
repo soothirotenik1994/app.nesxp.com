@@ -87,7 +87,7 @@ export const VehicleQueue: React.FC = () => {
       setQueueData(calculatedData);
     } catch (err) {
       console.error('Error fetching queue data:', err);
-      setError('ไม่สามารถโหลดข้อมูลคิวรถได้');
+      setError(t('failed_to_load_queue_data'));
     } finally {
       setLoading(false);
     }
@@ -112,21 +112,21 @@ export const VehicleQueue: React.FC = () => {
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-medium">
             <ArrowUpRight className="w-4 h-4" />
-            ควรได้งานต่างจังหวัด
+            {t('should_get_upcountry_job')}
           </span>
         );
       case 'bkk':
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">
             <ArrowDownRight className="w-4 h-4" />
-            ควรได้งานกรุงเทพฯ
+            {t('should_get_bkk_job')}
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-sm font-medium">
             <Minus className="w-4 h-4" />
-            ปกติ
+            {t('normal_status')}
           </span>
         );
     }
@@ -141,8 +141,8 @@ export const VehicleQueue: React.FC = () => {
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-800">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <div>
-            <p className="font-bold">ระบบจัดลำดับคิวรถถูกปิดใช้งานอยู่</p>
-            <p className="text-sm mt-1">ระบบจะไม่แนะนำคิวรถอัตโนมัติในหน้า "จ่ายงานใหม่" คุณสามารถเปิดใช้งานได้ที่เมนู "ตั้งค่าระบบ"</p>
+            <p className="font-bold">{t('queue_system_disabled')}</p>
+            <p className="text-sm mt-1">{t('queue_system_disabled_desc')}</p>
           </div>
         </div>
       )}
@@ -151,16 +151,16 @@ export const VehicleQueue: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <ListOrdered className="w-8 h-8 text-primary" />
-            ระบบจัดลำดับคิวรถ
+            {t('vehicle_queue')}
           </h1>
-          <p className="text-gray-500 mt-1">คำนวณลำดับคิวอัตโนมัติจากประวัติการวิ่งงาน (กทม. vs ต่างจังหวัด)</p>
+          <p className="text-gray-500 mt-1">{t('vehicle_queue_desc')}</p>
         </div>
         
         <div className="flex items-center gap-3">
           <button
             onClick={fetchData}
             className="p-2 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
-            title="รีเฟรชข้อมูล"
+            title={t('refresh_data')}
           >
             <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
           </button>
@@ -168,7 +168,7 @@ export const VehicleQueue: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="ค้นหาทะเบียนรถ, ชื่อคนขับ..."
+              placeholder={t('search_car_driver_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none w-full sm:w-64"
@@ -189,12 +189,12 @@ export const VehicleQueue: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white border-b border-gray-100">
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">ลำดับ</th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">ข้อมูลรถ</th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">งาน กทม.<br/><span className="text-xs font-normal text-gray-400">(≤ {bkkMaxDistance} กม.)</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">งานต่างจังหวัด<br/><span className="text-xs font-normal text-gray-400">(&gt; {bkkMaxDistance} กม.)</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">Priority Score<br/><span className="text-xs font-normal text-gray-400">(กทม. / (ตจว. + 1))</span></th>
-                <th className="px-6 py-4 text-sm font-bold text-gray-500">สถานะคิวถัดไป</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500">{t('queue_order')}</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500">{t('car_info')}</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">{t('bkk_jobs')}<br/><span className="text-xs font-normal text-gray-400">(≤ {bkkMaxDistance} {t('km')})</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">{t('upcountry_jobs')}<br/><span className="text-xs font-normal text-gray-400">(&gt; {bkkMaxDistance} {t('km')})</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500 text-center">{t('priority_score')}<br/><span className="text-xs font-normal text-gray-400">({t('priority_score_formula')})</span></th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-500">{t('next_queue_status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -202,13 +202,13 @@ export const VehicleQueue: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <RefreshCw className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-gray-500">กำลังคำนวณลำดับคิว...</p>
+                    <p className="text-gray-500">{t('calculating_queue')}</p>
                   </td>
                 </tr>
               ) : filteredQueue.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    ไม่พบข้อมูลรถที่ค้นหา
+                    {t('no_car_found')}
                   </td>
                 </tr>
               ) : (
@@ -232,7 +232,7 @@ export const VehicleQueue: React.FC = () => {
                         </div>
                         <div>
                           <p className="font-bold text-gray-900">{item.car.car_number}</p>
-                          <p className="text-sm text-gray-500">{item.car.owner_name || 'ไม่ระบุคนขับ'}</p>
+                          <p className="text-sm text-gray-500">{item.car.owner_name || t('no_driver')}</p>
                         </div>
                       </div>
                     </td>

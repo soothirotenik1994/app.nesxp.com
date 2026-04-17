@@ -151,20 +151,20 @@ export const MaintenanceLog: React.FC = () => {
         </div>
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-gray-900">{t('success')}</h2>
-          <p className="text-gray-500">{t('save_maintenance_record_success') || 'Maintenance record saved successfully'}</p>
+          <p className="text-gray-500">{t('save_maintenance_record_success')}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <button
             onClick={resetForm}
             className="px-8 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
           >
-            {t('add_another') || 'Add Another'}
+            {t('add_another')}
           </button>
           <button
             onClick={() => navigate('/maintenance/reports')}
             className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
           >
-            {t('view_reports') || 'View Reports'}
+            {t('view_reports')}
           </button>
         </div>
       </div>
@@ -235,7 +235,7 @@ export const MaintenanceLog: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   <div className="bg-white/50 p-2 rounded-lg">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('current_mileage')}</p>
-                    <p className="text-sm font-bold text-gray-900">{selectedCar.current_mileage?.toLocaleString() || 0} กม.</p>
+                    <p className="text-sm font-bold text-gray-900">{selectedCar.current_mileage?.toLocaleString() || 0} {t('km')}</p>
                   </div>
                   <div className="bg-white/50 p-2 rounded-lg">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('status')}</p>
@@ -256,7 +256,7 @@ export const MaintenanceLog: React.FC = () => {
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
                 <Search className="w-8 h-8 text-gray-300" />
               </div>
-              <p className="text-gray-400 font-medium">{t('please_select_vehicle_to_continue') || 'Please select a vehicle to continue'}</p>
+              <p className="text-gray-400 font-medium">{t('please_select_vehicle_to_continue')}</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6">
@@ -311,7 +311,7 @@ export const MaintenanceLog: React.FC = () => {
                   isMulti
                   options={maintenanceItems}
                   onChange={(newValue) => setServiceItems(newValue.map(v => v.value))}
-                  placeholder={t('select_or_type_items') || 'Select or type items...'}
+                  placeholder={t('select_or_type_items')}
                   className="react-select-container"
                   classNamePrefix="react-select"
                   styles={{
@@ -334,7 +334,7 @@ export const MaintenanceLog: React.FC = () => {
                   <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                   <textarea
                     rows={3}
-                    placeholder={t('history_notes_placeholder') || 'Additional notes...'}
+                    placeholder={t('history_notes_placeholder')}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none"
@@ -350,7 +350,7 @@ export const MaintenanceLog: React.FC = () => {
                 {submitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    {t('saving') || 'Saving...'}
+                    {t('saving')}
                   </>
                 ) : (
                   <>

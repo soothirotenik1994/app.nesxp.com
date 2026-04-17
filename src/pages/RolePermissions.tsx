@@ -11,6 +11,8 @@ import {
   Trash2,
   ChevronRight,
   Layout,
+  Activity,
+  Bell,
   Users,
   Car,
   MapPin,
@@ -23,7 +25,6 @@ import {
   ClipboardList,
   History,
   UserCog,
-  Bell,
   MessageSquare,
   Code,
   ListOrdered
@@ -40,30 +41,31 @@ interface PermissionGroup {
 }
 
 const MENU_KEYS = [
-  { key: 'dashboard', label: 'แผนที่เรียลไทม์', icon: LayoutDashboard, group: 'โลจิสติกส์' },
-  { key: 'calendar', label: 'ปฏิทินงาน', icon: Calendar, group: 'โลจิสติกส์' },
-  { key: 'all_jobs', label: 'รายการงาน', icon: ClipboardList, group: 'โลจิสติกส์' },
-  { key: 'history', label: 'ประวัติงาน', icon: History, group: 'โลจิสติกส์' },
-  { key: 'trip_history', label: 'ดูรถย้อนหลัง', icon: MapPin, group: 'โลจิสติกส์' },
-  { key: 'vehicle_queue', label: 'จัดลำดับคิวรถ', icon: ListOrdered, group: 'โลจิสติกส์' },
+  { key: 'dashboard', label: 'dashboard', icon: LayoutDashboard, group: 'logistics' },
+  { key: 'calendar', label: 'job_calendar', icon: Calendar, group: 'logistics' },
+  { key: 'all_jobs', label: 'all_jobs', icon: ClipboardList, group: 'logistics' },
+  { key: 'history', label: 'job_history', icon: History, group: 'logistics' },
+  { key: 'trip_history', label: 'trip_history', icon: MapPin, group: 'logistics' },
+  { key: 'live_monitor', label: 'live_monitor', icon: Activity, group: 'logistics' },
+  { key: 'announcements', label: 'company_announcements', icon: Bell, group: 'logistics' },
+  { key: 'vehicle_queue', label: 'vehicle_queue', icon: ListOrdered, group: 'logistics' },
   
-  { key: 'reports', label: 'รายงาน', icon: ShieldCheck, group: 'การจัดการ' },
-  { key: 'members', label: 'สมาชิก', icon: Users, group: 'การจัดการ' },
-  { key: 'vehicles', label: 'ยานพาหนะ', icon: Car, group: 'การจัดการ' },
-  { key: 'locations', label: 'ที่อยู่ลูกค้า', icon: MapPin, group: 'การจัดการ' },
-  { key: 'new_job', label: 'มอบหมายงานใหม่', icon: FileText, group: 'การจัดการ' },
+  { key: 'reports', label: 'reports', icon: ShieldCheck, group: 'management' },
+  { key: 'members', label: 'members', icon: Users, group: 'management' },
+  { key: 'vehicles', label: 'vehicles', icon: Car, group: 'management' },
+  { key: 'locations', label: 'customer_locations', icon: MapPin, group: 'management' },
+  { key: 'new_job', label: 'new_job_assignment', icon: FileText, group: 'management' },
   
-  { key: 'maintenance', label: 'แดชบอร์ดการบำรุงรักษา', icon: RefreshCcw, group: 'การบำรุงรักษา' },
-  { key: 'maintenance_log', label: 'บันทึกการซ่อมบำรุง', icon: Wrench, group: 'การบำรุงรักษา' },
-  { key: 'maintenance_reports', label: 'รายงานการซ่อมบำรุง', icon: FileText, group: 'การบำรุงรักษา' },
-  { key: 'maintenance_items', label: 'ประเภทการซ่อมบำรุง', icon: Settings, group: 'การบำรุงรักษา' },
+  { key: 'maintenance', label: 'maintenance_dashboard', icon: RefreshCcw, group: 'maintenance' },
+  { key: 'maintenance_log', label: 'maintenance_log', icon: Wrench, group: 'maintenance' },
+  { key: 'maintenance_reports', label: 'maintenance_reports', icon: FileText, group: 'maintenance' },
+  { key: 'maintenance_items', label: 'manage_maintenance_types', icon: Settings, group: 'maintenance' },
   
-  { key: 'admins', label: 'ผู้ดูแลระบบ', icon: UserCog, group: 'ระบบ' },
-  { key: 'admin_notifications', label: 'การแจ้งเตือนผู้ดูแล', icon: Bell, group: 'ระบบ' },
-  { key: 'line_broadcast', label: 'LINE บรอดแคสต์', icon: MessageSquare, group: 'ระบบ' },
-  { key: 'api_settings', label: 'การเชื่อมต่อ API', icon: Code, group: 'ระบบ' },
-  { key: 'role_permissions', label: 'จัดการสิทธิ์การใช้งาน', icon: Shield, group: 'ระบบ' },
-  { key: 'system_settings', label: 'ตั้งค่าระบบ', icon: Settings, group: 'ระบบ' },
+  { key: 'admins', label: 'admins', icon: UserCog, group: 'system' },
+  { key: 'line_broadcast', label: 'line_broadcast', icon: MessageSquare, group: 'system' },
+  { key: 'api_settings', label: 'api_settings', icon: Code, group: 'system' },
+  { key: 'role_permissions', label: 'role_permissions', icon: Shield, group: 'system' },
+  { key: 'system_settings', label: 'system_settings', icon: Settings, group: 'system' },
 ];
 
 // Fallback icon if specific one is missing
@@ -87,23 +89,24 @@ export const RolePermissions: React.FC = () => {
     try {
       const data = await directusApi.getRolePermissions();
       
-      // If no data in Directus, initialize with hardcoded ones
-      if (data.length === 0) {
-        const initialGroups = Object.entries(ROLE_PERMISSIONS).map(([role, perms]) => ({
+      // Ensure all roles from ROLE_PERMISSIONS are present
+      const allRoles = Object.keys(ROLE_PERMISSIONS);
+      const mergedGroups = allRoles.map(role => {
+        const existing = data.find(d => d.role.toLowerCase() === role.toLowerCase());
+        if (existing) return { ...existing, role }; // Use the key from ROLE_PERMISSIONS but keep data
+        return {
           id: '',
           role,
-          permissions: perms,
-          description: `สิทธิ์เริ่มต้นสำหรับ ${role}`
-        }));
-        setGroups(initialGroups as any);
-        if (initialGroups.length > 0) setActiveRole(initialGroups[0].role);
-      } else {
-        setGroups(data);
-        if (data.length > 0) setActiveRole(data[0].role);
-      }
+          permissions: (ROLE_PERMISSIONS as any)[role],
+          description: t('default_permissions_for', { role })
+        };
+      });
+      
+      setGroups(mergedGroups as any);
+      if (mergedGroups.length > 0) setActiveRole(mergedGroups[0].role);
     } catch (err) {
       console.error('Failed to fetch permissions:', err);
-      setError('ไม่สามารถโหลดข้อมูลสิทธิ์จากเซิร์ฟเวอร์ได้');
+      setError(t('permissions_load_error'));
     } finally {
       setLoading(false);
     }
@@ -152,11 +155,11 @@ export const RolePermissions: React.FC = () => {
       });
       localStorage.setItem('dynamic_role_permissions', JSON.stringify(permissionsMap));
       
-      setSuccess('บันทึกสิทธิ์การใช้งานเรียบร้อยแล้ว');
+      setSuccess(t('permissions_saved_success'));
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Failed to save permissions:', err);
-      setError('ไม่สามารถบันทึกข้อมูลสิทธิ์ได้ กรุณาตรวจสอบว่ามีคอลเลกชัน "role_permissions" ใน Directus แล้ว');
+      setError(t('permissions_save_error'));
     } finally {
       setSaving(false);
     }
@@ -178,9 +181,9 @@ export const RolePermissions: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Shield className="w-8 h-8 text-primary" />
-            จัดการสิทธิ์การใช้งานเมนู
+            {t('role_permissions_title')}
           </h1>
-          <p className="text-gray-500 mt-1">กำหนดว่ากลุ่มผู้ใช้งานใดสามารถมองเห็นเมนูใดได้บ้าง</p>
+          <p className="text-gray-500 mt-1">{t('role_permissions_desc')}</p>
         </div>
         <button
           onClick={handleSave}
@@ -188,7 +191,7 @@ export const RolePermissions: React.FC = () => {
           className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
         >
           {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-          <span className="font-bold">{saving ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลงทั้งหมด'}</span>
+          <span className="font-bold">{saving ? t('saving_permissions') : t('save_all_changes')}</span>
         </button>
       </div>
 
@@ -209,7 +212,7 @@ export const RolePermissions: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Role Selection */}
         <div className="lg:col-span-1 space-y-2">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">กลุ่มผู้ใช้งาน</h3>
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">{t('user_groups')}</h3>
           {groups.map(group => (
             <button
               key={group.role}
@@ -232,16 +235,16 @@ export const RolePermissions: React.FC = () => {
           {currentGroup ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-50 bg-gray-50/50">
-                <h2 className="text-lg font-bold text-gray-900">การตั้งค่าสิทธิ์สำหรับกลุ่ม {currentGroup.role}</h2>
-                <p className="text-sm text-gray-500 mt-1">คลิกที่รายการเพื่อเปิดหรือปิดการแสดงผลเมนูสำหรับกลุ่มนี้</p>
+                <h2 className="text-lg font-bold text-gray-900">{t('permissions_for_group', { role: currentGroup.role })}</h2>
+                <p className="text-sm text-gray-500 mt-1">{t('click_to_toggle_menu')}</p>
               </div>
               
               <div className="p-6">
-                {['โลจิสติกส์', 'การจัดการ', 'การบำรุงรักษา', 'ระบบ'].map(groupName => (
+                {['logistics', 'management', 'maintenance', 'system'].map(groupName => (
                   <div key={groupName} className="mb-8 last:mb-0">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <div className="h-px flex-1 bg-gray-100"></div>
-                      {groupName}
+                      {t(groupName)}
                       <div className="h-px flex-1 bg-gray-100"></div>
                     </h3>
                     
@@ -265,8 +268,8 @@ export const RolePermissions: React.FC = () => {
                               <menu.icon className="w-5 h-5" />
                             </div>
                             <div>
-                              <p className="font-bold text-gray-900">{menu.label}</p>
-                              <p className="text-xs text-gray-500">รหัสเมนู: {menu.key}</p>
+                              <p className="font-bold text-gray-900">{t(menu.label)}</p>
+                              <p className="text-xs text-gray-500">{t('menu_id')}: {menu.key}</p>
                             </div>
                           </div>
                           
@@ -289,7 +292,7 @@ export const RolePermissions: React.FC = () => {
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
               <Shield className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">กรุณาเลือกกลุ่มผู้ใช้งานเพื่อจัดการสิทธิ์</p>
+              <p className="text-gray-500 font-medium">{t('select_role_to_manage')}</p>
             </div>
           )}
         </div>

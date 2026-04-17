@@ -62,6 +62,8 @@ export const ProtectedRoute: React.FC = () => {
     '/line/broadcast': 'line_broadcast',
     '/settings/api': 'api_settings',
     '/settings/system': 'system_settings',
+    '/monitor': 'live_monitor',
+    '/announcements': 'announcements',
   };
 
   // Check if current path requires a permission that the user doesn't have

@@ -12,7 +12,8 @@ import {
   Download,
   RefreshCw,
   User as UserIcon,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -197,8 +198,8 @@ export const DriverRatingManagement: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">การจัดการคะแนนคนขับ</h1>
-          <p className="text-slate-500 text-sm">ดูข้อมูลการประเมินความพึงพอใจจากลูกค้า</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('driver_rating_management')}</h1>
+          <p className="text-slate-500 text-sm">{t('satisfied_desc')}</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
@@ -240,7 +241,7 @@ export const DriverRatingManagement: React.FC = () => {
           <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mb-4">
             <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
           </div>
-          <p className="text-sm font-medium text-slate-500">คะแนนเฉลี่ย</p>
+          <p className="text-sm font-medium text-slate-500">{t('avg_rating')}</p>
           <p className="text-2xl font-bold text-slate-900">{stats.avgRating.toFixed(1)} / 5.0</p>
         </div>
         
@@ -248,15 +249,15 @@ export const DriverRatingManagement: React.FC = () => {
           <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
             <MessageSquare className="w-6 h-6 text-blue-600" />
           </div>
-          <p className="text-sm font-medium text-slate-500">จำนวนการประเมิน</p>
-          <p className="text-2xl font-bold text-slate-900">{stats.totalRatings} ครั้ง</p>
+          <p className="text-sm font-medium text-slate-500">{t('total_ratings')}</p>
+          <p className="text-2xl font-bold text-slate-900">{stats.totalRatings} {t('times')}</p>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
             <TrendingUp className="w-6 h-6 text-emerald-600" />
           </div>
-          <p className="text-sm font-medium text-slate-500">ความพึงพอใจสูงสุด (5 ดาว)</p>
+          <p className="text-sm font-medium text-slate-500">{t('max_satisfaction')}</p>
           <p className="text-2xl font-bold text-slate-900">{stats.positiveRate.toFixed(1)}%</p>
         </div>
 
@@ -264,8 +265,8 @@ export const DriverRatingManagement: React.FC = () => {
           <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
             <Users className="w-6 h-6 text-indigo-600" />
           </div>
-          <p className="text-sm font-medium text-slate-500">พนักงานที่ถูกประเมิน</p>
-          <p className="text-2xl font-bold text-slate-900">{Object.keys(driverRatings).length} คน</p>
+          <p className="text-sm font-medium text-slate-500">{t('rated_drivers')}</p>
+          <p className="text-2xl font-bold text-slate-900">{Object.keys(driverRatings).length} {t('persons')}</p>
         </div>
       </div>
 
@@ -273,7 +274,7 @@ export const DriverRatingManagement: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Rating Distribution */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">สัดส่วนคะแนนประเมิน</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-6">{t('rating_distribution')}</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ratingDistribution} layout="vertical" margin={{ left: 20, right: 40 }}>
@@ -292,7 +293,7 @@ export const DriverRatingManagement: React.FC = () => {
 
         {/* Top Rated Drivers Chart */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">พนักงานขับรถคะแนนสูงสุด</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-6">{t('top_rated_drivers')}</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={driverRatings}>
@@ -317,8 +318,8 @@ export const DriverRatingManagement: React.FC = () => {
               <ClipboardList className="w-5 h-5 text-slate-600" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">รายการประเมินทั้งหมด</h3>
-              <p className="text-xs text-slate-500">แสดงข้อมูลการประเมินรายบุคคล</p>
+              <h3 className="text-lg font-bold text-slate-900">{t('all_rating_items')}</h3>
+              <p className="text-xs text-slate-500">{t('individual_rating_desc')}</p>
             </div>
           </div>
           
@@ -326,7 +327,7 @@ export const DriverRatingManagement: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text"
-              placeholder="ค้นหาพนักงาน หรือเลขที่งาน..."
+              placeholder={t('search_driver_or_case')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -338,12 +339,12 @@ export const DriverRatingManagement: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-white">
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">เลขที่งาน</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">พนักงานขับรถ</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">คะแนน</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">ความคิดเห็น</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">วันที่ประเมิน</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">จัดการ</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('rating_case_number')}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('rating_driver_name')}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('rating_score')}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('rating_feedback')}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('rating_date')}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -393,7 +394,7 @@ export const DriverRatingManagement: React.FC = () => {
                           onClick={() => setSelectedRating(report)}
                           className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
                         >
-                          ดูรายละเอียด
+                          {t('view_details')}
                         </button>
                       </td>
                     </tr>
@@ -402,7 +403,7 @@ export const DriverRatingManagement: React.FC = () => {
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    ไม่พบข้อมูลการประเมิน
+                    {t('no_data')}
                   </td>
                 </tr>
               )}
@@ -416,23 +417,23 @@ export const DriverRatingManagement: React.FC = () => {
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-900">รายละเอียดการประเมิน</h3>
+              <h3 className="text-xl font-bold text-slate-900">{t('rating_details')}</h3>
               <button 
                 onClick={() => setSelectedRating(null)}
                 className="p-2 hover:bg-slate-100 rounded-full transition-colors"
               >
-                <RefreshCw className="w-5 h-5 text-slate-400 rotate-45" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
             
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">เลขที่งาน</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{t('rating_case_number')}</p>
                   <p className="font-mono text-lg font-bold text-primary">{selectedRating.case_number || '-'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">วันที่ประเมิน</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{t('rating_date')}</p>
                   <p className="text-slate-700 font-medium">
                     {selectedRating.rated_at ? format(parseISO(selectedRating.rated_at), 'dd MMM yyyy, HH:mm') : '-'}
                   </p>
@@ -444,7 +445,7 @@ export const DriverRatingManagement: React.FC = () => {
                   <UserIcon className="w-6 h-6 text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">พนักงานขับรถ</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('rating_driver_name')}</p>
                   <p className="text-slate-900 font-bold">
                     {(() => {
                       const driver = (typeof selectedRating.driver_id === 'object' ? selectedRating.driver_id : null) || 
@@ -456,7 +457,7 @@ export const DriverRatingManagement: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">คะแนนความพึงพอใจ</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t('customer_feedback')}</p>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -474,10 +475,10 @@ export const DriverRatingManagement: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">ความคิดเห็นจากลูกค้า</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t('customer_feedback')}</p>
                 <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl">
                   <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {selectedRating.feedback || 'ไม่มีความคิดเห็นเพิ่มเติม'}
+                    {selectedRating.feedback || t('no_feedback')}
                   </p>
                 </div>
               </div>
@@ -488,7 +489,7 @@ export const DriverRatingManagement: React.FC = () => {
                 onClick={() => setSelectedRating(null)}
                 className="px-8 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors shadow-sm"
               >
-                ปิดหน้าต่าง
+                {t('close_window')}
               </button>
             </div>
           </div>

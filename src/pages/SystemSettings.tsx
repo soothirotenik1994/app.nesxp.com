@@ -1,35 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare, MapPin } from 'lucide-react';
+import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare, MapPin, History } from 'lucide-react';
 import { directusApi } from '../api/directus';
 import { LineSettings } from './LineSettings';
 
 export const SystemSettings: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'general' | 'line'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'line' | 'smtp' | 'logs'>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
-    directusUrl: localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com',
-    staticApiKey: localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
-    websiteName: localStorage.getItem('website_name') || 'NES Tracking',
-    websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
-    websiteBackground: localStorage.getItem('website_background') || '',
-    appUrl: localStorage.getItem('app_url') || window.location.origin,
-    googleMapsApiKey: localStorage.getItem('google_maps_api_key') || '',
-    enableQueueSystem: localStorage.getItem('enable_queue_system') !== 'false', // Default true
-    bkkMaxDistance: parseInt(localStorage.getItem('bkk_max_distance') || '250', 10),
-    enableTracking: localStorage.getItem('enable_tracking') !== 'false', // Default true
+  const [formData, setFormData] = useState(() => {
+    let key = localStorage.getItem('static_api_key');
+    const badTokens = [
+      '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
+      'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
+      'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4'
+    ];
+    if (key && badTokens.includes(key)) {
+      localStorage.removeItem('static_api_key');
+      key = null;
+    }
+    const envKey = (import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
+    const finalKey = key || (badTokens.includes(envKey) ? null : envKey) || 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
+    
+    return {
+      directusUrl: localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com',
+      staticApiKey: finalKey,
+      websiteName: localStorage.getItem('website_name') || 'NES Tracking',
+      websiteLogo: localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg',
+      websiteBackground: localStorage.getItem('website_background') || '',
+      appUrl: localStorage.getItem('app_url') || window.location.origin,
+      googleMapsApiKey: localStorage.getItem('google_maps_api_key') || '',
+      enableQueueSystem: localStorage.getItem('enable_queue_system') !== 'false',
+      bkkMaxDistance: parseInt(localStorage.getItem('bkk_max_distance') || '250', 10),
+      enableTracking: localStorage.getItem('enable_tracking') !== 'false',
+      enableLineLogin: localStorage.getItem('enable_line_login') !== 'false',
+      enableGoogleLogin: localStorage.getItem('enable_google_login') === 'true',
+      googleClientId: localStorage.getItem('google_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '559675370597-bs7c8aabdco373h9vc81gb09kbp62dte.apps.googleusercontent.com',
+      emailSmtpHost: localStorage.getItem('email_smtp_host') || '',
+      emailSmtpPort: localStorage.getItem('email_smtp_port') || '587',
+      emailSmtpUser: localStorage.getItem('email_smtp_user') || '',
+      emailSmtpPassword: localStorage.getItem('email_smtp_password') || '',
+      emailSmtpSecure: localStorage.getItem('email_smtp_secure') === 'true',
+      emailFrom: localStorage.getItem('email_from') || '',
+      emailFromName: localStorage.getItem('email_from_name') || '',
+    };
   });
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const settings = await directusApi.getSystemSettings();
-        console.log('Fetched settings from Directus:', settings);
         if (settings) {
           setFormData(prev => ({
             ...prev,
@@ -41,22 +65,26 @@ export const SystemSettings: React.FC = () => {
             enableQueueSystem: settings.enable_queue_system !== undefined ? settings.enable_queue_system : prev.enableQueueSystem,
             bkkMaxDistance: settings.bkk_max_distance !== undefined ? settings.bkk_max_distance : prev.bkkMaxDistance,
             enableTracking: settings.enable_tracking !== undefined ? settings.enable_tracking : prev.enableTracking,
+            enableLineLogin: settings.enable_line_login !== undefined ? settings.enable_line_login : prev.enableLineLogin,
+            enableGoogleLogin: settings.enable_google_login !== undefined ? settings.enable_google_login : prev.enableGoogleLogin,
+            googleClientId: settings.google_client_id || prev.googleClientId,
+            emailSmtpHost: settings.email_smtp_host || prev.emailSmtpHost,
+            emailSmtpPort: settings.email_smtp_port || prev.emailSmtpPort,
+            emailSmtpUser: settings.email_smtp_user || prev.emailSmtpUser,
+            emailSmtpPassword: settings.email_smtp_password || prev.emailSmtpPassword,
+            emailSmtpSecure: settings.email_smtp_secure !== undefined ? settings.email_smtp_secure : prev.emailSmtpSecure,
+            emailFrom: settings.email_from || prev.emailFrom,
+            emailFromName: settings.email_from_name || prev.emailFromName,
           }));
           
-          // Sync to localStorage for immediate use in app
-          localStorage.setItem('website_name', settings.website_name || '');
-          localStorage.setItem('website_logo', settings.website_logo || '');
-          localStorage.setItem('website_background', settings.website_background || '');
-          localStorage.setItem('app_url', settings.app_url || '');
-          localStorage.setItem('google_maps_api_key', settings.google_maps_api_key || '');
-          localStorage.setItem('enable_queue_system', settings.enable_queue_system !== undefined ? String(settings.enable_queue_system) : 'true');
-          localStorage.setItem('bkk_max_distance', settings.bkk_max_distance !== undefined ? String(settings.bkk_max_distance) : '250');
-          localStorage.setItem('enable_tracking', settings.enable_tracking !== undefined ? String(settings.enable_tracking) : 'true');
+          Object.keys(settings).forEach(key => {
+            if (settings[key] !== undefined) {
+              const storageKey = key === 'expense_categories' ? 'expense_categories' : key;
+              localStorage.setItem(storageKey, String(settings[key]));
+            }
+          });
         }
       } catch (error: any) {
-        if (error.response?.status === 401) {
-          return;
-        }
         console.error('Failed to fetch settings from Directus:', error);
       }
     };
@@ -74,8 +102,7 @@ export const SystemSettings: React.FC = () => {
       setFormData({ ...formData, [field]: fileUrl });
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      const errorMsg = error.response?.data?.errors?.[0]?.message || error.message || 'Failed to upload file';
-      alert(`Upload Error: ${errorMsg}`);
+      alert(`Upload Error: ${error.message}`);
     } finally {
       setIsUploading(false);
     }
@@ -84,7 +111,6 @@ export const SystemSettings: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Save to Directus
       await directusApi.updateSystemSettings({
         website_name: formData.websiteName,
         website_logo: formData.websiteLogo,
@@ -94,9 +120,18 @@ export const SystemSettings: React.FC = () => {
         enable_queue_system: formData.enableQueueSystem,
         bkk_max_distance: formData.bkkMaxDistance,
         enable_tracking: formData.enableTracking,
+        enable_line_login: formData.enableLineLogin,
+        enable_google_login: formData.enableGoogleLogin,
+        google_client_id: formData.googleClientId,
+        email_smtp_host: formData.emailSmtpHost,
+        email_smtp_port: formData.emailSmtpPort,
+        email_smtp_user: formData.emailSmtpUser,
+        email_smtp_password: formData.emailSmtpPassword,
+        email_smtp_secure: formData.emailSmtpSecure,
+        email_from: formData.emailFrom,
+        email_from_name: formData.emailFromName,
       });
 
-      // Save to localStorage
       localStorage.setItem('directus_url', formData.directusUrl);
       localStorage.setItem('static_api_key', formData.staticApiKey);
       localStorage.setItem('website_name', formData.websiteName);
@@ -107,19 +142,29 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('enable_queue_system', String(formData.enableQueueSystem));
       localStorage.setItem('bkk_max_distance', String(formData.bkkMaxDistance));
       localStorage.setItem('enable_tracking', String(formData.enableTracking));
+      localStorage.setItem('enable_line_login', String(formData.enableLineLogin));
+      localStorage.setItem('enable_google_login', String(formData.enableGoogleLogin));
+      localStorage.setItem('google_client_id', formData.googleClientId);
+      localStorage.setItem('email_smtp_host', formData.emailSmtpHost);
+      localStorage.setItem('email_smtp_port', formData.emailSmtpPort);
+      localStorage.setItem('email_smtp_user', formData.emailSmtpUser);
+      localStorage.setItem('email_smtp_password', formData.emailSmtpPassword);
+      localStorage.setItem('email_smtp_secure', String(formData.emailSmtpSecure));
+      localStorage.setItem('email_from', formData.emailFrom);
+      localStorage.setItem('email_from_name', formData.emailFromName);
       
       setTimeout(() => {
         setIsSaving(false);
         setShowSuccess(true);
         setTimeout(() => {
           setShowSuccess(false);
-          window.location.reload(); // Reload to apply new settings to API client
+          window.location.reload();
         }, 1500);
       }, 800);
     } catch (error) {
       console.error('Failed to save settings:', error);
       setIsSaving(false);
-      alert('Failed to save settings to Directus. Please check your permissions or if the collection "system_settings" exists.');
+      alert('Failed to save settings to Directus.');
     }
   };
 
@@ -131,14 +176,11 @@ export const SystemSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
         <button
           onClick={() => setActiveTab('general')}
           className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
-            activeTab === 'general' 
-              ? 'bg-white text-primary shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700'
+            activeTab === 'general' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <Settings className="w-4 h-4" />
@@ -147,336 +189,266 @@ export const SystemSettings: React.FC = () => {
         <button
           onClick={() => setActiveTab('line')}
           className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
-            activeTab === 'line' 
-              ? 'bg-white text-primary shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700'
+            activeTab === 'line' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          ตั้งค่า API LINE
+          {t('line_api_settings')}
+        </button>
+        <button
+          onClick={() => setActiveTab('smtp')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
+            activeTab === 'smtp' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          {t('smtp_settings')}
+        </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl font-semibold transition-all ${
+            activeTab === 'logs' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          {t('login_history')}
         </button>
       </div>
 
       {activeTab === 'general' ? (
-        <>
+        <div className="space-y-6 animate-in fade-in duration-500">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-              <Globe className="w-5 h-5" />
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{t('website_branding')}</h2>
+                  <p className="text-sm text-slate-500">{t('customize_website_name_logo')}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Website Branding</h2>
-              <p className="text-sm text-slate-500">Customize your website name and logo</p>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('website_name')}</label>
+                  <input 
+                    type="text" 
+                    value={formData.websiteName}
+                    onChange={(e) => setFormData({...formData, websiteName: e.target.value})}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700">{t('website_logo')}</label>
+                  <div className="flex gap-3">
+                    <input 
+                      type="text" 
+                      value={formData.websiteLogo}
+                      onChange={(e) => setFormData({...formData, websiteLogo: e.target.value})}
+                      className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                    />
+                    <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'websiteLogo')} className="hidden" accept="image/*" />
+                    <button onClick={() => fileInputRef.current?.click()} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
+                      {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                      Upload
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4 text-slate-400" />
+                  {t('app_url')}
+                </label>
+                <input 
+                  type="text" 
+                  value={formData.appUrl}
+                  onChange={(e) => setFormData({...formData, appUrl: e.target.value})}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{t('system_features')}</h2>
+                  <p className="text-sm text-slate-500">{t('system_features_desc')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{t('queue_system')}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{t('queue_system_desc')}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
+                  <input type="checkbox" className="sr-only peer" checked={formData.enableQueueSystem} onChange={(e) => setFormData({...formData, enableQueueSystem: e.target.checked})} />
+                  <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{t('bkk_max_distance_label')}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{t('bkk_max_distance_desc')}</p>
+                </div>
+                <div className="mt-4 sm:mt-0 flex items-center gap-2">
+                  <input type="number" value={formData.bkkMaxDistance} onChange={(e) => setFormData({...formData, bkkMaxDistance: parseInt(e.target.value) || 0})} className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all text-center" />
+                  <span className="text-slate-500">{t('km')}</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{t('google_login_setting')}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{t('google_login_setting_desc')}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
+                  <input type="checkbox" className="sr-only peer" checked={formData.enableGoogleLogin} onChange={(e) => setFormData({...formData, enableGoogleLogin: e.target.checked})} />
+                  <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{t('api_configuration')}</h2>
+                  <p className="text-sm text-slate-500">{t('manage_directus_connection')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-slate-400" />
+                    {t('directus_url')}
+                  </label>
+                  <input type="text" value={formData.directusUrl} onChange={(e) => setFormData({...formData, directusUrl: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-slate-400" />
+                    {t('static_api_key')}
+                  </label>
+                  <input type="password" value={formData.staticApiKey} onChange={(e) => setFormData({...formData, staticApiKey: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-slate-400" />
+                    {t('google_maps_api_key')}
+                  </label>
+                  <input type="password" value={formData.googleMapsApiKey} onChange={(e) => setFormData({...formData, googleMapsApiKey: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100 text-blue-800">
+                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div className="text-sm font-medium">{t('note_on_changes_desc')}</div>
+              </div>
+            </div>
+            <div className="p-6 bg-white border-t border-slate-100 flex justify-end">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-sm"
+              >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {t('save')}
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">
-                Website Name
-              </label>
-              <input 
-                type="text" 
-                value={formData.websiteName}
-                onChange={(e) => setFormData({...formData, websiteName: e.target.value})}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="NES Tracking"
-              />
+      ) : activeTab === 'smtp' ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
+          <div className="p-6 border-b border-slate-100 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                <Globe className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">{t('smtp_settings')}</h2>
+                <p className="text-sm text-slate-500">{t('manage_smtp_settings')}</p>
+              </div>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">
-                Website Logo
-              </label>
-              <div className="flex gap-3">
-                <input 
-                  type="text" 
-                  value={formData.websiteLogo}
-                  onChange={(e) => setFormData({...formData, websiteLogo: e.target.value})}
-                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                  placeholder="https://example.com/logo.png"
-                />
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  onChange={(e) => handleFileUpload(e, 'websiteLogo')}
-                  className="hidden"
-                  accept="image/*"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200 disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Upload className="w-5 h-5" />
-                  )}
-                  Upload
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('smtp_host')}</label>
+                <input type="text" value={formData.emailSmtpHost} onChange={(e) => setFormData({...formData, emailSmtpHost: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('smtp_port')}</label>
+                <input type="text" value={formData.emailSmtpPort} onChange={(e) => setFormData({...formData, emailSmtpPort: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('smtp_user')}</label>
+                <input type="text" value={formData.emailSmtpUser} onChange={(e) => setFormData({...formData, emailSmtpUser: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('smtp_password')}</label>
+                <input type="password" value={formData.emailSmtpPassword} onChange={(e) => setFormData({...formData, emailSmtpPassword: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none" />
+              </div>
+            </div>
+            <div className="p-6 bg-white border-t border-slate-100 flex justify-end">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-sm"
+              >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'logs' ? (
+        <div className="animate-in fade-in duration-500">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">{t('login_history')}</h2>
+                  <p className="text-sm text-slate-500">{t('manage_login_history')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-200 border-dashed">
+                <p className="text-slate-600 mb-4">{t('view_all_login_logs_desc')}</p>
+                <button onClick={() => window.location.href = '/settings/logs'} className="px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-sm flex items-center gap-2 mx-auto">
+                  <History className="w-5 h-5" />
+                  {t('view_login_history')}
                 </button>
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">
-                Website Background
-              </label>
-              <div className="flex gap-3">
-                <input 
-                  type="text" 
-                  value={formData.websiteBackground}
-                  onChange={(e) => setFormData({...formData, websiteBackground: e.target.value})}
-                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                  placeholder="https://example.com/background.jpg"
-                />
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  onChange={(e) => handleFileUpload(e, 'websiteBackground')}
-                  className="hidden"
-                  accept="image/*"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200 disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Upload className="w-5 h-5" />
-                  )}
-                  Upload
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <LinkIcon className="w-4 h-4 text-slate-400" />
-              {t('app_url')}
-            </label>
-            <input 
-              type="text" 
-              value={formData.appUrl}
-              onChange={(e) => setFormData({...formData, appUrl: e.target.value})}
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-              placeholder="https://your-app-url.com"
-            />
-            <p className="text-[10px] text-slate-400">Used for generating deep links and LINE notifications</p>
-          </div>
-          
-          <div className="flex gap-6">
-            {formData.websiteLogo && (
-              <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 inline-block">
-                <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Logo Preview</p>
-                <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
-                  <img 
-                    src={formData.websiteLogo} 
-                    alt="Logo Preview" 
-                    className="max-w-full max-h-full object-contain"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {formData.websiteBackground && (
-              <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 inline-block">
-                <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Background Preview</p>
-                <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
-                  <img 
-                    src={formData.websiteBackground} 
-                    alt="Background Preview" 
-                    className="max-w-full max-h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Invalid+URL';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">ฟีเจอร์ระบบ (System Features)</h2>
-              <p className="text-sm text-slate-500">เปิด/ปิดการใช้งานฟีเจอร์ต่างๆ ภายในระบบ</p>
-            </div>
-          </div>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
-            <div>
-              <h3 className="font-semibold text-slate-900">ระบบจัดลำดับคิวรถอัตโนมัติ (Queue System)</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                เปิดเพื่อใช้ระบบคำนวณและแนะนำคิวรถอัตโนมัติในหน้าจ่ายงาน (คำนวณจากประวัติการวิ่งงาน กทม. และ ตจว.)
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
-              <input 
-                type="checkbox" 
-                className="sr-only peer"
-                checked={formData.enableQueueSystem}
-                onChange={(e) => setFormData({...formData, enableQueueSystem: e.target.checked})}
-              />
-              <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
-            <div>
-              <h3 className="font-semibold text-slate-900">ระยะทางสูงสุดสำหรับงาน กทม./ปริมณฑล (กิโลเมตร)</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                ใช้สำหรับแยกระหว่างงาน กทม. และงานต่างจังหวัด ในระบบจัดคิวรถ (ค่าเริ่มต้น: 250 กม.)
-              </p>
-            </div>
-            <div className="mt-4 sm:mt-0 flex items-center gap-2">
-              <input
-                type="number"
-                min="1"
-                value={formData.bkkMaxDistance}
-                onChange={(e) => setFormData({...formData, bkkMaxDistance: parseInt(e.target.value) || 0})}
-                className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all text-center font-semibold text-slate-700"
-              />
-              <span className="text-slate-500 font-medium">กม.</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
-            <div>
-              <h3 className="font-semibold text-slate-900">ระบบติดตามพัสดุ (Tracking System)</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                เปิดเพื่อแสดงแท็บ "ติดตามพัสดุ" ในหน้าเข้าสู่ระบบ (Login) ให้ลูกค้าสามารถค้นหาสถานะงานได้
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
-              <input 
-                type="checkbox" 
-                className="sr-only peer"
-                checked={formData.enableTracking}
-                onChange={(e) => setFormData({...formData, enableTracking: e.target.checked})}
-              />
-              <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">API Configuration</h2>
-              <p className="text-sm text-slate-500">Manage Directus backend connection and authentication</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-slate-400" />
-                Directus URL
-              </label>
-              <input 
-                type="text" 
-                value={formData.directusUrl}
-                onChange={(e) => setFormData({...formData, directusUrl: e.target.value})}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="https://your-directus-instance.com"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Key className="w-4 h-4 text-slate-400" />
-                Static API Key (Access Token)
-              </label>
-              <input 
-                type="password" 
-                value={formData.staticApiKey}
-                onChange={(e) => setFormData({...formData, staticApiKey: e.target.value})}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="Enter your Directus static token"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-slate-400" />
-                Google Maps API Key
-              </label>
-              <input 
-                type="password" 
-                value={formData.googleMapsApiKey}
-                onChange={(e) => setFormData({...formData, googleMapsApiKey: e.target.value})}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                placeholder="Enter your Google Maps API Key"
-              />
-              <p className="text-[10px] text-slate-400">ใช้สำหรับคำนวณระยะทางจริงและจัดลำดับเส้นทางอัตโนมัติ (Route Optimization)</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100 text-blue-800">
-            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold">Note on Changes</p>
-              <p className="opacity-90">
-                Saving these settings will update the connection parameters for all API requests. 
-                The application will automatically reload to apply the new configuration.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-white border-t border-slate-100 flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all disabled:opacity-50 shadow-sm"
-          >
-            {isSaving ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Save className="w-5 h-5" />
-            )}
-            {t('save')}
-          </button>
-        </div>
-      </div>
-      </>
       ) : (
         <LineSettings hideHeader={true} />
       )}
 
       {showSuccess && (
         <div className="fixed bottom-8 right-8 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
-          <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
+          <CheckCircle2 className="w-5 h-5" />
           <span className="font-medium">{t('save_success')}</span>
         </div>
       )}

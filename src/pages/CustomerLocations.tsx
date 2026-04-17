@@ -36,6 +36,7 @@ interface SortableMemberProps {
 }
 
 const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd, isOverlay }) => {
+  const { t } = useTranslation();
   if (!member) return null;
 
   const {
@@ -92,7 +93,7 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
           type="button"
           onClick={() => onAdd(member.id)}
           className="p-1.5 hover:bg-primary/10 text-primary rounded-lg transition-colors"
-          title="คลิกเพื่อเพิ่ม"
+          title={t('click_to_add')}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -103,7 +104,7 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
           type="button"
           onClick={() => onRemove(member.id)}
           className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-colors"
-          title="คลิกเพื่อลบ"
+          title={t('click_to_remove')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -165,6 +166,11 @@ export const CustomerLocations: React.FC = () => {
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [junctionField, setJunctionField] = useState<string>('line_users_id');
+
+  const userRole = localStorage.getItem('user_role') || 'Customer';
+  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isCustomerMember = userRole === 'customer' || userRole === 'Customer'; // Handle both casing
+  const canAddLocation = isAdmin || isCustomerMember;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<CustomerLocation | null>(null);
@@ -269,7 +275,7 @@ export const CustomerLocations: React.FC = () => {
   };
 
   const availableMembers = members.filter(m => 
-    (m.role === 'customer' || m.role === 'member' || m.role === 'general') && 
+    (m.role === 'customer' || m.role === 'member') && 
     !formData.member_ids.map(String).includes(String(m.id)) &&
     (
       (m.display_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
@@ -342,8 +348,13 @@ export const CustomerLocations: React.FC = () => {
           const id = typeof m.line_users_id === 'object' ? m.line_users_id?.id :
                      (typeof m.line_user_id === 'object' ? m.line_user_id?.id : 
                      (typeof m.members_id === 'object' ? m.members_id?.id : (m.line_users_id || m.line_user_id || m.members_id)));
+          
           if (id && !memberIds.includes(String(id))) {
-            memberIds.push(String(id));
+            // Only add members who have the correct role (customer or member)
+            const memberObj = members.find(mbr => String(mbr.id) === String(id));
+            if (memberObj && (memberObj.role === 'customer' || memberObj.role === 'member')) {
+              memberIds.push(String(id));
+            }
           }
         });
       }
@@ -505,15 +516,15 @@ export const CustomerLocations: React.FC = () => {
         member_ids: []
       });
       await fetchData();
-      window.alert('บันทึกข้อมูลสำเร็จ');
+      window.alert(t('save_success'));
     } catch (err: any) {
       console.error('CRITICAL: Error saving location:', err);
       if (err.response) {
         console.error('Error Response Data:', err.response.data);
       }
-      const errorMsg = err.response?.data?.errors?.[0]?.message || err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล';
+      const errorMsg = err.response?.data?.errors?.[0]?.message || err.message || t('save_error');
       setActionError(errorMsg);
-      window.alert(`เกิดข้อผิดพลาด: ${errorMsg}`);
+      window.alert(`${t('error_occurred')}: ${errorMsg}`);
     } finally {
       setSubmitting(false);
     }
@@ -546,13 +557,15 @@ export const CustomerLocations: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{t('customer_locations')}</h2>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
-        >
-          <Plus className="w-5 h-5" />
-          {t('add_customer_location')}
-        </button>
+        {canAddLocation && (
+          <button 
+            onClick={() => handleOpenModal()}
+            className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
+          >
+            <Plus className="w-5 h-5" />
+            {t('add_customer_location')}
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -600,18 +613,22 @@ export const CustomerLocations: React.FC = () => {
                     <Building2 className="w-6 h-6 text-slate-400 group-hover:text-primary" />
                   </div>
                   <div className="flex gap-1">
-                    <button 
-                      onClick={() => handleOpenModal(loc)}
-                      className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => setDeleteId(loc.id)}
-                      className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canAddLocation && (
+                      <>
+                        <button 
+                          onClick={() => handleOpenModal(loc)}
+                          className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteId(loc.id)}
+                          className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -657,7 +674,11 @@ export const CustomerLocations: React.FC = () => {
                         loc.members.forEach((m: any) => {
                           const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
                           if (id && !memberIds.includes(String(id))) {
-                            memberIds.push(String(id));
+                            // Only include those with proper roles
+                            const memberObj = members.find(mbr => String(mbr.id) === String(id));
+                            if (memberObj && (memberObj.role === 'member' || memberObj.role === 'customer')) {
+                              memberIds.push(String(id));
+                            }
                           }
                         });
                       }
@@ -860,7 +881,7 @@ export const CustomerLocations: React.FC = () => {
                     </div>
 
                     <p className="text-[10px] text-slate-500 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                      * สมาชิกในกลุ่มนี้จะได้รับการแจ้งเตือนผ่าน LINE เมื่อมีการมอบหมายงาน
+                      * {t('member_notification_desc')}
                     </p>
 
                     {/* Member Selection Area */}
@@ -869,7 +890,7 @@ export const CustomerLocations: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input 
                           type="text"
-                          placeholder="ค้นหาสมาชิก..."
+                          placeholder={t('search_members_placeholder')}
                           value={memberSearchTerm}
                           onChange={(e) => setMemberSearchTerm(e.target.value)}
                           className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary transition-all"
@@ -885,11 +906,11 @@ export const CustomerLocations: React.FC = () => {
                         <div className="flex flex-col gap-4">
                           <DroppableContainer
                             id="available-container"
-                            title="สมาชิกที่ว่าง"
+                            title={t('available_members')}
                             icon={User}
                             items={availableMembers}
                             onAdd={handleAddMember}
-                            emptyText="ไม่พบสมาชิกที่ว่าง"
+                            emptyText={t('no_available_members')}
                           />
                           
                           <div className="flex items-center justify-center gap-4 text-slate-300 py-2">
@@ -903,11 +924,11 @@ export const CustomerLocations: React.FC = () => {
 
                           <DroppableContainer
                             id="selected-container"
-                            title="สมาชิกที่เลือก"
+                            title={t('selected_members')}
                             icon={CheckCircle2}
                             items={selectedMembersList}
                             onRemove={handleRemoveMember}
-                            emptyText="ลากสมาชิกมาวางที่นี่"
+                            emptyText={t('drag_members_here')}
                           />
                         </div>
 

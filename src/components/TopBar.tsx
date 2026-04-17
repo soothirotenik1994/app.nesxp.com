@@ -86,7 +86,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
           <Menu className="w-6 h-6 text-slate-600" />
         </button>
         <h1 className="text-lg font-semibold text-slate-800 hidden sm:block">
-          ระบบจัดการติดตามยานพาหนะ
+          {t('vehicle_tracking_management')}
         </h1>
       </div>
 
@@ -98,7 +98,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
               className="flex items-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-lg hover:bg-[#002266] transition-colors text-sm font-bold shadow-lg shadow-blue-900/20"
             >
               <PlusCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">มอบหมายงานใหม่</span>
+              <span className="hidden sm:inline">{t('new_job_assignment')}</span>
             </Link>
 
             <div className="relative" ref={notificationRef}>

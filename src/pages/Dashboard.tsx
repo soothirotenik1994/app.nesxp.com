@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 import { clsx } from 'clsx';
+import { ROLE_PERMISSIONS } from '../config/menuPermissions';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -27,6 +28,35 @@ export const Dashboard: React.FC = () => {
   const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
+
+  const userRole = localStorage.getItem('user_role') || 'Customer';
+  const [hasMonitorPermission, setHasMonitorPermission] = useState(false);
+
+  useEffect(() => {
+    const checkPermission = () => {
+      // 1. Check dynamic permissions
+      const dynamicPermissionsRaw = localStorage.getItem('dynamic_role_permissions');
+      if (dynamicPermissionsRaw) {
+        try {
+          const dynamicPermissions = JSON.parse(dynamicPermissionsRaw);
+          const roleKey = Object.keys(dynamicPermissions).find(
+            r => r.toLowerCase() === userRole.toLowerCase()
+          );
+          if (roleKey && dynamicPermissions[roleKey]['live_monitor'] !== undefined) {
+            return dynamicPermissions[roleKey]['live_monitor'] === true;
+          }
+        } catch (e) {}
+      }
+      
+      // 2. Fallback to static config
+      const fallbackRoleKey = Object.keys(ROLE_PERMISSIONS).find(
+        r => r.toLowerCase() === userRole.toLowerCase()
+      );
+      const permissions = ROLE_PERMISSIONS[fallbackRoleKey || ''] || ROLE_PERMISSIONS['Driver'];
+      return (permissions as any)['live_monitor'] === true;
+    };
+    setHasMonitorPermission(checkPermission());
+  }, [userRole]);
 
   const fetchGpsData = async (carsData: Car[]) => {
     const BATCH_SIZE = 3;
@@ -431,20 +461,22 @@ export const Dashboard: React.FC = () => {
       {/* Dashboard Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-slate-900">ระบบจัดการติดตามยานพาหนะ</h2>
-          <button 
-            onClick={() => window.open('/monitor', '_blank')}
-            className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
-          >
-            <Activity className="w-4 h-4" />
-            Live Monitor
-          </button>
+          <h2 className="text-2xl font-bold text-slate-900">{t('vehicle_tracking_system')}</h2>
+          {hasMonitorPermission && (
+            <button 
+              onClick={() => window.open('/monitor', '_blank')}
+              className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+            >
+              <Activity className="w-4 h-4" />
+              {t('live_monitor', 'Live Monitor')}
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-3">
           <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-medium text-slate-600 shadow-sm">
             <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-xs text-slate-400 mr-1">อัปเดตล่าสุด:</span>
+            <span className="text-xs text-slate-400 mr-1">{t('last_update')}:</span>
             <span className="font-semibold text-slate-900">
               {carStatuses.length > 0 
                 ? format(new Date(Math.max(...carStatuses.map(s => new Date(s.lastUpdate).getTime()))), 'HH:mm:ss')
@@ -454,7 +486,7 @@ export const Dashboard: React.FC = () => {
           
           <div className="bg-white px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2 text-sm font-bold text-primary shadow-sm">
             <RefreshCw className={clsx("w-4 h-4", countdown < 10 && "animate-spin")} />
-            <span className="text-xs text-blue-400 mr-1">อัปเดตครั้งต่อไป:</span>
+            <span className="text-xs text-blue-400 mr-1">{t('next_update')}:</span>
             <span>{formatCountdown(countdown)}</span>
           </div>
         </div>
@@ -566,7 +598,7 @@ export const Dashboard: React.FC = () => {
                       job.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>
-                      {t(job.status)}
+                      {t('status_' + job.status, t(job.status))}
                     </span>
                   </div>
                   <div className="flex items-center gap-4">

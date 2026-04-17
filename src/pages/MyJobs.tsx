@@ -171,6 +171,9 @@ export const MyJobs: React.FC = () => {
         'Arrival Time': formatTimeDisplay(r.arrival_time),
         'Mileage Start': r.mileage_start || '-',
         'Mileage End': r.mileage_end || '-',
+        [t('total_expenses')]: (r.expense_items && r.expense_items.length > 0) 
+          ? r.expense_items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0)
+          : (Number(r.toll_fee || 0) + Number(r.fuel_cost || 0) + Number(r.other_expenses || 0)),
         'Notes': r.notes || '-'
       };
     });

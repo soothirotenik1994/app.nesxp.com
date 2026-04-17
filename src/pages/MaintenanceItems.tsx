@@ -329,13 +329,13 @@ export const MaintenanceItems: React.FC = () => {
                           {item.default_mileage_interval && (
                             <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
                               <Gauge className="w-3 h-3" />
-                              {item.default_mileage_interval.toLocaleString()} กม.
+                              {item.default_mileage_interval.toLocaleString()} {t('km')}
                             </div>
                           )}
                           {item.default_month_interval && (
                             <div className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
                               <Calendar className="w-3 h-3" />
-                              {item.default_month_interval} เดือน
+                              {item.default_month_interval} {t('month')}
                             </div>
                           )}
                         </div>

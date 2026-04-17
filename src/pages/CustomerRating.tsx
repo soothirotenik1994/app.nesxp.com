@@ -102,8 +102,8 @@ export const CustomerRating: React.FC = () => {
           <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">ขอบคุณสำหรับคะแนน!</h2>
-          <p className="text-slate-600 mb-8">ความคิดเห็นของคุณจะช่วยให้เราพัฒนาบริการให้ดียิ่งขึ้น</p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">{t('thank_you_rating')}</h2>
+          <p className="text-slate-600 mb-8">{t('rating_improve_desc')}</p>
           
           <div className="flex justify-center gap-2 mb-8">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -118,7 +118,7 @@ export const CustomerRating: React.FC = () => {
             onClick={() => navigate('/')}
             className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
           >
-            กลับสู่หน้าหลัก
+            {t('back_to_home')}
           </button>
         </div>
       </div>
@@ -129,13 +129,13 @@ export const CustomerRating: React.FC = () => {
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 max-w-md w-full overflow-hidden">
         <div className="bg-primary p-6 text-white text-center">
-          <h1 className="text-xl font-bold mb-1">ให้คะแนนบริการ</h1>
-          <p className="text-blue-100 text-sm opacity-90">เลขที่งาน: {report?.case_number || '-'}</p>
+          <h1 className="text-xl font-bold mb-1">{t('rate_service_label')}</h1>
+          <p className="text-blue-100 text-sm opacity-90">{t('case_id_label', { id: report?.case_number || '-' })}</p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-8 text-center">
-            <p className="text-slate-600 font-medium mb-4">คุณพึงพอใจกับบริการของเราแค่ไหน?</p>
+            <p className="text-slate-600 font-medium mb-4">{t('satisfaction_question')}</p>
             <div className="flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -160,12 +160,12 @@ export const CustomerRating: React.FC = () => {
           
           <div className="mb-6">
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              ความคิดเห็นเพิ่มเติม (ไม่บังคับ)
+              {t('additional_feedback_optional')}
             </label>
             <textarea
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              placeholder="บอกเราหน่อยว่าคุณชอบอะไร หรืออยากให้เราปรับปรุงอะไร..."
+              placeholder={t('feedback_placeholder')}
               className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none h-32 transition-all"
             />
           </div>
@@ -189,10 +189,10 @@ export const CustomerRating: React.FC = () => {
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                กำลังบันทึก...
+                {t('saving')}...
               </>
             ) : (
-              'ส่งคะแนนประเมิน'
+              t('submit_rating')
             )}
           </button>
         </form>

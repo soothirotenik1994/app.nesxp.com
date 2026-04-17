@@ -1,7 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { LineCallback } from './pages/LineCallback';
+import { GoogleCallback } from './pages/GoogleCallback';
 import { CustomerRating } from './pages/CustomerRating';
 import { Dashboard } from './pages/Dashboard';
 import { Members } from './pages/Members';
@@ -17,6 +20,7 @@ import { LineBroadcast } from './pages/LineBroadcast';
 import { LineSettings } from './pages/LineSettings';
 import { LineApiSettings } from './pages/LineApiSettings';
 import { SystemSettings } from './pages/SystemSettings';
+import { ExpenseManagement } from './pages/ExpenseManagement';
 import { ApiSettings } from './pages/ApiSettings';
 import { MaintenanceDashboard } from './pages/MaintenanceDashboard';
 import { MaintenanceItems } from './pages/MaintenanceItems';
@@ -24,6 +28,8 @@ import { MaintenanceReports } from './pages/MaintenanceReports';
 import { MaintenanceLog } from './pages/MaintenanceLog';
 import { DriverRatingManagement } from './pages/DriverRatingManagement';
 import { RolePermissions } from './pages/RolePermissions';
+import { LoginLogs } from './pages/LoginLogs';
+import { Announcements } from './pages/Announcements';
 import { VehicleQueue } from './pages/VehicleQueue';
 import { FleetMonitor } from './pages/FleetMonitor';
 import { TripHistory } from './pages/TripHistory';
@@ -35,52 +41,73 @@ import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (token) {
-      setAuthToken(token);
-      
-      // Refresh user info
-      const isSwitchedAccount = localStorage.getItem('is_switched_account') === 'true';
-      
-      if (!isSwitchedAccount) {
-        directusApi.getCurrentUser().then(user => {
-          const role = user.role?.name || 'Driver';
-          const isAdmin = role.toLowerCase() === 'administrator' || role.toLowerCase() === 'admin';
-          localStorage.setItem('user_role', role);
-          localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
-          localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
-          localStorage.setItem('user_email', user.email);
+    const adminToken = localStorage.getItem('admin_token');
+    const memberId = localStorage.getItem('member_id');
+    const isSwitchedAccount = localStorage.getItem('is_switched_account') === 'true';
+
+    // Set token (handles both admin token and static fallback for staff)
+    setAuthToken(adminToken);
+    
+    // Refresh user info
+    if (adminToken && !isSwitchedAccount) {
+      // 1. Refresh Admin User Info
+      directusApi.getCurrentUser().then(user => {
+        const role = user.role?.name || 'Driver';
+        const isAdmin = role.toLowerCase() === 'administrator' || role.toLowerCase() === 'admin';
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
+        localStorage.setItem('user_name', `${user.first_name} ${user.last_name}`);
+        localStorage.setItem('user_email', user.email);
+        
+        if (user.avatar) {
+          localStorage.setItem('user_picture', directusApi.getFileUrl(user.avatar));
+        } else {
+          localStorage.removeItem('user_picture');
+        }
+        
+        window.dispatchEvent(new Event('user-info-updated'));
+        
+        // Fetch dynamic role permissions
+        directusApi.getRolePermissions().then(permissions => {
+          if (permissions && permissions.length > 0) {
+            const permissionsMap: Record<string, any> = {};
+            permissions.forEach(p => {
+              permissionsMap[p.role] = p.permissions;
+            });
+            localStorage.setItem('dynamic_role_permissions', JSON.stringify(permissionsMap));
+          }
+        }).catch(err => {
+          console.error('Error fetching dynamic permissions:', err);
+        });
+
+        localStorage.removeItem('menu_permissions');
+      }).catch(err => {
+        if (err.response?.status !== 401) {
+          console.error('Error refreshing admin info:', err);
+        }
+      });
+    } else if (memberId) {
+      // 2. Refresh Staff/Member User Info
+      directusApi.getMember(memberId).then(member => {
+        if (member) {
+          localStorage.setItem('user_role', member.role || 'Customer');
+          localStorage.setItem('is_admin', 'false');
+          localStorage.setItem('user_name', member.display_name || `${member.first_name} ${member.last_name}`);
+          localStorage.setItem('user_email', member.email || '');
           
-          if (user.avatar) {
-            localStorage.setItem('user_picture', directusApi.getFileUrl(user.avatar));
+          if (member.picture_url) {
+            localStorage.setItem('user_picture', directusApi.getFileUrl(member.picture_url));
           } else {
             localStorage.removeItem('user_picture');
           }
           
           window.dispatchEvent(new Event('user-info-updated'));
-          
-          // Fetch dynamic role permissions from Directus
-          directusApi.getRolePermissions().then(permissions => {
-            if (permissions && permissions.length > 0) {
-              const permissionsMap: Record<string, any> = {};
-              permissions.forEach(p => {
-                permissionsMap[p.role] = p.permissions;
-              });
-              localStorage.setItem('dynamic_role_permissions', JSON.stringify(permissionsMap));
-            }
-          }).catch(err => {
-            console.error('Error fetching dynamic permissions:', err);
-          });
-
-          // เราไม่ใช้ menu_permissions จาก Directus แล้ว แต่ใช้จากไฟล์ config แทน
-          localStorage.removeItem('menu_permissions');
-        }).catch(err => {
-          // Only log if it's not a 401 (which is handled by the interceptor)
-          if (err.response?.status !== 401) {
-            console.error('Error refreshing user info:', err);
-          }
-        });
-      }
+        }
+      }).catch(err => {
+        if (err.response?.status !== 401) {
+          console.error('Error refreshing staff info:', err);
+        }
+      });
     }
 
     // Update document title
@@ -94,7 +121,10 @@ export default function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/line/callback" element={<LineCallback />} />
+            <Route path="/google/callback" element={<GoogleCallback />} />
             <Route path="/rate/:id" element={<CustomerRating />} />
             
             <Route element={<ProtectedRoute />}>
@@ -123,7 +153,10 @@ export default function App() {
                 <Route path="/maintenance/items" element={<MaintenanceItems />} />
                 <Route path="/maintenance/reports" element={<MaintenanceReports />} />
                 <Route path="/ratings" element={<DriverRatingManagement />} />
+                <Route path="/announcements" element={<Announcements />} />
                 <Route path="/settings/system" element={<SystemSettings />} />
+                <Route path="/settings/expenses" element={<ExpenseManagement />} />
+                <Route path="/settings/logs" element={<LoginLogs />} />
                 <Route path="/role-permissions" element={<RolePermissions />} />
                 <Route path="/permissions" element={<Members />} />
               </Route>

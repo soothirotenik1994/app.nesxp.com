@@ -215,6 +215,7 @@ export const Members: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -440,7 +441,7 @@ export const Members: React.FC = () => {
     
     // Validate password match
     if (formData.password !== formData.confirm_password) {
-      setActionError(t('passwords_do_not_match') || 'รหัสผ่านไม่ตรงกัน');
+      setActionError(t('passwords_do_not_match'));
       return;
     }
 
@@ -554,9 +555,22 @@ export const Members: React.FC = () => {
       const role = (m.role || '').toLowerCase();
       const search = searchTerm.toLowerCase();
       
-      return fullName.includes(search) || email.includes(search) || phone.includes(searchTerm) || role.includes(search);
+      const matchesSearch = fullName.includes(search) || email.includes(search) || phone.includes(searchTerm) || role.includes(search);
+      
+      let matchesRole = true;
+      if (filterRole === 'all') {
+        matchesRole = true;
+      } else if (filterRole === 'inactive') {
+        matchesRole = m.status === 'inactive';
+      } else if (filterRole === 'pending') {
+        matchesRole = m.status === 'pending';
+      } else {
+        matchesRole = m.role === filterRole && m.status !== 'inactive' && m.status !== 'pending';
+      }
+      
+      return matchesSearch && matchesRole;
     });
-  }, [members, searchTerm]);
+  }, [members, searchTerm, filterRole]);
 
   const editingMemberCars = useMemo(() => {
     if (!editingMember) return [];
@@ -668,15 +682,32 @@ export const Members: React.FC = () => {
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input 
-              type="text"
-              placeholder={t('search_members')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-            />
+          <div className="flex flex-col md:flex-row flex-1 gap-4 max-w-2xl">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input 
+                type="text"
+                placeholder={t('search_members')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+              />
+            </div>
+            
+            <div className="w-full md:w-48">
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm font-medium appearance-none"
+              >
+                <option value="all">{t('all_roles')}</option>
+                <option value="driver">{t('driver_role')}</option>
+                <option value="customer">{t('customer_role')}</option>
+                <option value="general">{t('general_role')}</option>
+                <option value="pending">{t('pending')}</option>
+                <option value="inactive">{t('disabled')}</option>
+              </select>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -819,11 +850,11 @@ export const Members: React.FC = () => {
 
       <ConfirmModal 
         isOpen={!!switchAccountMember}
-        title={t('switch_account') || 'สลับบัญชี'}
-        message={t('confirm_switch_account', { name: switchAccountMember?.first_name || switchAccountMember?.display_name || '' }) || `คุณต้องการสลับบัญชีไปเป็น ${switchAccountMember?.first_name || switchAccountMember?.display_name} ใช่หรือไม่?`}
+        title={t('switch_account')}
+        message={t('confirm_switch_account', { name: switchAccountMember?.first_name || switchAccountMember?.display_name || '' })}
         onConfirm={confirmSwitchAccount}
         onCancel={() => setSwitchAccountMember(null)}
-        confirmText={t('confirm') || 'ยืนยัน'}
+        confirmText={t('confirm')}
       />
 
       {isModalOpen && (
@@ -939,7 +970,7 @@ export const Members: React.FC = () => {
                         className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
                       >
                         <RefreshCw className="w-3 h-3" />
-                        {t('generate_password') || 'สร้างรหัสผ่านอัตโนมัติ'}
+                        {t('generate_password')}
                       </button>
                     </div>
                     <div className="relative">
@@ -963,7 +994,7 @@ export const Members: React.FC = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700">{t('confirm_password') || 'ยืนยันรหัสผ่าน'}</label>
+                    <label className="text-sm font-semibold text-slate-700">{t('confirm_password')}</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input 
@@ -988,7 +1019,7 @@ export const Members: React.FC = () => {
                       </button>
                     </div>
                     {formData.password && formData.confirm_password && formData.password !== formData.confirm_password && (
-                      <p className="text-[10px] text-red-500 font-medium mt-1">{t('passwords_do_not_match') || 'รหัสผ่านไม่ตรงกัน'}</p>
+                      <p className="text-[10px] text-red-500 font-medium mt-1">{t('passwords_do_not_match')}</p>
                     )}
                   </div>
 
@@ -1039,6 +1070,18 @@ export const Members: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {editingMember && (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-slate-700">{t('registration_date')}</label>
+                      <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
+                        <span className="text-sm text-slate-500 font-medium">{t('created_at')}</span>
+                        <div className="text-sm font-bold text-slate-900">
+                          {editingMember.date_created ? format(new Date(editingMember.date_created), 'dd/MM/yyyy HH:mm') : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>

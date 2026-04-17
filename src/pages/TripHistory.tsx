@@ -138,7 +138,7 @@ export const TripHistory: React.FC = () => {
           // If a car was passed in URL but user doesn't have access, clear it
           if (selectedCar && !allowedCarIds.has(selectedCar)) {
             setSelectedCar('');
-            setError('คุณไม่มีสิทธิ์เข้าถึงประวัติของรถคันนี้ หรือรถไม่ได้อยู่ในระหว่างการจัดส่ง');
+            setError(t('no_access_to_vehicle_history'));
           } else if (!selectedCar && filteredCars.length > 0) {
             setSelectedCar(filteredCars[0].car_number);
           }
@@ -172,11 +172,11 @@ export const TripHistory: React.FC = () => {
       setHistoryData(data);
       
       if (data.length === 0) {
-        setError(t('no_data_found_for_period', 'ไม่พบข้อมูลการเดินทางในช่วงเวลานี้'));
+        setError(t('no_data_found_for_period'));
       }
     } catch (err: any) {
       console.error('Error fetching history:', err);
-      setError(err.message || t('failed_to_fetch_data', 'ดึงข้อมูลล้มเหลว'));
+      setError(err.message || t('failed_to_fetch_data'));
     } finally {
       setLoading(false);
     }
@@ -211,7 +211,7 @@ export const TripHistory: React.FC = () => {
         >
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </button>
-        <h2 className="text-2xl font-bold text-slate-900">{t('trip_history', 'ประวัติการเดินทาง')}</h2>
+        <h2 className="text-2xl font-bold text-slate-900">{t('trip_history')}</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -222,29 +222,29 @@ export const TripHistory: React.FC = () => {
             {!isAdmin && (
               <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-2 text-blue-700 text-xs">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>คุณสามารถดูประวัติได้เฉพาะรถที่กำลังจัดส่งให้คุณ และดูได้เฉพาะช่วงเวลาที่กำลังจัดส่งเท่านั้น</p>
+                <p>{t('trip_history_access_desc')}</p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">{t('vehicle', 'รถ')}</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">{t('vehicle')}</label>
               <select 
                 value={selectedCar}
                 onChange={(e) => setSelectedCar(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
               >
-                <option value="">{t('select_vehicle', 'เลือกรถ')}</option>
+                <option value="">{t('select_vehicle')}</option>
                 {cars.map(c => (
                   <option key={c.id} value={c.car_number}>{c.car_number}</option>
                 ))}
               </select>
               {cars.length === 0 && !isAdmin && (
-                <p className="text-xs text-red-500 mt-1">ไม่มีรถที่กำลังจัดส่งในขณะนี้</p>
+                <p className="text-xs text-red-500 mt-1">{t('no_active_delivery_vehicles')}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">{t('start_time', 'เวลาเริ่มต้น')}</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">{t('start_time')}</label>
               <input 
                 type="datetime-local"
                 value={startDate}
@@ -255,7 +255,7 @@ export const TripHistory: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">{t('end_time', 'เวลาสิ้นสุด')}</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1">{t('end_time')}</label>
               <input 
                 type="datetime-local"
                 value={endDate}
@@ -275,7 +275,7 @@ export const TripHistory: React.FC = () => {
               ) : (
                 <>
                   <Search className="w-5 h-5" />
-                  {t('search', 'ค้นหา')}
+                  {t('search')}
                 </>
               )}
             </button>
@@ -284,12 +284,12 @@ export const TripHistory: React.FC = () => {
           {/* Stats */}
           {historyData.length > 0 && (
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-900">{t('trip_summary', 'สรุปการเดินทาง')}</h3>
+              <h3 className="font-bold text-slate-900">{t('trip_summary')}</h3>
               
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                 <Navigation className="w-5 h-5 text-blue-500" />
                 <div>
-                  <p className="text-xs text-slate-500 font-medium">{t('total_distance', 'ระยะทางรวม')}</p>
+                  <p className="text-xs text-slate-500 font-medium">{t('total_distance')}</p>
                   <p className="font-bold text-slate-900">{totalDistance} km</p>
                 </div>
               </div>
@@ -297,7 +297,7 @@ export const TripHistory: React.FC = () => {
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                 <Activity className="w-5 h-5 text-emerald-500" />
                 <div>
-                  <p className="text-xs text-slate-500 font-medium">{t('max_speed', 'ความเร็วสูงสุด')}</p>
+                  <p className="text-xs text-slate-500 font-medium">{t('max_speed')}</p>
                   <p className="font-bold text-slate-900">{maxSpeed} km/h</p>
                 </div>
               </div>
@@ -305,8 +305,8 @@ export const TripHistory: React.FC = () => {
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                 <MapPin className="w-5 h-5 text-purple-500" />
                 <div>
-                  <p className="text-xs text-slate-500 font-medium">{t('data_points', 'จุดบันทึกข้อมูล')}</p>
-                  <p className="font-bold text-slate-900">{historyData.length} {t('points', 'จุด')}</p>
+                  <p className="text-xs text-slate-500 font-medium">{t('data_points')}</p>
+                  <p className="font-bold text-slate-900">{historyData.length} {t('points')}</p>
                 </div>
               </div>
             </div>
@@ -346,7 +346,7 @@ export const TripHistory: React.FC = () => {
                 <Marker position={positions[0]} icon={StartIcon}>
                   <Popup>
                     <div className="text-sm">
-                      <p className="font-bold text-emerald-600 mb-1">{t('start_point', 'จุดเริ่มต้น')}</p>
+                      <p className="font-bold text-emerald-600 mb-1">{t('start_point')}</p>
                       <p>{format(new Date(historyData[0].timestamp), 'dd/MM/yyyy HH:mm:ss')}</p>
                       <p>{historyData[0].speed} km/h</p>
                     </div>
@@ -358,7 +358,7 @@ export const TripHistory: React.FC = () => {
                   <Marker position={positions[positions.length - 1]} icon={EndIcon}>
                     <Popup>
                       <div className="text-sm">
-                        <p className="font-bold text-red-600 mb-1">{t('end_point', 'จุดสิ้นสุด')}</p>
+                        <p className="font-bold text-red-600 mb-1">{t('end_point')}</p>
                         <p>{format(new Date(historyData[historyData.length - 1].timestamp), 'dd/MM/yyyy HH:mm:ss')}</p>
                         <p>{historyData[historyData.length - 1].speed} km/h</p>
                       </div>

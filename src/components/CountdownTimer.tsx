@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 interface CountdownTimerProps {
   deadline: string;
@@ -10,6 +11,7 @@ interface CountdownTimerProps {
 }
 
 export const CountdownTimer: React.FC<CountdownTimerProps> = ({ deadline, onOverdue, className, compact = false }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isOverdue, setIsOverdue] = useState<boolean>(false);
 
@@ -63,7 +65,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({ deadline, onOver
       <Clock className="w-5 h-5" />
       <div className="flex flex-col">
         <span className="text-[10px] uppercase tracking-wider opacity-80 leading-none mb-1">
-          {isOverdue ? 'หมดเวลา' : 'เวลาที่เหลือ'}
+          {isOverdue ? t('expired') : t('time_left')}
         </span>
         <span className="leading-none">{timeLeft}</span>
       </div>

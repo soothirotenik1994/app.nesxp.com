@@ -4,7 +4,7 @@ import { VehicleMap } from '../components/VehicleMap';
 import { directusApi } from '../api/directus';
 import { gpsApi } from '../api/gps';
 import { Car, CarStatus } from '../types';
-import { Activity, Clock, Navigation, Search, AlertCircle, Maximize2, Minimize2, Map as MapIcon, Car as CarIcon, CheckCircle2, XCircle, Zap, History } from 'lucide-react';
+import { Activity, Clock, Navigation, Search, AlertCircle, Maximize2, Minimize2, Map as MapIcon, Car as CarIcon, CheckCircle2, XCircle, Zap, History, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -149,7 +149,7 @@ export const FleetMonitor: React.FC = () => {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-emerald-500 font-medium tracking-widest uppercase text-sm">Initializing Monitor...</p>
+          <p className="text-emerald-500 font-medium tracking-widest uppercase text-sm">{t('initializing_monitor')}</p>
         </div>
       </div>
     );
@@ -160,12 +160,23 @@ export const FleetMonitor: React.FC = () => {
       {/* Header */}
       <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-10">
         <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-2 group"
+            title={t('back')}
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">{t('back')}</span>
+          </button>
+          
+          <div className="h-8 w-px bg-slate-800 mx-2"></div>
+
           <div className="w-10 h-10 bg-white rounded-lg p-1 flex items-center justify-center">
             <img src={websiteLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <div>
             <h1 className="text-white font-bold text-lg tracking-tight leading-none">{websiteName}</h1>
-            <p className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest mt-1">Live Fleet Monitor</p>
+            <p className="text-emerald-500 text-[10px] font-bold uppercase tracking-widest mt-1">{t('live_fleet_monitor')}</p>
           </div>
         </div>
 
@@ -173,7 +184,7 @@ export const FleetMonitor: React.FC = () => {
           <div className="flex items-center gap-4 text-sm font-medium">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-slate-400">Updating in <span className="text-white font-mono">{countdown}s</span></span>
+              <span className="text-slate-400">{t('updating_in')} <span className="text-white font-mono">{countdown}s</span></span>
             </div>
             <div className="h-4 w-px bg-slate-800"></div>
             <div className="flex items-center gap-2 text-slate-400">
@@ -185,7 +196,7 @@ export const FleetMonitor: React.FC = () => {
           <button 
             onClick={toggleFullscreen}
             className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-            title="Toggle Fullscreen"
+            title={t('toggle_fullscreen')}
           >
             {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
           </button>
@@ -201,28 +212,28 @@ export const FleetMonitor: React.FC = () => {
             <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
               <div className="flex items-center gap-2 text-slate-400 mb-1">
                 <CarIcon className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Total</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{t('total')}</span>
               </div>
               <p className="text-2xl font-bold text-white">{stats.total}</p>
             </div>
             <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20">
               <div className="flex items-center gap-2 text-emerald-500 mb-1">
                 <CheckCircle2 className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Online</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{t('online')}</span>
               </div>
               <p className="text-2xl font-bold text-emerald-400">{stats.online}</p>
             </div>
             <div className="bg-blue-500/10 rounded-xl p-3 border border-blue-500/20">
               <div className="flex items-center gap-2 text-blue-500 mb-1">
                 <Zap className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Moving</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{t('moving')}</span>
               </div>
               <p className="text-2xl font-bold text-blue-400">{stats.moving}</p>
             </div>
             <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
               <div className="flex items-center gap-2 text-slate-500 mb-1">
                 <XCircle className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">Offline</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{t('offline')}</span>
               </div>
               <p className="text-2xl font-bold text-slate-400">{stats.offline}</p>
             </div>
@@ -234,7 +245,7 @@ export const FleetMonitor: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input 
                 type="text"
-                placeholder="Search vehicles or drivers..."
+                placeholder={t('search_vehicles_drivers')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
@@ -295,11 +306,11 @@ export const FleetMonitor: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <Navigation className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{v.address || 'Unknown Location'}</span>
+                      <span className="truncate">{v.address || t('unknown_location')}</span>
                     </div>
                     <div className="flex items-center justify-between text-[10px]">
                       <span className="text-slate-500 truncate pr-2">
-                        {v.memberName || 'No Driver Assigned'}
+                        {v.memberName || t('no_driver_assigned')}
                       </span>
                       <span className="text-slate-600 font-mono shrink-0">
                         {format(new Date(v.lastUpdate), 'HH:mm:ss')}

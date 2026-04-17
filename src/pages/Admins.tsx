@@ -181,7 +181,7 @@ export const Admins: React.FC = () => {
         const firstError = errorData.errors[0];
         errorMsg = firstError.message;
         if (firstError.extensions?.field) {
-          errorMsg += ` (ฟิลด์ที่มีปัญหา: ${firstError.extensions.field})`;
+          errorMsg += ` (${t('problematic_field')}: ${firstError.extensions.field})`;
         }
       }
       

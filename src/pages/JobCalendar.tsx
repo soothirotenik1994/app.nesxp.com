@@ -214,10 +214,10 @@ export const JobCalendar: React.FC = () => {
               dayMaxEvents={true}
               nowIndicator={true}
               buttonText={{
-                today: i18n.language === 'th' ? 'วันนี้' : 'Today',
-                month: i18n.language === 'th' ? 'เดือน' : 'Month',
-                week: i18n.language === 'th' ? 'สัปดาห์' : 'Week',
-                day: i18n.language === 'th' ? 'วัน' : 'Day'
+                today: t('today'),
+                month: t('month'),
+                week: t('week'),
+                day: t('day')
               }}
             />
           </div>

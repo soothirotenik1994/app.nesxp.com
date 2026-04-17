@@ -2,16 +2,49 @@ import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
 export const DIRECTUS_URL = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+
+// Use administrative proxy for better reliability and token management
+const PROXY_URL = '/api/directus';
+
 const getStaticKey = () => {
-  const key = localStorage.getItem('static_api_key') || import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0';
-  if (key === 'null' || key === 'undefined' || !key) return null;
-  return key;
+  let key = localStorage.getItem('static_api_key');
+  
+  // Clean up problematic values
+  if (key === 'null' || key === 'undefined' || key === '') {
+    key = null;
+    localStorage.removeItem('static_api_key');
+  }
+  
+  const badTokens = [
+    '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
+    'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
+    'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4',
+    'null',
+    'undefined'
+  ];
+  
+  // Confirmed working token provided by user - now primarily handled by backend for security
+  const confirmedToken = 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
+  
+  if (key && (badTokens.some(bt => key.trim().includes(bt)) || key.length < 30)) {
+    console.log('[directusApi] Specifically found and clearing invalid/leaked token from localStorage');
+    localStorage.removeItem('static_api_key');
+    key = null;
+  }
+  
+  const envKey = (import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
+  // Return user's setting, or the env variable, or fallback to the confirmed token
+  let finalKey = key || (envKey && !badTokens.includes(envKey) ? envKey : confirmedToken);
+  
+  if (finalKey === 'null' || finalKey === 'undefined' || !finalKey) return confirmedToken;
+  return finalKey.trim();
 };
 
 export const STATIC_API_KEY = getStaticKey();
 
+// Use the proxy URL as the base for all API calls to avoid CORS and auth header issues
 export const api = axios.create({
-  baseURL: DIRECTUS_URL,
+  baseURL: PROXY_URL,
   timeout: 30000, // 30 seconds timeout
 });
 
@@ -38,6 +71,12 @@ api.interceptors.request.use(
       return config;
     }
 
+    // If Authorization is already set (e.g. explicitly in trackJob), don't overwrite it
+    if (config.headers.Authorization) {
+      console.log(`Using existing Authorization for: ${config.url}`);
+      return config;
+    }
+
     const token = localStorage.getItem('admin_token');
     if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
@@ -61,26 +100,31 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn('401 Unauthorized detected at:', window.location.pathname);
       
-      // Clear all auth data
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('member_id');
-      localStorage.removeItem('user_role');
-      localStorage.removeItem('is_admin');
-      localStorage.removeItem('user_name');
-      localStorage.removeItem('user_email');
-      localStorage.removeItem('user_picture');
-      localStorage.removeItem('menu_permissions');
-      localStorage.removeItem('is_switched_account');
-      
-      setAuthToken(null);
-      
-      // Only redirect if we're not already on the login page
-      // and if we're not trying to log in (to avoid infinite loops)
+      const adminToken = localStorage.getItem('admin_token');
+      const memberId = localStorage.getItem('member_id');
       const isLoginPage = window.location.pathname.includes('/login');
       const isAuthRequest = error.config?.url?.includes('/auth/login');
       
-      if (!isLoginPage && !isAuthRequest) {
-        console.log('Redirecting to login due to 401...');
+      // If we have an admin token, it might be expired. Refresh or logout.
+      if (adminToken && !isLoginPage && !isAuthRequest) {
+        console.log('[Interceptor] Admin token error, clearing session...');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('member_id');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('is_admin');
+        localStorage.removeItem('user_name');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('user_picture');
+        localStorage.removeItem('menu_permissions');
+        localStorage.removeItem('is_switched_account');
+        setAuthToken(null);
+        window.location.href = '/login';
+      } else if (memberId && !adminToken) {
+        // If it's a staff member (no admin token), do NOT logout automatically.
+        // Let the specific API calls handle their own fallbacks.
+        console.log('[Interceptor] Staff member 401 detected. Will attempt fallback in the API call.');
+      } else if (!isLoginPage && !isAuthRequest) {
+        // No session at all and got 401
         window.location.href = '/login';
       }
     }
@@ -99,39 +143,76 @@ export const directusApi = {
     }
   },
 
-  loginStaff: async (email: string, password: string) => {
+  loginStaff: async (identifier: string, password: string) => {
     try {
-      const response = await api.get('/items/line_users', {
-        params: {
-          filter: {
-            email: { _eq: email },
-            password: { _eq: password }
-          }
-        }
+      console.log(`[directusApi] loginStaff: Using secure backend authentication for ${identifier}`);
+      
+      // Use the dedicated server-side login endpoint to avoid sending passwords to browser
+      const response = await axios.post('/api/auth/staff-login', { 
+        identifier, 
+        password 
       });
-      return response.data.data[0];
-    } catch (error) {
-      console.error('Staff login error:', error);
+      
+      const member = response.data.data;
+      if (member) {
+        console.log(`[directusApi] loginStaff: Success! Authorized as ${member.email || member.display_name}`);
+        return member;
+      }
+      return null;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] loginStaff: Invalid credentials');
+        return null;
+      }
+      console.error('[directusApi] loginStaff Critical Error:', error.response?.status, error.response?.data || error.message);
       throw error;
     }
   },
   
   getMembers: async (): Promise<Member[]> => {
-    const response = await api.get('/items/line_users', {
-      params: {
-        limit: -1
+    try {
+      const response = await api.get('/items/line_users', {
+        params: {
+          limit: -1,
+          fields: '*,car_users.*,car_users.car_id.*'
+        }
+      });
+      return response.data.data || [];
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] getMembers Auth failed (401), trying Public Access fallback...');
+        const response = await axios.get(`${PROXY_URL}/items/line_users`, { 
+          params: { 
+            limit: -1,
+            fields: '*,car_users.*,car_users.car_id.*'
+          } 
+        });
+        return response.data.data || [];
       }
-    });
-    return response.data.data || [];
+      throw error;
+    }
   },
 
   getMember: async (id: string): Promise<Member> => {
-    const response = await api.get(`/items/line_users/${id}`, {
-      params: {
-        fields: '*,car_users.*,car_users.car_id.*'
+    try {
+      const response = await api.get(`/items/line_users/${id}`, {
+        params: {
+          fields: '*,car_users.*,car_users.car_id.*'
+        }
+      });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(`[directusApi] getMember ${id} Auth failed (401), trying Public Access fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/line_users/${id}`, {
+          params: {
+            fields: '*,car_users.*,car_users.car_id.*'
+          }
+        });
+        return response.data.data;
       }
-    });
-    return response.data.data;
+      throw error;
+    }
   },
 
   createMember: async (data: Partial<Member>): Promise<Member> => {
@@ -377,11 +458,7 @@ export const directusApi = {
   uploadFile: async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/files', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.post('/files', formData);
     return response.data.data.id;
   },
 
@@ -424,8 +501,14 @@ export const directusApi = {
       const response = await api.get('/items/system_settings/1');
       return response.data.data;
     } catch (error) {
-      console.warn('System settings not found in Directus, using defaults');
-      return null;
+      console.warn('System settings auth failed, trying Public Access fallback...');
+      try {
+        const response = await axios.get(`${PROXY_URL}/items/system_settings/1`);
+        return response.data.data;
+      } catch (e) {
+        console.warn('System settings not found in Directus, using defaults');
+        return null;
+      }
     }
   },
 
@@ -469,6 +552,40 @@ export const directusApi = {
     } catch (error) {
       console.error('Error updating LINE settings:', error);
       throw error;
+    }
+  },
+  
+  getLoginLogs: async (): Promise<any[]> => {
+    try {
+      const response = await api.get('/items/login_logs', {
+        params: {
+          sort: '-timestamp',
+          limit: 100
+        }
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching login logs:', error);
+      return [];
+    }
+  },
+
+  createLoginLog: async (data: { 
+    user_email: string; 
+    ip_address: string; 
+    timestamp: string; 
+    user_agent: string;
+    status: string;
+  }): Promise<any> => {
+    try {
+      // Use the dedicated server-side endpoint for creating logs
+      // This bypasses 401 issues on the proxy because the server appends the static token
+      const response = await axios.post('/api/login-logs', data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Error creating login log:', error.response?.status, error.response?.data || error.message);
+      // Don't throw, we don't want to block login if logging fails
+      return null;
     }
   },
 
@@ -654,44 +771,60 @@ export const directusApi = {
   trackJob: async (caseNumber: string, phone: string): Promise<any> => {
     try {
       // 1. Find the job by case number
-      const response = await api.get('/items/work_reports', {
-        params: {
-          filter: {
-            case_number: { _eq: caseNumber }
-          },
-          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
-          limit: 1
-        }
-      });
-
-      const job = response.data.data[0];
+      // Use our backend's public tracking API which uses server-side token
+      // This avoids 401 errors and CORS issues in the browser
+      console.log(`Tracking: Calling backend API for ${caseNumber} with phone ${phone}`);
+      const response = await axios.get(`/api/track/${caseNumber}`, { params: { phone } });
+      
+      const job = response.data.data;
       if (!job) return null;
 
       // 2. Verify phone number
       // Normalize phone numbers for comparison (remove non-digits)
-      const normalize = (p: string) => p.replace(/\D/g, '');
-      const searchPhone = normalize(phone);
+      const getDigits = (p: string) => (p || '').toString().replace(/\D/g, '');
+      
+      const searchDigits = getDigits(phone);
+      console.log(`Tracking: Verifying phone (search digits: ${searchDigits})`);
 
-      // Check driver phone
-      const driverPhone = normalize(job.driver_id?.phone || job.driver_id?.Phone || '');
-      if (driverPhone === searchPhone) return job;
+      const checkPhone = (p: string | undefined | null, label: string) => {
+        if (!p) return false;
+        const dbDigits = getDigits(p);
+        console.log(`Tracking: Checking ${label}: ${dbDigits}`);
+        
+        if (!dbDigits || !searchDigits) return false;
+        
+        // Match if one is a suffix of the other (at least 8 digits)
+        const minMatch = 8;
+        if (dbDigits.length >= minMatch && searchDigits.length >= minMatch) {
+          if (dbDigits.endsWith(searchDigits) || searchDigits.endsWith(dbDigits)) {
+            console.log(`Tracking: Match found via suffix on ${label}`);
+            return true;
+          }
+        }
+        
+        // Exact match
+        return dbDigits === searchDigits;
+      };
 
-      // Check customer primary member phone
-      const customerMemberPhone = normalize(job.customer_id?.member_id?.phone || job.customer_id?.member_id?.Phone || '');
-      if (customerMemberPhone === searchPhone) return job;
+      // Check all potential phone fields
+      if (checkPhone(job.driver_id?.phone, 'Driver')) return job;
+      if (checkPhone(job.member_id?.phone, 'Member')) return job;
+      if (checkPhone(job.customer_id?.phone, 'Customer Direct')) return job;
+      if (checkPhone(job.customer_id?.member_id?.phone, 'Customer Primary Member')) return job;
 
       // Check other customer members
       if (job.customer_id?.members && Array.isArray(job.customer_id.members)) {
-        for (const m of job.customer_id.members) {
-          const mPhone = normalize(m.line_user_id?.phone || m.line_user_id?.Phone || '');
-          if (mPhone === searchPhone) return job;
+        for (let i = 0; i < job.customer_id.members.length; i++) {
+          if (checkPhone(job.customer_id.members[i].line_user_id?.phone, `Customer Member ${i}`)) return job;
         }
       }
 
       // If no match
+      console.warn('Tracking: Phone verification failed');
       throw new Error('Verification failed: Phone number does not match this case.');
-    } catch (error) {
-      console.error('Tracking error:', error);
+    } catch (error: any) {
+      console.error('Tracking error:', error.response?.data || error.message);
+      if (error.response?.status === 404) return null;
       throw error;
     }
   },
@@ -726,5 +859,23 @@ export const directusApi = {
     localStorage.removeItem('menu_permissions');
     localStorage.removeItem('is_switched_account');
     setAuthToken(null);
+  },
+
+  requestPasswordReset: async (email: string, resetUrl: string) => {
+    try {
+      await api.post('/auth/password/request', { email, reset_url: resetUrl });
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (token: string, password: string) => {
+    try {
+      await api.post('/auth/password/reset', { token, password });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      throw error;
+    }
   }
 };

@@ -149,7 +149,7 @@ ${t('route_index', { index: index + 1 })}:
 🔗 ${t('origin_url_label')} : ${route.origin_url || '-'}
 📍 ${t('destination_label')} : ${route.destination || '-'}
 🔗 ${t('destination_url_label')} : ${route.destination_url || '-'}
-${t('distance_label')} : ${route.distance !== undefined ? route.distance + ' km' : '-'}`).join('\n');
+${t('distance_label')} : ${route.distance !== undefined ? route.distance + ' ' + t('km') : '-'}`).join('\n');
     } else {
       routesText = `📍 ${t('origin')} : ${report.origin || '-'}
 📍 ${t('destination')} : ${report.destination || '-'}`;
@@ -159,7 +159,7 @@ ${t('distance_label')} : ${route.distance !== undefined ? route.distance + ' km'
 📅 ${t('report_date')} : ${workDate}
 📁 ${t('customer_name')} : ${report.customer_name}
 ${routesText}
-${report.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')} รวม : ${report.estimated_distance} ${t('km')}` : ''}
+${report.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')} ${t('total_label')} : ${report.estimated_distance} ${t('km')}` : ''}
 
 🚚 ${t('car_number')} : ${carNum}
 
@@ -173,6 +173,12 @@ ${!isCustomer ? `
 🍄 ${t('mileage_start')} : ${report.mileage_start}
 🍄 ${t('mileage_end')} : ${report.mileage_end}
 ` : ''}
+${((report.expense_items && report.expense_items.length > 0) || report.toll_fee || report.fuel_cost || report.other_expenses) ? `
+💰 ${t('expenses')}:
+${(report.expense_items && report.expense_items.length > 0) 
+  ? report.expense_items.map(item => `👉 ${item.name || t('expense_name')} : ${item.amount.toLocaleString()} ${t('baht')}`).join('\n')
+  : `${report.toll_fee ? `👉 ${t('toll_fee')} : ${report.toll_fee} ${t('baht')}\n` : ''}${report.fuel_cost ? `👉 ${t('fuel_cost')} : ${report.fuel_cost} ${t('baht')}\n` : ''}${report.other_expenses ? `👉 ${t('other_expenses')} : ${report.other_expenses} ${t('baht')}\n` : ''}${report.other_expenses_note ? `👉 ${t('other_expenses_note')} : ${report.other_expenses_note}\n` : ''}`}
+💵 ${t('total_expenses')} : ${((report.expense_items && report.expense_items.length > 0) ? report.expense_items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0) : (Number(report.toll_fee || 0) + Number(report.fuel_cost || 0) + Number(report.other_expenses || 0))).toLocaleString()} ${t('baht')}` : ''}
 📌 ${t('notes')} : ${report.notes || '-'}`;
   };
 
@@ -252,6 +258,13 @@ ${!isCustomer ? `
         [t('arrival_time')]: formatTimeDisplay(r.arrival_time),
         [t('mileage_start')]: r.mileage_start || '-',
         [t('mileage_end')]: r.mileage_end || '-',
+        [t('toll_fee')]: r.toll_fee || '-',
+        [t('fuel_cost')]: r.fuel_cost || '-',
+        [t('other_expenses')]: r.other_expenses || '-',
+        [t('other_expenses_note')]: r.other_expenses_note || '-',
+        [t('total_expenses')]: (r.expense_items && r.expense_items.length > 0) 
+          ? r.expense_items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0)
+          : (Number(r.toll_fee || 0) + Number(r.fuel_cost || 0) + Number(r.other_expenses || 0)),
         [t('notes')]: r.notes || '-'
       };
     });

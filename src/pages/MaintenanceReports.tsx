@@ -330,7 +330,7 @@ export const MaintenanceReports: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 text-right font-mono">
-                        {record.mileage.toLocaleString()} กม.
+                        {record.mileage.toLocaleString()} {t('km')}
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600 text-right">
                         ฿{(record.cost || 0).toLocaleString()}

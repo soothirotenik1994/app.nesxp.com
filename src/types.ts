@@ -10,7 +10,8 @@ export interface MaintenanceHistory {
 
 export interface Member {
   id: string;
-  line_user_id: string;
+  line_user_id?: string;
+  google_user_id?: string;
   display_name?: string;
   picture_url?: string;
   first_name: string;
@@ -146,6 +147,19 @@ export interface Route {
   type?: 'outbound' | 'return';
   pickups?: TripPoint[];
   deliveries?: TripPoint[];
+  status?: 'pending' | 'completed';
+  date?: string;
+  standby_time?: string;
+  departure_time?: string;
+  arrival_time?: string;
+  mileage_start?: string | number;
+  mileage_end?: string | number;
+}
+
+export interface ExpenseItem {
+  id: string;
+  name: string;
+  amount: number;
 }
 
 export interface WorkReport {
@@ -190,6 +204,11 @@ export interface WorkReport {
     longitude?: number;
     timestamp?: string;
   }[];
+  toll_fee?: number;
+  fuel_cost?: number;
+  other_expenses?: number;
+  other_expenses_note?: string;
+  expense_items?: ExpenseItem[];
   status?: 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending' | 'deleted';
   cancel_reason?: string;
   acceptance_deadline?: string;
@@ -208,4 +227,27 @@ export interface WorkReport {
   rating?: number;
   feedback?: string;
   rated_at?: string;
+}
+
+export interface SystemSettings {
+  id: number;
+  website_name?: string;
+  website_logo?: string;
+  website_background?: string;
+  app_url?: string;
+  google_maps_api_key?: string;
+  enable_queue_system?: boolean;
+  bkk_max_distance?: number;
+  enable_tracking?: boolean;
+  enable_line_login?: boolean;
+  enable_google_login?: boolean;
+  google_client_id?: string;
+  email_smtp_host?: string;
+  email_smtp_port?: string;
+  email_smtp_user?: string;
+  email_smtp_password?: string;
+  email_smtp_secure?: boolean;
+  email_from?: string;
+  email_from_name?: string;
+  expense_categories?: string | string[];
 }

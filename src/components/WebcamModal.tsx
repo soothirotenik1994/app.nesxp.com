@@ -16,6 +16,8 @@ export const WebcamModal: React.FC<WebcamModalProps> = ({ isOpen, onClose, onCap
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [error, setError] = useState<string | null>(null);
 
+  const [isCapturing, setIsCapturing] = useState(false);
+
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
@@ -24,17 +26,36 @@ export const WebcamModal: React.FC<WebcamModalProps> = ({ isOpen, onClose, onCap
   }, [webcamRef]);
 
   const handleConfirm = async () => {
-    if (imgSrc) {
-      const blob = await (await fetch(imgSrc)).blob();
-      const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      onCapture(file);
-      handleClose();
+    if (imgSrc && !isCapturing) {
+      setIsCapturing(true);
+      try {
+        // Robust way to convert data URL to Blob
+        const parts = imgSrc.split(';base64,');
+        const contentType = parts[0].split(':')[1];
+        const raw = window.atob(parts[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
+        }
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        
+        await onCapture(file);
+        handleClose();
+      } catch (err) {
+        console.error("Error confirming photo:", err);
+        setError("Failed to process photo. Please try again.");
+      } finally {
+        setIsCapturing(false);
+      }
     }
   };
 
   const handleClose = () => {
     setImgSrc(null);
     setError(null);
+    setIsCapturing(false);
     onClose();
   };
 
@@ -101,10 +122,15 @@ export const WebcamModal: React.FC<WebcamModalProps> = ({ isOpen, onClose, onCap
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                disabled={isCapturing}
+                className={`flex-1 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 ${isCapturing ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <Check className="w-5 h-5" />
-                {t('confirm', 'ยืนยัน')}
+                {isCapturing ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Check className="w-5 h-5" />
+                )}
+                {isCapturing ? t('processing', 'กำลังประมวลผล...') : t('confirm', 'ยืนยัน')}
               </button>
             </>
           ) : (
