@@ -461,13 +461,22 @@ ${(report.expense_items && report.expense_items.length > 0)
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => setSelectedReport(report)}
-                          className="p-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all"
-                          title={t('view_report')}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => navigate(`/jobs/new?copyFrom=${report.id}`)}
+                            className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                            title={t('duplicate_job')}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => setSelectedReport(report)}
+                            className="p-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all"
+                            title={t('view_report')}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

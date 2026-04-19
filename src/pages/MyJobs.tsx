@@ -392,6 +392,7 @@ export const MyJobs: React.FC = () => {
                               report.status === 'accepted' ? "bg-blue-100 text-blue-700" :
                               report.status === 'cancelled' ? "bg-red-100 text-red-700" :
                               report.status === 'cancel_pending' ? "bg-orange-100 text-orange-700 border border-orange-200" :
+                              report.status === 'pending' ? "bg-amber-100 text-amber-700 animate-pulse ring-2 ring-amber-400/20" :
                               "bg-slate-100 text-slate-700"
                             )}>
                               {t(`status_${report.status || 'pending'}`)}

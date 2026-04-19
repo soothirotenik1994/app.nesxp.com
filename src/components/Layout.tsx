@@ -3,6 +3,7 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { NewJobNotification } from './NewJobNotification';
 import { ProfileModal } from './ProfileModal';
 import { AlertCircle, X } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export const Layout: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden transition-colors duration-300">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <NewJobNotification />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar 

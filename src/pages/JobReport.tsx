@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import Select from 'react-select';
@@ -187,6 +187,8 @@ const processImageWithOverlay = async (file: File, location: { lat: number, lng:
 export const JobReport: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const copyFromId = searchParams.get('copyFrom');
   const navigate = useNavigate();
   const userRole = localStorage.getItem('user_role') || 'customer';
   const isAdmin = userRole.toLowerCase() === 'administrator' || userRole.toLowerCase() === 'admin';
@@ -1415,6 +1417,47 @@ export const JobReport: React.FC = () => {
             const photoIds = report.document_photos.map((p: any) => typeof p === 'string' ? p : p.id);
             setExistingDocumentPhotos(photoIds);
           }
+        } else if (copyFromId) {
+          const report = await directusApi.getWorkReport(copyFromId);
+          const newCaseNumber = generateCaseNumber('TH', reportsData);
+
+          setFormData(prev => ({
+            ...prev,
+            case_number: newCaseNumber,
+            job_type: (report.job_type as 'one_way' | 'round_trip') || 'one_way',
+            customer_name: report.customer_name || report.customer_id?.company_name || '',
+            customer_contact_name: report.customer_contact_name || '',
+            customer_contact_phone: report.customer_contact_phone || '',
+            origin: report.origin || '',
+            origin_url: report.origin_url || '',
+            origin_lat: report.origin_lat,
+            origin_lng: report.origin_lng,
+            destination: report.destination || '',
+            destination_url: report.destination_url || '',
+            destination_lat: report.destination_lat,
+            destination_lng: report.destination_lng,
+            waypoints: report.waypoints || [],
+            routes: (report.routes && report.routes.length > 0) 
+              ? report.routes.map((r: any) => ({ 
+                  ...r, 
+                  status: 'pending',
+                  date: new Date().toISOString().slice(0, 10),
+                  standby_time: '',
+                  departure_time: '',
+                  arrival_time: '',
+                  mileage_start: '',
+                  mileage_end: ''
+                }))
+              : prev.routes,
+            estimated_distance: report.estimated_distance,
+            vehicle_type: report.vehicle_type || report.car_id?.vehicle_type || '',
+            car_id: report.car_id?.id || report.car_id || '',
+            member_id: report.member_id?.id || report.member_id || report.driver_id?.id || report.driver_id || '',
+            customer_id: report.customer_id?.id || report.customer_id || '',
+            phone: report.phone || '',
+            notes: report.notes || '',
+            status: 'pending'
+          }));
         } else {
           // Generate new case number for new reports
           const newCaseNumber = generateCaseNumber('TH', reportsData);
