@@ -16,7 +16,6 @@ async function startServer() {
   console.log('Backend: Starting server...');
   
   const getStaticToken = () => {
-    // Prefer environment variables directly
     const badTokens = [
       '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
       'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
@@ -24,8 +23,18 @@ async function startServer() {
       'null',
       'undefined'
     ];
-    const envToken = (process.env.DIRECTUS_STATIC_TOKEN || process.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
-    return (envToken && !badTokens.includes(envToken) ? envToken : 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex');
+    
+    const fallbackToken = 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
+    
+    // Prefer DIRECTUS_STATIC_TOKEN, then VITE_DIRECTUS_STATIC_TOKEN
+    let token = (process.env.DIRECTUS_STATIC_TOKEN || process.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
+    
+    // If environment token is bad or missing, use the hardcoded fallback
+    if (!token || badTokens.includes(token) || token.length < 20 || token === 'null' || token === 'undefined') {
+      token = fallbackToken;
+    }
+    
+    return token;
   };
 
   const finalToken = getStaticToken();
@@ -38,19 +47,35 @@ async function startServer() {
   };
 
   const getLineSettingsFromDirectus = async () => {
+    const staticToken = getStaticToken();
+    const fallbackToken = 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
+    const directusUrl = getDirectusUrl();
+    const url = `${directusUrl}/items/line_settings`;
+    
     try {
-      const staticToken = getStaticToken();
-      const directusUrl = getDirectusUrl();
-      const url = `${directusUrl}/items/line_settings`;
-      
       console.log(`Backend: Fetching LINE settings from: ${url} using token: ${staticToken.substring(0, 5)}...`);
       
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${staticToken}`
-        },
-        timeout: 5000
-      });
+      let response;
+      try {
+        response = await axios.get(url, {
+          headers: {
+            'Authorization': `Bearer ${staticToken}`
+          },
+          timeout: 5000
+        });
+      } catch (error: any) {
+        if (error.response?.status === 401 && staticToken !== fallbackToken) {
+          console.warn('Backend: LINE settings primary token failed (401). Retrying with fallback...');
+          response = await axios.get(url, {
+            headers: {
+              'Authorization': `Bearer ${fallbackToken}`
+            },
+            timeout: 5000
+          });
+        } else {
+          throw error;
+        }
+      }
       
       // Return the first setting found
       if (response.data.data && response.data.data.length > 0) {
@@ -1112,6 +1137,8 @@ async function startServer() {
   app.get('/api/track/:case_number', async (req, res) => {
     const { case_number } = req.params;
     const { phone } = req.query;
+    const staticToken = getStaticToken();
+    const fallbackToken = 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
 
     try {
       console.log(`Backend: Tracking request received for case: ${case_number}, phone: ${phone}`);
@@ -1124,27 +1151,54 @@ async function startServer() {
         return res.status(400).json({ error: 'Phone number is required for verification' });
       }
 
-      const staticToken = process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
       const directusUrl = (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, '');
+      
+      console.log(`Tracking case: ${case_number} using token prefix: ${staticToken.substring(0, 5)}... (Length: ${staticToken.length})`);
       
       console.log(`Backend: Querying Directus at ${directusUrl} for case ${case_number}`);
       
       // Query Directus for the job report with the matching case_number
-      const response = await axios.get(`${directusUrl}/items/work_reports`, {
-        params: {
-          filter: {
-            case_number: {
-              _eq: case_number.trim()
-            }
+      let response;
+      const getFields = 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,routes,car_id.car_number,driver_id.first_name,driver_id.last_name,driver_id.phone,member_id.phone,customer_id.phone,customer_id.member_id.phone,customer_id.members.line_user_id.phone';
+      
+      try {
+        response = await axios.get(`${directusUrl}/items/work_reports`, {
+          params: {
+            filter: {
+              case_number: {
+                _eq: case_number.trim()
+              }
+            },
+            fields: getFields
           },
-          // Only fetch fields that are safe to expose publicly, plus phone numbers for verification
-          fields: 'case_number,status,origin,destination,work_date,standby_time,departure_time,arrival_time,status_logs,car_id.car_number,driver_id.first_name,driver_id.last_name,driver_id.phone,member_id.phone,customer_id.phone,customer_id.member_id.phone,customer_id.members.line_user_id.phone'
-        },
-        headers: {
-          'Authorization': `Bearer ${staticToken.trim()}`
-        },
-        timeout: 10000
-      });
+          headers: {
+            'Authorization': `Bearer ${staticToken.trim()}`
+          },
+          timeout: 10000
+        });
+      } catch (error: any) {
+        // If the custom token failed with 401, try one more time with the hardcoded fallback
+        if (error.response?.status === 401 && staticToken !== fallbackToken) {
+          console.warn(`Tracking API: Custom token failed (401). Retrying with backup token...`);
+          response = await axios.get(`${directusUrl}/items/work_reports`, {
+            params: {
+              filter: {
+                case_number: {
+                  _eq: case_number.trim()
+                }
+              },
+              fields: getFields
+            },
+            headers: {
+              'Authorization': `Bearer ${fallbackToken}`
+            },
+            timeout: 10000
+          });
+        } else {
+          // If fallback also fails or it wasn't a 401, rethrow
+          throw error;
+        }
+      }
 
       const jobs = response.data.data;
       console.log(`Backend: Directus returned ${jobs?.length || 0} jobs for case: ${case_number}`);
@@ -1204,7 +1258,7 @@ async function startServer() {
         debug: {
           case_number,
           directusUrl: (process.env.VITE_DIRECTUS_URL || process.env.DIRECTUS_URL || 'https://data.nesxp.com').replace(/\/$/, ''),
-          tokenPrefix: (process.env.VITE_DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_STATIC_TOKEN || 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex').substring(0, 5)
+          tokenUsedPrefix: (staticToken === fallbackToken ? 'fallback' : 'custom') + ': ' + staticToken.substring(0, 5)
         }
       });
     }

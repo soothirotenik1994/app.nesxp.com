@@ -412,6 +412,7 @@ const resources = {
       "company_name": "ชื่อบริษัท",
       "company_code": "รหัสบริษัท",
       "address": "ที่อยู่บริษัท",
+      "customer_address": "ที่อยู่ลูกค้า",
       "reset": "รีเซต",
       "tax_id": "เลขผู้เสียภาษี",
       "branch": "สาขา",
@@ -831,7 +832,15 @@ const resources = {
       "back_to_home": "กลับสู่หน้าหลัก",
       "additional_work_saved_msg": "บันทึกข้อมูลและแจ้งเตือนคนขับเรื่องงานเพิ่มเติมเรียบร้อยแล้ว",
       "estimated_distance": "ระยะทางประเมิน",
-      "total_label": "ทั้งสิ้น"
+      "total_label": "ทั้งสิ้น",
+      "driver_ratings": "คะแนนประเมินพนักงาน",
+      "available_members": "พนักงานที่ว่าง",
+      "selected_members": "พนักงานที่เลือก",
+      "search_members_placeholder": "ค้นหาพนักงาน...",
+      "member_notification_desc": "สมาชิกที่เลือกจะได้รับการแจ้งเตือนงานผ่าน LINE เมื่อมีการทำงานในพิกัดนี้",
+      "drag_members_here": "ลากพนักงานมาวางที่นี่",
+      "no_available_members": "ไม่พบพนักงานในระบบ",
+      "company_code_placeholder": "รหัสบริษัท"
     }
   }
 };

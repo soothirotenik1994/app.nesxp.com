@@ -4684,6 +4684,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                     case_number: !id ? generateCaseNumber(selectedCustomerLoc?.company_code || 'TH') : prev.case_number
                   }));
                   
+                  // Auto-fill origin if empty
+                  if (selectedCustomerLoc?.address && !formData.origin) {
+                    setFormData(prev => ({ ...prev, origin: selectedCustomerLoc.address }));
+                  }
+                  
                   // Auto-fill car if there's only one car assigned to this customer
                   if (isAdmin && customerName && selectedCustomerLoc) {
                     let matchingMember = null;

@@ -18,6 +18,7 @@ export interface Member {
   last_name: string;
   phone: string;
   email: string;
+  address?: string;
   password?: string;
   role?: 'member' | 'customer' | 'general' | 'driver';
   status?: 'active' | 'inactive' | 'pending';

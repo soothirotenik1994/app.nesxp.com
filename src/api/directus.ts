@@ -26,7 +26,7 @@ const getStaticKey = () => {
   // Confirmed working token provided by user - now primarily handled by backend for security
   const confirmedToken = 'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex';
   
-  if (key && (badTokens.some(bt => key.trim().includes(bt)) || key.length < 30)) {
+  if (key && (badTokens.some(bt => key.trim().includes(bt)) || key.length < 20)) {
     console.log('[directusApi] Specifically found and clearing invalid/leaked token from localStorage');
     localStorage.removeItem('static_api_key');
     key = null;
@@ -34,7 +34,7 @@ const getStaticKey = () => {
   
   const envKey = (import.meta.env.VITE_DIRECTUS_STATIC_TOKEN || '').trim();
   // Return user's setting, or the env variable, or fallback to the confirmed token
-  let finalKey = key || (envKey && !badTokens.includes(envKey) ? envKey : confirmedToken);
+  let finalKey = key || (envKey && !badTokens.includes(envKey) && envKey.length >= 20 ? envKey : confirmedToken);
   
   if (finalKey === 'null' || finalKey === 'undefined' || !finalKey) return confirmedToken;
   return finalKey.trim();

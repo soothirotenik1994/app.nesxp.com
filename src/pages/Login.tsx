@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck, Navigation, Settings } from 'lucide-react';
+import { Car, Lock, Mail, Loader2, UserCog, User, MessageCircle, CheckSquare, Square, Search, Phone, Hash, MapPin, Clock, Package, CheckCircle2, Circle, AlertCircle, X, Truck, Navigation, Settings, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import axios from 'axios';
 import { directusApi, setAuthToken } from '../api/directus';
 import { gpsApi } from '../api/gps';
@@ -772,26 +772,72 @@ export const Login: React.FC = () => {
               <StatusTimeline status={trackingResult.status} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-outline uppercase tracking-wider">{t('origin')}</p>
-                      <p className="text-on-surface font-semibold">{trackingResult.origin}</p>
-                    </div>
-                  </div>
+                <div className="space-y-6">
+                  {trackingResult.routes && trackingResult.routes.length > 0 ? (
+                    trackingResult.routes.map((route: any, rIdx: number) => (
+                      <div key={rIdx} className="space-y-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                        <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Navigation className="w-3 h-3" />
+                            {t('route_index', { index: rIdx + 1 })}
+                          </div>
+                          {route.distance && (
+                            <div className="text-[10px] text-outline lowercase font-medium">
+                              {route.distance} กม.
+                            </div>
+                          )}
+                        </h4>
+                        
+                        {/* Pickups */}
+                        {route.pickups?.map((pickup: any, pIdx: number) => (
+                          <div key={`p-${pIdx}`} className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                              <ArrowUpRight className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-outline uppercase tracking-wider">{t('pickup_location_label')}</p>
+                              <p className="text-sm font-semibold text-on-surface line-clamp-2">{pickup.name || trackingResult.origin}</p>
+                            </div>
+                          </div>
+                        ))}
 
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-tertiary-container/10 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-on-tertiary-container" />
+                        {/* Deliveries */}
+                        {route.deliveries?.map((delivery: any, dIdx: number) => (
+                          <div key={`d-${dIdx}`} className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-success-container/10 flex items-center justify-center flex-shrink-0 mt-1">
+                              <ArrowDownRight className="w-4 h-4 text-success" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-outline uppercase tracking-wider">{t('delivery_location_label')}</p>
+                              <p className="text-sm font-semibold text-on-surface line-clamp-2">{delivery.name || trackingResult.destination}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-outline uppercase tracking-wider">{t('origin')}</p>
+                          <p className="text-on-surface font-semibold">{trackingResult.origin}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-tertiary-container/10 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-5 h-5 text-on-tertiary-container" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-outline uppercase tracking-wider">{t('destination')}</p>
+                          <p className="text-on-surface font-semibold">{trackingResult.destination}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-outline uppercase tracking-wider">{t('destination')}</p>
-                      <p className="text-on-surface font-semibold">{trackingResult.destination}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">

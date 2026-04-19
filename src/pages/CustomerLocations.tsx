@@ -167,10 +167,18 @@ export const CustomerLocations: React.FC = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [junctionField, setJunctionField] = useState<string>('line_users_id');
 
-  const userRole = localStorage.getItem('user_role') || 'Customer';
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
-  const isCustomerMember = userRole === 'customer' || userRole === 'Customer'; // Handle both casing
-  const canAddLocation = isAdmin || isCustomerMember;
+  const userRole = (localStorage.getItem('user_role') || '').trim();
+  const isAdminStored = localStorage.getItem('is_admin') === 'true';
+  const roleLower = userRole.toLowerCase();
+  
+  // Use a more permissive check for admin roles to ensure visibility
+  const isAdmin = isAdminStored || 
+                  roleLower.includes('admin') || 
+                  roleLower.includes('administrator') || 
+                  roleLower.includes('super');
+                  
+  const isCustomerMember = roleLower === 'customer' || roleLower === 'member';
+  const canAddLocation = isAdmin || isCustomerMember || userRole === '';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<CustomerLocation | null>(null);
@@ -554,18 +562,19 @@ export const CustomerLocations: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-900">{t('customer_locations')}</h2>
+          {canAddLocation && (
+            <button 
+              onClick={() => handleOpenModal()}
+              className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100 whitespace-nowrap"
+            >
+              <Plus className="w-5 h-5 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('add_customer_location')}</span>
+              <Plus className="w-5 h-5 sm:hidden" />
+            </button>
+          )}
         </div>
-        {canAddLocation && (
-          <button 
-            onClick={() => handleOpenModal()}
-            className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100"
-          >
-            <Plus className="w-5 h-5" />
-            {t('add_customer_location')}
-          </button>
-        )}
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -791,7 +800,7 @@ export const CustomerLocations: React.FC = () => {
                           value={formData.company_code}
                           onChange={(e) => setFormData({...formData, company_code: e.target.value})}
                           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                          placeholder="CODE"
+                          placeholder={t('company_code_placeholder')}
                         />
                       </div>
                     </div>

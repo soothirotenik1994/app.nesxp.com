@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { directusApi } from '../api/directus';
 import { lineService } from '../services/lineService';
-import { Member } from '../types';
-import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check, Shield, UserCheck, Lock, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Member, CustomerLocation } from '../types';
+import { Search, UserPlus, MoreVertical, ExternalLink, Mail, Phone, X, Edit2, Trash2, Loader2, Car as CarIcon, AlertCircle, Plus, Settings2, Check, Shield, UserCheck, Lock, RefreshCw, Eye, EyeOff, Building2, MapPin } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -15,6 +15,7 @@ const MemberRow = React.memo(({
   visibleColumns, 
   allCars, 
   allPermissions, 
+  allCustomerLocations,
   onEdit, 
   onDelete,
   onSwitchAccount
@@ -23,11 +24,28 @@ const MemberRow = React.memo(({
   visibleColumns: string[], 
   allCars: any[], 
   allPermissions: any[], 
+  allCustomerLocations: CustomerLocation[],
   onEdit: (member: Member) => void, 
   onDelete: (id: string) => void,
   onSwitchAccount: (member: Member) => void
 }) => {
   const { t } = useTranslation();
+
+  const memberAddress = useMemo(() => {
+    // Find customer location linked to this member
+    const loc = allCustomerLocations.find(l => {
+      const primaryId = typeof l.member_id === 'object' ? l.member_id?.id : l.member_id;
+      if (String(primaryId) === String(member.id)) return true;
+      
+      return l.members?.some((m: any) => {
+        const mId = typeof m.line_users_id === 'object' ? m.line_users_id?.id : 
+                   (typeof m.line_user_id === 'object' ? m.line_user_id?.id : 
+                   (typeof m.members_id === 'object' ? m.members_id?.id : (m.line_users_id || m.line_user_id || m.members_id)));
+        return String(mId) === String(member.id);
+      });
+    });
+    return loc ? { address: loc.address, company: loc.company_name, branch: loc.branch } : null;
+  }, [member.id, allCustomerLocations]);
 
   const memberVehicles = useMemo(() => {
     // 1. Try manual join first
@@ -129,6 +147,32 @@ const MemberRow = React.memo(({
           </div>
         </td>
       )}
+      {visibleColumns.includes('address') && (
+        <td className="px-6 py-4">
+          {memberAddress ? (
+            <div className="space-y-1 max-w-[200px]">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Building2 className="w-3 h-3 text-primary" />
+                <span className="truncate">{memberAddress.company}</span>
+              </div>
+              {memberAddress.branch && (
+                <p className="text-[10px] text-slate-500 font-medium">{t('branch')}: {memberAddress.branch}</p>
+              )}
+              <div className="flex items-start gap-2 text-[10px] text-slate-500 leading-relaxed">
+                <MapPin className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
+                <span className="line-clamp-2">{memberAddress.address || t('not_specified')}</span>
+              </div>
+            </div>
+          ) : member.address ? (
+            <div className="flex items-start gap-2 text-[10px] text-slate-500 leading-relaxed max-w-[200px]">
+              <MapPin className="w-3 h-3 text-slate-400 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2">{member.address}</span>
+            </div>
+          ) : (
+            <span className="text-slate-300 italic text-xs">-</span>
+          )}
+        </td>
+      )}
       {visibleColumns.includes('role') && (
         <td className="px-6 py-4">
           <span className={clsx(
@@ -212,6 +256,7 @@ export const Members: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [allCars, setAllCars] = useState<any[]>([]);
   const [allPermissions, setAllPermissions] = useState<any[]>([]);
+  const [allCustomerLocations, setAllCustomerLocations] = useState<CustomerLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -244,6 +289,7 @@ export const Members: React.FC = () => {
   const columns = [
     { id: 'name', label: t('name') },
     { id: 'contact', label: t('contact_info') },
+    { id: 'address', label: t('customer_address') },
     { id: 'role', label: t('role') },
     { id: 'line_uid', label: t('line_uid') },
     { id: 'vehicles', label: t('assigned_vehicles') },
@@ -257,6 +303,7 @@ export const Members: React.FC = () => {
     line_user_id: '',
     password: '',
     confirm_password: '',
+    address: '',
     role: 'general' as 'member' | 'customer' | 'general' | 'driver' | 'inactive',
     status: 'active' as 'active' | 'inactive' | 'pending',
     picture_url: ''
@@ -297,11 +344,14 @@ export const Members: React.FC = () => {
                           (userRole === 'admin' || userRole === 'administrator');
       const memberId = localStorage.getItem('member_id');
 
-      const [membersData, carsData, permissionsData] = await Promise.all([
+      const [membersData, carsData, permissionsData, locationsData] = await Promise.all([
         directusApi.getMembers(),
         directusApi.getCars(),
-        directusApi.getCarPermissions()
+        directusApi.getCarPermissions(),
+        directusApi.getCustomerLocations().catch(() => [])
       ]);
+
+      setAllCustomerLocations(locationsData);
 
       let finalMembers = membersData;
 
@@ -389,6 +439,7 @@ export const Members: React.FC = () => {
         line_user_id: member.line_user_id || '',
         password: '', // Don't show password
         confirm_password: '',
+        address: member.address || '',
         role: member.role || 'customer',
         status: member.status || 'active',
         picture_url: member.picture_url || ''
@@ -403,6 +454,7 @@ export const Members: React.FC = () => {
         line_user_id: '',
         password: '',
         confirm_password: '',
+        address: '',
         role: 'general',
         status: 'active',
         picture_url: ''
@@ -787,6 +839,7 @@ export const Members: React.FC = () => {
               <tr className="bg-white text-slate-500 text-xs uppercase tracking-wider font-bold">
                 {visibleColumns.includes('name') && <th className="px-6 py-4">{t('name')}</th>}
                 {visibleColumns.includes('contact') && <th className="px-6 py-4">{t('contact_info')}</th>}
+                {visibleColumns.includes('address') && <th className="px-6 py-4">{t('address')}</th>}
                 {visibleColumns.includes('role') && <th className="px-6 py-4">{t('role')}</th>}
                 {visibleColumns.includes('line_uid') && <th className="px-6 py-4">{t('line_uid')}</th>}
                 {visibleColumns.includes('vehicles') && <th className="px-6 py-4">{t('assigned_vehicles')}</th>}
@@ -815,6 +868,7 @@ export const Members: React.FC = () => {
                     visibleColumns={visibleColumns}
                     allCars={allCars}
                     allPermissions={allPermissions}
+                    allCustomerLocations={allCustomerLocations}
                     onEdit={handleEdit}
                     onDelete={handleDeleteClick}
                     onSwitchAccount={handleSwitchAccountClick}
@@ -954,6 +1008,20 @@ export const Members: React.FC = () => {
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">{t('address')}</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                      <textarea 
+                        rows={2}
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all resize-none"
+                        placeholder={t('address')}
                       />
                     </div>
                   </div>

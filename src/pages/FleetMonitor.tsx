@@ -266,14 +266,22 @@ export const FleetMonitor: React.FC = () => {
               const isMoving = isOnline && v.speed > 0;
               
               return (
-                <button
+                <div
                   key={v.carNumber}
                   onClick={() => setSelectedVehicle(v)}
-                  className={`w-full text-left p-3 rounded-xl transition-all border ${
+                  className={`w-full text-left p-3 rounded-xl transition-all border cursor-pointer ${
                     isSelected 
                       ? 'bg-slate-800 border-slate-600 shadow-lg' 
                       : 'bg-transparent border-transparent hover:bg-slate-800/50'
                   }`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedVehicle(v);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -322,7 +330,7 @@ export const FleetMonitor: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
