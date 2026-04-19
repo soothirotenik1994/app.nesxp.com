@@ -22,7 +22,8 @@ import {
   X
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { formatDate, formatTime, formatDateTime } from '../lib/dateUtils';
+import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 export const MyJobs: React.FC = () => {
@@ -126,9 +127,7 @@ export const MyJobs: React.FC = () => {
   }, []);
 
   const formatTimeDisplay = (time: any) => {
-    if (!time || typeof time !== 'string') return '-';
-    // Remove seconds if present (e.g. 2023-10-27 14:54:00 -> 2023-10-27 14:54)
-    return time.split(':').slice(0, 2).join(':');
+    return formatTime(time);
   };
 
   const formatCaseNumber = (report: WorkReport) => {
@@ -408,7 +407,7 @@ export const MyJobs: React.FC = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-xs text-slate-500">
                             <Calendar className="w-3.5 h-3.5" />
-                            {(report.work_date || report.date_created || '').split('T')[0].split(' ')[0]}
+                            {formatDate(report.work_date || report.date_created, 'dd/MM/yyyy')}
                           </div>
                         </td>
                         <td className="px-6 py-4">

@@ -4,11 +4,66 @@ import fs from "fs";
 import axios from "axios";
 import cors from "cors";
 import puppeteer from "puppeteer";
+import * as ntp from "ntp-client";
 import 'dotenv/config';
 
 async function startServer() {
   console.log('Backend: startServer() called');
-  console.log('Backend: NODE_ENV:', process.env.NODE_ENV);
+  
+  // Set global timezone to Bangkok
+  process.env.TZ = 'Asia/Bangkok';
+  console.log('Backend: Timezone set to:', process.env.TZ);
+  
+  // NTP Time Synchronization (Using NIMT Thailand: time1.nimt.or.th)
+  let timeOffset = 0; // ms
+  const syncTimeWithNTP = () => {
+    return new Promise<void>((resolve) => {
+      const ntpServer = "time1.nimt.or.th";
+      console.log(`Backend: Syncing time with NTP (${ntpServer})...`);
+      ntp.getNetworkTime(ntpServer, 123, (err, date) => {
+        if (err) {
+          console.error(`Backend: NTP Sync failed with ${ntpServer}:`, err.message);
+          // Try pool.ntp.org as a secondary NTP fallback
+          ntp.getNetworkTime("pool.ntp.org", 123, (err2, date2) => {
+            if (err2) {
+              // Final fallback to HTTP time
+              axios.get('https://worldtimeapi.org/api/timezone/Asia/Bangkok', { timeout: 5000 })
+                .then(res => {
+                  const netTime = new Date(res.data.datetime);
+                  timeOffset = netTime.getTime() - Date.now();
+                  console.log(`Backend: Time synced via HTTP (Bangkok). Offset: ${timeOffset}ms`);
+                  resolve();
+                })
+                .catch(() => {
+                  console.warn('Backend: Using system time as final fallback.');
+                  resolve();
+                });
+            } else {
+              timeOffset = date2.getTime() - Date.now();
+              console.log(`Backend: NTP Sync success via fallback. Offset: ${timeOffset}ms`);
+              resolve();
+            }
+          });
+          return;
+        }
+        
+        timeOffset = date.getTime() - Date.now();
+        console.log(`Backend: NTP Sync success (NIMT). Offset: ${timeOffset}ms. Network Time: ${date.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+        resolve();
+      });
+    });
+  };
+
+  // Helper to get adjusted date
+  const getSyncedDate = () => {
+    return new Date(Date.now() + timeOffset);
+  };
+
+  // Initial sync
+  await syncTimeWithNTP();
+  // Resync every hour
+  setInterval(syncTimeWithNTP, 60 * 60 * 1000);
+
   const app = express();
   const PORT = 3000;
 
@@ -145,7 +200,7 @@ async function startServer() {
 
       console.log(`Backend: Found ${reports.length} pending reports to check`);
 
-      const now = new Date();
+      const now = getSyncedDate();
 
       for (const report of reports) {
         if (!report.work_date || !report.member_id) continue;
@@ -163,10 +218,10 @@ async function startServer() {
 
         if (diffHours <= 24 && diffHours > 12 && !has24h) {
           notificationType = '24h';
-          updateData.status_logs = [...statusLogs, { status: 'notification_24h_sent', timestamp: new Date().toISOString() }];
+          updateData.status_logs = [...statusLogs, { status: 'notification_24h_sent', timestamp: getSyncedDate().toISOString() }];
         } else if (diffHours <= 12 && diffHours > 0 && !has12h) {
           notificationType = '12h';
-          updateData.status_logs = [...statusLogs, { status: 'notification_12h_sent', timestamp: new Date().toISOString() }];
+          updateData.status_logs = [...statusLogs, { status: 'notification_12h_sent', timestamp: getSyncedDate().toISOString() }];
         }
 
         if (notificationType) {
@@ -411,7 +466,17 @@ async function startServer() {
   // API health check - Move to top for faster verification
   app.get("/api/health", (req, res) => {
     console.log('Backend: Health check requested');
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ status: "ok", timestamp: getSyncedDate().toISOString() });
+  });
+
+  // Get synchronized network time
+  app.get("/api/time", (req, res) => {
+    const now = getSyncedDate();
+    res.json({
+      timestamp: now.toISOString(),
+      time: now.getTime(),
+      offset: timeOffset
+    });
   });
 
   // Helper to extract coordinates from Google Maps URL

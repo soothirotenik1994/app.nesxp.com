@@ -4663,6 +4663,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               </label>
               <input 
                 type="datetime-local" 
+                lang="th-TH"
                 required
                 disabled={!!id && !isAdmin}
                 value={formData.work_date || ''}
@@ -4939,6 +4940,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </label>
                         <input 
                           type="date"
+                          lang="th-TH"
                           disabled={!isEditable}
                           value={route.date || ''}
                           onChange={e => {
@@ -4955,6 +4957,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </label>
                         <input 
                           type="datetime-local"
+                          lang="th-TH"
                           disabled={!isEditable}
                           value={route.standby_time || ''}
                           onChange={e => {
@@ -4971,6 +4974,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </label>
                         <input 
                           type="datetime-local"
+                          lang="th-TH"
                           disabled={!isEditable}
                           value={route.departure_time || ''}
                           onChange={e => {
@@ -4987,6 +4991,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </label>
                         <input 
                           type="datetime-local"
+                          lang="th-TH"
                           disabled={!isEditable}
                           value={route.arrival_time || ''}
                           onChange={e => {
@@ -5217,6 +5222,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
                                   type="datetime-local" 
+                                  lang="th-TH"
                                   disabled={!!id && !isAdmin}
                                   value={pickup.time || ''}
                                   onChange={e => {
@@ -5347,6 +5353,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
                                   type="datetime-local" 
+                                  lang="th-TH"
                                   disabled={!!id && !isAdmin}
                                   value={delivery.time || ''}
                                   onChange={e => {

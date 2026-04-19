@@ -23,7 +23,7 @@ import {
   Camera
 } from 'lucide-react';
 import { isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { formatDate } from '../lib/dateUtils';
+import { formatDate, formatDateTime } from '../lib/dateUtils';
 import * as XLSX from 'xlsx';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { clsx } from 'clsx';
@@ -273,7 +273,7 @@ ${(report.expense_items && report.expense_items.length > 0)
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Job History");
     
-    const fileName = `Job_History_${formatDate(new Date(), 'dd/MM/yyyy_HHmm')}.xlsx`;
+    const fileName = `Job_History_${formatDate(new Date(), 'dd-MM-yyyy_HHmm')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   }, [filteredReports, t]);
 
@@ -399,7 +399,7 @@ ${(report.expense_items && report.expense_items.length > 0)
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <Calendar className="w-3.5 h-3.5" />
-                          {formatDate(new Date(report.work_date || report.date_created || Date.now()), 'dd/MM/yyyy')}
+                          {formatDateTime(report.work_date || report.date_created)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
