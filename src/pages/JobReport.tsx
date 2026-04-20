@@ -40,6 +40,7 @@ import {
   Coins,
   Search,
   Link,
+  Navigation,
   PenTool,
   Eraser,
   RefreshCw,
@@ -214,10 +215,13 @@ export const JobReport: React.FC = () => {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [webcamTarget, setWebcamTarget] = useState<'pickup' | 'delivery' | 'document' | null>(null);
+  const [showScheduling, setShowScheduling] = useState(false);
 
   const [formData, setFormData] = useState({
     job_type: 'one_way' as 'one_way' | 'round_trip',
     work_date: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+    advance_opening_time: '',
+    notify_driver_24h_before: false,
     customer_name: '',
     customer_contact_name: '',
     customer_contact_phone: '',
@@ -1286,10 +1290,30 @@ export const JobReport: React.FC = () => {
 
         // Check LINE configuration
         try {
-          const configRes = await axios.get('/api/line/config-check');
+          const [configRes, timeRes] = await Promise.all([
+            axios.get('/api/line/config-check'),
+            axios.get('/api/time')
+          ]);
+          
           console.log('LINE Configuration Check:', configRes.data);
           if (!configRes.data.configured) {
             console.warn('LINE_CHANNEL_ACCESS_TOKEN is not configured in the backend.');
+          }
+
+          // If this is a new job (no id and no copyFromId), default the work_date to server time
+          if (!id && !copyFromId && timeRes.data && timeRes.data.timestamp) {
+            const serverDate = new Date(timeRes.data.timestamp);
+            const formatted = serverDate.getFullYear() + '-' + 
+                            String(serverDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(serverDate.getDate()).padStart(2, '0') + 'T' + 
+                            String(serverDate.getHours()).padStart(2, '0') + ':' + 
+                            String(serverDate.getMinutes()).padStart(2, '0');
+            
+            setFormData(prev => ({ 
+              ...prev, 
+              work_date: formatted,
+              routes: prev.routes.map(r => ({ ...r, date: formatted.slice(0, 10) }))
+            }));
           }
         } catch (configErr: any) {
           if (configErr.response?.status === 401) return;
@@ -1394,10 +1418,13 @@ export const JobReport: React.FC = () => {
             deadline_value: '',
             deadline_unit: 'minutes' as 'minutes' | 'hours',
             acceptance_deadline: report.acceptance_deadline,
-            accepted_at: report.accepted_at
+            accepted_at: report.accepted_at,
+            advance_opening_time: formatTimeForInput(report.advance_opening_time),
+            notify_driver_24h_before: report.notify_driver_24h_before || false
           };
           
           setFormData(initialData);
+          setShowScheduling(!!report.advance_opening_time || !!report.notify_driver_24h_before);
           // Deep clone to prevent mutation issues when comparing in handleSubmit
           setInitialValues(JSON.parse(JSON.stringify(initialData)));
           setOriginalCustomerAndCar({
@@ -3090,6 +3117,18 @@ export const JobReport: React.FC = () => {
           const wd = formatTime(formData.work_date);
           if (wd) reportData.work_date = wd;
         }
+        if (formData.advance_opening_time) {
+          const aot = formatTime(formData.advance_opening_time);
+          if (aot) reportData.advance_opening_time = aot;
+          else if (formData.advance_opening_time === '') reportData.advance_opening_time = null;
+        } else if (formData.advance_opening_time === '') {
+          reportData.advance_opening_time = null;
+        }
+        
+        if (formData.notify_driver_24h_before !== undefined) {
+          reportData.notify_driver_24h_before = formData.notify_driver_24h_before;
+        }
+
         if (formData.customer_name !== undefined) reportData.customer_name = formData.customer_name;
         if (currentCustomerId && currentCustomerId !== '') reportData.customer_id = currentCustomerId;
         if (formData.customer_contact_name !== undefined) reportData.customer_contact_name = formData.customer_contact_name;
@@ -4678,6 +4717,79 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               />
             </div>
 
+            {/* Scheduling Toggle */}
+            {(!id || isAdmin) && (
+              <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                       <Clock className="w-4 h-4 text-primary" /> {t('schedule_job')}
+                    </h4>
+                    <p className="text-xs text-slate-500">{t('schedule_job_desc') || 'Enable advance scheduling and notifications'}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={showScheduling}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setShowScheduling(enabled);
+                        if (!enabled) {
+                          setFormData(prev => ({
+                            ...prev,
+                            advance_opening_time: '',
+                            notify_driver_24h_before: false
+                          }));
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Conditional Scheduling Fields */}
+            {showScheduling && (!id || isAdmin) && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> {t('advance_opening_time')}
+                  </label>
+                  <input 
+                    type="datetime-local" 
+                    lang="th-TH"
+                    disabled={!!id && !isAdmin}
+                    value={formData.advance_opening_time || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, advance_opening_time: e.target.value }))}
+                    className={clsx(
+                      "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                      (!!id && !isAdmin) ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:bg-white"
+                    )}
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 italic">{t('advance_opening_desc')}</p>
+                </div>
+
+                <div className="flex items-center gap-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 md:col-span-2">
+                  <input
+                    id="notify_24h"
+                    type="checkbox"
+                    disabled={!!id && !isAdmin}
+                    checked={formData.notify_driver_24h_before || false}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notify_driver_24h_before: e.target.checked }))}
+                    className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <div className="flex flex-col">
+                    <label htmlFor="notify_24h" className="text-sm font-bold text-slate-700 cursor-pointer">
+                      {t('notify_driver_24h_before')}
+                    </label>
+                    <span className="text-xs text-slate-500">{t('notify_driver_24h_desc')}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> {t('customer_name')}
@@ -5167,22 +5279,34 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
-                                <input 
-                                  type="text" 
-                                  required
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('enter_google_map_link')}
-                                  value={pickup.url || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
-                                    newRoutes[index].pickups[pIndex].url = val;
-                                    if (pIndex === 0) newRoutes[index].origin_url = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
+                                <div className="flex gap-2">
+                                  <input 
+                                    type="text" 
+                                    required
+                                    disabled={!!id && !isAdmin}
+                                    placeholder={t('enter_google_map_link')}
+                                    value={pickup.url || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      const newRoutes = [...formData.routes];
+                                      if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                      newRoutes[index].pickups[pIndex].url = val;
+                                      if (pIndex === 0) newRoutes[index].origin_url = val;
+                                      setFormData({ ...formData, routes: newRoutes });
+                                    }}
+                                    className="flex-1 px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
+                                  />
+                                  {pickup.url && pickup.url.startsWith('http') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(pickup.url, '_blank')}
+                                      className="px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 whitespace-nowrap"
+                                    >
+                                      <Navigation className="w-3.5 h-3.5" />
+                                      {t('navigate')}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
@@ -5298,22 +5422,34 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
-                                <input 
-                                  type="text" 
-                                  required
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('enter_google_map_link')}
-                                  value={delivery.url || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
-                                    newRoutes[index].deliveries[dIndex].url = val;
-                                    if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
+                                <div className="flex gap-2">
+                                  <input 
+                                    type="text" 
+                                    required
+                                    disabled={!!id && !isAdmin}
+                                    placeholder={t('enter_google_map_link')}
+                                    value={delivery.url || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      const newRoutes = [...formData.routes];
+                                      if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                      newRoutes[index].deliveries[dIndex].url = val;
+                                      if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
+                                      setFormData({ ...formData, routes: newRoutes });
+                                    }}
+                                    className="flex-1 px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
+                                  />
+                                  {delivery.url && delivery.url.startsWith('http') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(delivery.url, '_blank')}
+                                      className="px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 whitespace-nowrap"
+                                    >
+                                      <Navigation className="w-3.5 h-3.5" />
+                                      {t('navigate')}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
@@ -6185,6 +6321,65 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                       <span className="text-sm font-bold text-slate-700">{t('total_expenses')}:</span>
                       <span className="text-sm font-black text-primary">{(totalExpenses || (Number(formData.toll_fee || 0) + Number(formData.fuel_cost || 0) + Number(formData.other_expenses || 0))).toLocaleString()} {t('baht')}</span>
                     </div>
+                  </div>
+                )}
+
+                {/* Photos & Signature Preview in Confirmation */}
+                {(existingPickupPhotos.length > 0 || pickupPhotos.length > 0 || 
+                  existingDeliveryPhotos.length > 0 || deliveryPhotos.length > 0 || 
+                  existingDocumentPhotos.length > 0 || documentPhotos.length > 0 ||
+                  formData.signature) && (
+                  <div className="pt-4 border-t border-slate-100 mt-4 space-y-4">
+                    {/* Photos */}
+                    {(existingPickupPhotos.length > 0 || pickupPhotos.length > 0 || 
+                      existingDeliveryPhotos.length > 0 || deliveryPhotos.length > 0 || 
+                      existingDocumentPhotos.length > 0 || documentPhotos.length > 0) && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <Camera className="w-4 h-4" /> {t('photos')}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            ...existingPickupPhotos.map(id => ({ url: directusApi.getFileUrl(id, { key: 'system-medium-contain' }), title: t('photo_pickup') })),
+                            ...pickupPhotos.map(p => ({ url: p.preview, title: t('photo_pickup') })),
+                            ...existingDeliveryPhotos.map(id => ({ url: directusApi.getFileUrl(id, { key: 'system-medium-contain' }), title: t('photo_delivery') })),
+                            ...deliveryPhotos.map(p => ({ url: p.preview, title: t('photo_delivery') })),
+                            ...existingDocumentPhotos.map(id => ({ url: directusApi.getFileUrl(id, { key: 'system-medium-contain' }), title: t('photo_document') })),
+                            ...documentPhotos.map(p => ({ url: p.preview, title: t('photo_document') }))
+                          ].map((item, idx) => (
+                            <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
+                              <img 
+                                src={item.url} 
+                                alt={item.title} 
+                                className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-110"
+                                onClick={() => setFullscreenImage(item.url)}
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[8px] text-white py-0.5 px-1 truncate pointer-events-none">
+                                {item.title}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Signature */}
+                    {formData.signature && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <PenTool className="w-4 h-4" /> {t('signature')}
+                        </p>
+                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col items-center">
+                          <img src={formData.signature} alt="Signature preview" className="max-h-32 object-contain" />
+                          {formData.signature_name && (
+                            <p className="text-sm font-bold text-slate-700 mt-2 border-t border-slate-200 pt-2 w-full text-center">
+                              {formData.signature_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

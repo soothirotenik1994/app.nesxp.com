@@ -216,7 +216,8 @@ async function startServer() {
         const has24h = statusLogs.some((log: any) => log.status === 'notification_24h_sent');
         const has12h = statusLogs.some((log: any) => log.status === 'notification_12h_sent');
 
-        if (diffHours <= 24 && diffHours > 12 && !has24h) {
+        // Send 24h notification only if enabled for this report
+        if (diffHours <= 24 && diffHours > 12 && !has24h && report.notify_driver_24h_before) {
           notificationType = '24h';
           updateData.status_logs = [...statusLogs, { status: 'notification_24h_sent', timestamp: getSyncedDate().toISOString() }];
         } else if (diffHours <= 12 && diffHours > 0 && !has12h) {

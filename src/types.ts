@@ -228,6 +228,9 @@ export interface WorkReport {
   rating?: number;
   feedback?: string;
   rated_at?: string;
+  advance_opening_time?: string;
+  notify_driver_24h_before?: boolean;
+  notification_24h_sent?: boolean;
 }
 
 export interface SystemSettings {

@@ -50,6 +50,7 @@ export const Reports: React.FC = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [cars, setCars] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [selectedCarId, setSelectedCarId] = useState<string>('all');
   const [dateRange, setDateRange] = useState({
     start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
@@ -85,12 +86,22 @@ export const Reports: React.FC = () => {
       const dateStr = r.work_date || r.date_created;
       if (!dateStr) return false;
       const reportDate = parseISO(dateStr);
-      return isWithinInterval(reportDate, {
+      
+      const isInDateRange = isWithinInterval(reportDate, {
         start: parseISO(dateRange.start),
         end: parseISO(dateRange.end)
       });
+
+      if (!isInDateRange) return false;
+
+      if (selectedCarId !== 'all') {
+        const reportCarId = (typeof r.car_id === 'object' ? r.car_id?.id : r.car_id);
+        if (String(reportCarId) !== String(selectedCarId)) return false;
+      }
+
+      return true;
     });
-  }, [reports, dateRange]);
+  }, [reports, dateRange, selectedCarId]);
 
   // --- MoM Calculation ---
   const momStats = useMemo(() => {
@@ -411,7 +422,24 @@ export const Reports: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-900">{t('reports')}</h1>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+            <Car className="w-4 h-4 text-slate-400 mr-2" />
+            <select
+              value={selectedCarId}
+              onChange={(e) => setSelectedCarId(e.target.value)}
+              className="text-sm outline-none bg-white font-medium text-slate-700 appearance-none pr-8 cursor-pointer relative"
+              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2724%27 height=%2724%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2394a3b8%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpolyline points=%276 9 12 15 18 9%27%3E%3C/polyline%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right center', backgroundSize: '1.2em' }}
+            >
+              <option value="all">{t('all_vehicles')}</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.car_number} {car.vehicle_type ? `(${car.vehicle_type})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
             <Calendar className="w-4 h-4 text-slate-400 mr-2" />
             <input 

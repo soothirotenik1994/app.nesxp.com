@@ -186,6 +186,15 @@ export const MyJobs: React.FC = () => {
   };
 
   const filteredReports = reports.filter(r => {
+    // Admin sees everything regardless of opening time
+    if (!isAdmin) {
+      const now = new Date();
+      if (r.advance_opening_time) {
+        const openingTime = new Date(r.advance_opening_time);
+        if (openingTime > now) return false;
+      }
+    }
+
     // Only show active jobs (not completed, cancelled, or deleted)
     if (r.status === 'completed' || r.status === 'cancelled' || r.status === 'deleted') return false;
 
