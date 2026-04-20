@@ -349,6 +349,7 @@ export const FleetMonitor: React.FC = () => {
             vehicles={carStatuses} 
             selectedVehicle={selectedVehicle}
             onSelectVehicle={setSelectedVehicle}
+            onViewHistory={(v) => window.open(`/cars/${v.carNumber}/history`, '_blank')}
             center={selectedVehicle ? { lat: selectedVehicle.lat, lng: selectedVehicle.lng } : undefined}
             zoom={selectedVehicle ? 16 : 11}
             darkMode={true}

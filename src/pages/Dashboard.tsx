@@ -645,6 +645,7 @@ export const Dashboard: React.FC = () => {
               vehicles={carStatuses} 
               selectedVehicle={selectedVehicle}
               onSelectVehicle={setSelectedVehicle}
+              onViewHistory={(v) => navigate(`/cars/${v.carNumber}/history`)}
               center={selectedVehicle ? { lat: selectedVehicle.lat, lng: selectedVehicle.lng } : undefined}
               zoom={selectedVehicle ? 15 : 12}
             />
