@@ -182,7 +182,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
 
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-900">{userInfo.role}</p>
+            <p className="text-sm font-bold text-slate-900">{t(userInfo.role.toLowerCase(), userInfo.role)}</p>
             <p className="text-xs text-slate-500">{userInfo.name}</p>
           </div>
           <button 

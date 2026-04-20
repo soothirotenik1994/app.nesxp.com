@@ -268,13 +268,27 @@ export const directusApi = {
   },
 
   getCars: async (): Promise<Car[]> => {
-    const response = await api.get('/items/cars', {
-      params: {
-        fields: '*,car_image.*,car_users.*,car_users.line_user_id.*',
-        limit: -1
+    try {
+      const response = await api.get('/items/cars', {
+        params: {
+          fields: '*,car_image.*,car_users.*,car_users.line_user_id.*',
+          limit: -1
+        }
+      });
+      return response.data.data || [];
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] getCars Auth failed (401), trying Public Access fallback...');
+        const response = await axios.get(`${PROXY_URL}/items/cars`, {
+          params: {
+            fields: '*,car_image.*,car_users.*,car_users.line_user_id.*',
+            limit: -1
+          }
+        });
+        return response.data.data || [];
       }
-    });
-    return response.data.data || [];
+      throw error;
+    }
   },
 
   createCar: async (data: Partial<Car>): Promise<Car> => {
@@ -386,33 +400,106 @@ export const directusApi = {
   },
   
   getWorkReports: async (): Promise<any[]> => {
-    const response = await api.get('/items/work_reports', {
-      params: {
-        fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
-        sort: '-date_created',
-        limit: -1
+    try {
+      const response = await api.get('/items/work_reports', {
+        params: {
+          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+          sort: '-date_created',
+          limit: -1
+        }
+      });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] getWorkReports Auth failed (401), trying Public Access fallback...');
+        const response = await axios.get(`${PROXY_URL}/items/work_reports`, { 
+          params: { 
+            fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+            sort: '-date_created',
+            limit: -1
+          } 
+        });
+        return response.data.data || [];
       }
-    });
-    return response.data.data;
+      throw error;
+    }
   },
 
   getWorkReport: async (id: string): Promise<any> => {
-    const response = await api.get(`/items/work_reports/${id}`, {
-      params: {
-        fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
+    try {
+      const response = await api.get(`/items/work_reports/${id}`, {
+        params: {
+          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
+        }
+      });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(`[directusApi] getWorkReport ${id} Auth failed (401), trying Public Access fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/work_reports/${id}`, {
+          params: {
+            fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
+          }
+        });
+        return response.data.data;
       }
-    });
-    return response.data.data;
+      throw error;
+    }
+  },
+
+  getMemberWorkReports: async (memberId: string): Promise<any[]> => {
+    const params = {
+      filter: {
+        _or: [
+          { member_id: { _eq: memberId } },
+          { driver_id: { _eq: memberId } }
+        ],
+        status: { _eq: 'pending' }
+      },
+      fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+      sort: '-date_created',
+      limit: -1
+    };
+
+    try {
+      const response = await api.get('/items/work_reports', { params });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(`[directusApi] getMemberWorkReports ${memberId} Auth failed (401), trying Public Access fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/work_reports`, { params });
+        return response.data.data || [];
+      }
+      throw error;
+    }
   },
 
   createWorkReport: async (data: any): Promise<any> => {
-    const response = await api.post('/items/work_reports', data);
-    return response.data.data;
+    try {
+      const response = await api.post('/items/work_reports', data);
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] createWorkReport Auth failed (401), trying fallback...');
+        const response = await axios.post(`${PROXY_URL}/items/work_reports`, data);
+        return response.data.data;
+      }
+      throw error;
+    }
   },
 
   updateWorkReport: async (id: string, data: any): Promise<any> => {
-    const response = await api.patch(`/items/work_reports/${id}`, data);
-    return response.data.data;
+    try {
+      const response = await api.patch(`/items/work_reports/${id}`, data);
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(`[directusApi] updateWorkReport ${id} Auth failed (401), trying fallback...`);
+        const response = await axios.patch(`${PROXY_URL}/items/work_reports/${id}`, data);
+        return response.data.data;
+      }
+      throw error;
+    }
   },
 
   deleteWorkReport: async (id: string): Promise<void> => {
@@ -463,23 +550,51 @@ export const directusApi = {
   },
 
   getCustomerLocation: async (id: string): Promise<any> => {
-    const response = await api.get(`/items/customer_locations/${id}`, {
-      params: {
-        fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*'
+    try {
+      const response = await api.get(`/items/customer_locations/${id}`, {
+        params: {
+          fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*'
+        }
+      });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn(`[directusApi] getCustomerLocation ${id} Auth failed (401), trying fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/customer_locations/${id}`, {
+          params: {
+            fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*'
+          }
+        });
+        return response.data.data;
       }
-    });
-    return response.data.data;
+      throw error;
+    }
   },
 
   getCustomerLocations: async (): Promise<any[]> => {
-    const response = await api.get('/items/customer_locations', {
-      params: {
-        fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*',
-        sort: '-date_created',
-        limit: -1
+    try {
+      const response = await api.get('/items/customer_locations', {
+        params: {
+          fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*',
+          sort: '-date_created',
+          limit: -1
+        }
+      });
+      return response.data.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn('[directusApi] getCustomerLocations Auth failed (401), trying fallback...');
+        const response = await axios.get(`${PROXY_URL}/items/customer_locations`, {
+          params: {
+            fields: '*,member_id.*,members.*,members.line_users_id.*,members.line_user_id.*,members.members_id.*',
+            sort: '-date_created',
+            limit: -1
+          }
+        });
+        return response.data.data;
       }
-    });
-    return response.data.data;
+      throw error;
+    }
   },
 
   createCustomerLocation: async (data: any): Promise<any> => {

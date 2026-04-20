@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { 
   LayoutDashboard, 
   Users, 
+  User,
   Car, 
   ShieldCheck, 
   Star,
@@ -41,9 +42,10 @@ function cn(...inputs: ClassValue[]) {
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  onProfileClick?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, onProfileClick }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -186,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight leading-none">{websiteName}</span>
                 <span className="text-[10px] font-bold text-white/40 uppercase mt-1.5 tracking-widest">
-                  {userRole}
+                  {t(userRole.toLowerCase(), userRole)}
                 </span>
               </div>
             </div>
@@ -306,6 +308,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
           {/* Footer */}
           <div className="p-4 border-t border-white/10 bg-black/10 dark:bg-black/20 space-y-2">
+            {onProfileClick && (
+              <button 
+                onClick={() => {
+                  onProfileClick();
+                  setIsOpen(false);
+                }}
+                className="flex items-center gap-3 px-4 py-3 w-full text-white/60 hover:bg-white/10 hover:text-white rounded-xl transition-all group active:scale-95"
+              >
+                <User className="w-5 h-5 transition-transform group-hover:scale-110" />
+                <span className="font-semibold">{t('profile')}</span>
+              </button>
+            )}
             {isSwitchedAccount && (
               <button 
                 onClick={handleBackToAdmin}

@@ -28,6 +28,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     driver_ratings: true,
     live_monitor: true,
     announcements: true,
+    profile: true,
   },
   'Admin': {
     reports: true,
@@ -58,6 +59,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     driver_ratings: true,
     live_monitor: true,
     announcements: true,
+    profile: true,
   },
   'Driver': {
     reports: false,
@@ -79,6 +81,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     maintenance: false,
     live_monitor: false,
     announcements: true,
+    profile: true,
   },
   'Customer': {
     reports: false,
@@ -101,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     maintenance: false,
     live_monitor: false,
     announcements: true,
+    profile: true,
   },
   'General': {
     reports: false,
@@ -123,5 +127,6 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     maintenance: false,
     live_monitor: false,
     announcements: true,
+    profile: true,
   }
 };

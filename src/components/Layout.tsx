@@ -45,7 +45,11 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden transition-colors duration-300">
-      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        setIsOpen={setIsSidebarOpen} 
+        onProfileClick={() => setIsProfileOpen(true)}
+      />
       <NewJobNotification />
       <MaintenanceAlert />
       

@@ -66,21 +66,54 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
             password: ''
           });
         } else {
-          const members = await directusApi.getMembers();
-          console.log('All members fetched:', members);
-          const found = members.find(m => m.line_user_id === lineUserId || m.id === lineUserId);
-          console.log('Member found:', found);
-          
-          if (found) {
-            setMember(found);
-            setFormData({
-              first_name: found.first_name || '',
-              last_name: found.last_name || '',
-              phone: found.phone || '',
-              email: found.email || '',
-              picture_url: found.picture_url || '',
-              password: ''
-            });
+          // If not admin, try to fetch the specific member directly
+          // This is more efficient and avoids permission issues with listing all members
+          console.log('Fetching specific member by ID:', lineUserId);
+          try {
+            const found = await directusApi.getMember(lineUserId);
+            console.log('Member fetched directly:', found);
+            
+            if (found) {
+              setMember(found);
+              setFormData({
+                first_name: found.first_name || '',
+                last_name: found.last_name || '',
+                phone: found.phone || '',
+                email: found.email || '',
+                picture_url: found.picture_url || '',
+                password: ''
+              });
+            } else {
+              // Fallback to searching if direct get fails (though it shouldn't)
+              const members = await directusApi.getMembers();
+              const searched = members.find(m => m.line_user_id === lineUserId || m.id === lineUserId);
+              if (searched) {
+                setMember(searched);
+                setFormData({
+                  first_name: searched.first_name || '',
+                  last_name: searched.last_name || '',
+                  phone: searched.phone || '',
+                  email: searched.email || '',
+                  picture_url: searched.picture_url || '',
+                  password: ''
+                });
+              }
+            }
+          } catch (getErr) {
+            console.warn('Direct getMember failed, falling back to all members list...', getErr);
+            const members = await directusApi.getMembers();
+            const searched = members.find(m => m.line_user_id === lineUserId || m.id === lineUserId);
+            if (searched) {
+              setMember(searched);
+              setFormData({
+                first_name: searched.first_name || '',
+                last_name: searched.last_name || '',
+                phone: searched.phone || '',
+                email: searched.email || '',
+                picture_url: searched.picture_url || '',
+                password: ''
+              });
+            }
           }
         }
       } catch (err: any) {
@@ -207,9 +240,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Member Not Found</h2>
-            <p className="text-slate-500 mb-6">{error || "We couldn't find your profile in our system."}</p>
-            <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">Close</button>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">{t('user_not_found')}</h2>
+            <p className="text-slate-500 mb-6">{error || t('user_not_found_msg')}</p>
+            <button onClick={onClose} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">{t('close')}</button>
           </div>
         ) : (
           <>
@@ -218,7 +251,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                 {success && (
                   <div className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-bounce">
                     <CheckCircle2 className="w-3 h-3" />
-                    Saved
+                    {t('save_success')}
                   </div>
                 )}
               </div>

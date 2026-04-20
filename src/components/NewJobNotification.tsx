@@ -21,14 +21,7 @@ export const NewJobNotification: React.FC = () => {
     if (!isDriver || !memberId) return;
 
     try {
-      const allReports = await directusApi.getWorkReports();
-      const myJobs = allReports.filter(r => {
-        // Driver sees only their own pending jobs
-        const mId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
-        const dId = typeof r.driver_id === 'object' ? r.driver_id?.id : r.driver_id;
-        return (String(mId) === String(memberId) || String(dId) === String(memberId)) && r.status === 'pending';
-      });
-
+      const myJobs = await directusApi.getMemberWorkReports(memberId);
       const trulyNewJobs = myJobs.filter(job => !notifiedIdsRef.current.has(String(job.id)));
 
       if (trulyNewJobs.length > 0) {
