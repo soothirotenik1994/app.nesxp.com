@@ -30,16 +30,48 @@ interface VehicleMapProps {
 }
 
 // Component to handle map center and zoom updates
-const MapUpdater: React.FC<{ center?: { lat: number; lng: number }; zoom?: number }> = ({ center, zoom }) => {
+const MapUpdater: React.FC<{ 
+  center?: { lat: number; lng: number }; 
+  zoom?: number;
+  selectedId?: string;
+}> = ({ center, zoom, selectedId }) => {
   const map = useMap();
+  const lastSelectedIdRef = useRef<string | undefined>(undefined);
   
   useEffect(() => {
     if (center) {
-      map.setView([center.lat, center.lng], zoom || map.getZoom(), {
-        animate: true
-      });
+      const isNewSelection = selectedId !== lastSelectedIdRef.current;
+      
+      // If it's a new vehicle selection, we "fly to" it with the requested zoom
+      if (isNewSelection) {
+        lastSelectedIdRef.current = selectedId;
+        map.setView([center.lat, center.lng], zoom || map.getZoom(), {
+          animate: true,
+          duration: 1
+        });
+      } else {
+        // If it's the same vehicle moving, we only update the center 
+        // IF the vehicle has moved significantly
+        // and we KEEP the current user's zoom level
+        const currentCenter = map.getCenter();
+        const dist = Math.sqrt(
+          Math.pow(currentCenter.lat - center.lat, 2) + 
+          Math.pow(currentCenter.lng - center.lng, 2)
+        );
+        
+        // Only auto-follow if the user is already "relatively" close to the vehicle (approx 2km)
+        // to avoid snapping back if they panned away to look at another area
+        if (dist < 0.02) {
+          map.panTo([center.lat, center.lng], {
+            animate: true,
+            duration: 0.5
+          });
+        }
+      }
+    } else {
+      lastSelectedIdRef.current = undefined;
     }
-  }, [center, zoom, map]);
+  }, [center, zoom, map, selectedId]);
 
   return null;
 };
@@ -67,7 +99,11 @@ export const VehicleMap: React.FC<VehicleMapProps> = ({
         url={darkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
       />
       
-      <MapUpdater center={center} zoom={zoom} />
+      <MapUpdater 
+        center={center} 
+        zoom={zoom} 
+        selectedId={selectedVehicle?.carNumber} 
+      />
 
       {vehicles.map((vehicle) => (
         <Marker 
