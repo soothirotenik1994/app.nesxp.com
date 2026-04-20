@@ -18,7 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { directusApi, api } from '../api/directus';
-import { format } from 'date-fns';
+import { formatDate } from '../lib/dateUtils';
 import { clsx } from 'clsx';
 
 export const Announcements: React.FC = () => {
@@ -265,7 +265,7 @@ export const Announcements: React.FC = () => {
               <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
                   <Calendar className="w-3.5 h-3.5" />
-                  {format(new Date(item.date_created), 'dd MMM yyyy')}
+                  {formatDate(item.date_created, 'dd MMM yyyy')}
                 </div>
                 <button 
                   onClick={() => {
@@ -451,7 +451,7 @@ export const Announcements: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 line-clamp-1">{viewingItem.title}</h2>
-                  <p className="text-xs text-slate-400 font-medium">{format(new Date(viewingItem.date_created), 'PPPP')}</p>
+                  <p className="text-xs text-slate-400 font-medium">{formatDate(viewingItem.date_created, 'PPPP')}</p>
                 </div>
               </div>
               <button 

@@ -281,7 +281,7 @@ export const SystemSettings: React.FC = () => {
                     <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'websiteLogo')} className="hidden" accept="image/*" />
                     <button onClick={() => fileInputRef.current?.click()} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
                       {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                      Upload
+                      {t('upload')}
                     </button>
                   </div>
                 </div>

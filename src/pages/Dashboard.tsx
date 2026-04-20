@@ -7,6 +7,7 @@ import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
 import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History, TrendingUp, Package, BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
+import { formatDateTime } from '../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
@@ -356,7 +357,7 @@ export const Dashboard: React.FC = () => {
         
         // Set recent jobs
         setRecentJobs(reports.sort((a, b) => 
-          new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+          new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime()
         ).slice(0, 5));
       } catch (e) {
         console.error('Error fetching job stats:', e);
@@ -610,7 +611,7 @@ export const Dashboard: React.FC = () => {
                         {job.customer_name || t('no_customer')}
                       </p>
                       <p className="text-[10px] text-slate-500 font-medium">
-                        {format(new Date(job.date_created), 'dd MMM yyyy, HH:mm')}
+                        {formatDateTime(job.work_date || job.date_created)}
                       </p>
                     </div>
                   </div>
