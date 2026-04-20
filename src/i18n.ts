@@ -78,6 +78,7 @@ const resources = {
       "phone_verification_desc": "API การติดตามต้องใช้ทั้งรหัสติดตามพัสดุที่ถูกต้องและเบอร์โทรศัพท์ที่เกี่ยวข้องเพื่อดึงข้อมูลสถานะ",
       "endpoint_url": "Endpoint URL",
       "copy_code": "คัดลอกโค้ด",
+      "copy_to_clipboard": "คัดลอกไปยังคลิปบอร์ด",
       "api_tester": "ตัวทดสอบ API",
       "api_tester_desc": "ทดสอบ API การติดตามด้วยรหัสติดตามพัสดุจริง",
       "security_rate_limiting": "ความปลอดภัยและการจำกัดจำนวนครั้ง",

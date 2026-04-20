@@ -26,7 +26,8 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [countdown, setCountdown] = useState(600); // 10 minutes in seconds
+  const [countdown, setCountdown] = useState(30); 
+  const [updateInterval, setUpdateInterval] = useState(30);
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
 
@@ -365,7 +366,19 @@ export const Dashboard: React.FC = () => {
 
       // Initial GPS fetch
       await fetchGpsData(finalCars);
-      setCountdown(600);
+      
+      // Fetch map update interval from settings
+      const settings = await directusApi.getSystemSettings();
+      if (settings && settings.map_update_interval) {
+        const interval = parseInt(String(settings.map_update_interval), 10);
+        setUpdateInterval(interval);
+        setCountdown(interval);
+        localStorage.setItem('map_update_interval', String(interval));
+      } else {
+        const localInterval = parseInt(localStorage.getItem('map_update_interval') || '30', 10);
+        setUpdateInterval(localInterval);
+        setCountdown(localInterval);
+      }
     } catch (err: any) {
       if (err.response?.status === 401) {
         return;
@@ -401,7 +414,7 @@ export const Dashboard: React.FC = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           fetchGpsData(cars);
-          return 600;
+          return updateInterval;
         }
         return prev - 1;
       });

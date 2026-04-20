@@ -351,7 +351,7 @@ export const Admins: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-sm font-bold text-slate-900">{admin.first_name} {admin.last_name}</p>
-                            <p className="text-xs text-slate-500">{t('id_label')}{admin.id.substring(0, 8)}...</p>
+                            <p className="text-xs text-slate-500">{t('id_label')}{admin.id ? `${admin.id.substring(0, 8)}...` : 'N/A'}</p>
                           </div>
                         </div>
                       </td>

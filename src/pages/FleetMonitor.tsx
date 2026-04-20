@@ -17,13 +17,9 @@ export const FleetMonitor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [countdown, setCountdown] = useState(() => {
-    return parseInt(localStorage.getItem('map_update_interval') || '10', 10);
-  });
+  const [countdown, setCountdown] = useState(30);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const updateInterval = useMemo(() => {
-    return parseInt(localStorage.getItem('map_update_interval') || '10', 10);
-  }, []);
+  const [updateInterval, setUpdateInterval] = useState(30);
 
   const websiteName = localStorage.getItem('website_name') || 'NES Tracking';
   const websiteLogo = localStorage.getItem('website_logo') || 'https://img2.pic.in.th/4863801.jpg';
@@ -79,7 +75,19 @@ export const FleetMonitor: React.FC = () => {
       const carsData = await directusApi.getCars();
       setCars(carsData);
       await fetchGpsData(carsData);
-      setCountdown(updateInterval);
+      
+      // Fetch map update interval from settings
+      const settings = await directusApi.getSystemSettings();
+      if (settings && settings.map_update_interval) {
+        const interval = parseInt(String(settings.map_update_interval), 10);
+        setUpdateInterval(interval);
+        setCountdown(interval);
+        localStorage.setItem('map_update_interval', String(interval));
+      } else {
+        const localInterval = parseInt(localStorage.getItem('map_update_interval') || '30', 10);
+        setUpdateInterval(localInterval);
+        setCountdown(localInterval);
+      }
     } catch (err: any) {
       console.error('Error fetching monitor data:', err);
       setError(err.message || t('failed_connect_server'));

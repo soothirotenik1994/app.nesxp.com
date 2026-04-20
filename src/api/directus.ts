@@ -78,6 +78,17 @@ api.interceptors.request.use(
     }
 
     const token = localStorage.getItem('admin_token');
+    
+    // Always attach the current target Directus URL for the backend proxy
+    // We read it from localStorage every time to ensure it's up to date even before page reload
+    const currentDirectusUrl = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+    config.headers['X-Directus-Target-Url'] = currentDirectusUrl;
+    
+    // Also pass the static key so the backend can use it if needed for this specific Directus instance
+    if (STATIC_API_KEY) {
+      config.headers['X-Directus-Static-Key'] = STATIC_API_KEY;
+    }
+
     if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
       console.log(`Using Admin Token for: ${config.url}`);
@@ -613,13 +624,23 @@ export const directusApi = {
 
   getSystemSettings: async (): Promise<any> => {
     try {
-      const response = await api.get('/items/system_settings/1');
-      return response.data.data;
+      // Try to get the first item from the collection (resilient to different IDs)
+      const response = await api.get('/items/system_settings', {
+        params: { limit: 1 }
+      });
+      if (response.data.data && response.data.data.length > 0) {
+        return response.data.data[0];
+      }
+      return null;
     } catch (error) {
-      console.warn('System settings auth failed, trying Public Access fallback...');
+      console.warn('System settings fetch failed, trying direct access fallback...');
       try {
-        const response = await axios.get(`${PROXY_URL}/items/system_settings/1`);
-        return response.data.data;
+        const targetUrl = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+        const response = await axios.get(`${targetUrl.replace(/\/$/, '')}/items/system_settings`, {
+          params: { limit: 1 },
+          timeout: 5000
+        });
+        return response.data.data?.[0] || null;
       } catch (e) {
         console.warn('System settings not found in Directus, using defaults');
         return null;
@@ -629,14 +650,21 @@ export const directusApi = {
 
   updateSystemSettings: async (data: any): Promise<any> => {
     try {
-      // Try to update ID 1, if fails, create it
-      try {
-        const response = await api.patch('/items/system_settings/1', data);
-        return response.data.data;
-      } catch (e: any) {
-        console.error('Patch failed, trying post:', e.response?.data || e.message);
-        const response = await api.post('/items/system_settings', { id: 1, ...data });
-        return response.data.data;
+      // 1. Try to find the existing settings record first
+      const response = await api.get('/items/system_settings', {
+        params: { limit: 1, fields: 'id' }
+      });
+      
+      const existing = response.data.data?.[0];
+      
+      if (existing) {
+        // Update the existing record
+        const patchResponse = await api.patch(`/items/system_settings/${existing.id}`, data);
+        return patchResponse.data.data;
+      } else {
+        // Create a new record (ID 1 is a good default for integers)
+        const postResponse = await api.post('/items/system_settings', { id: 1, ...data });
+        return postResponse.data.data;
       }
     } catch (error: any) {
       console.error('Error updating system settings:', error.response?.data || error.message);

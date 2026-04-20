@@ -44,7 +44,9 @@ import {
   PenTool,
   Eraser,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  Copy,
+  Check
 } from 'lucide-react';
 import SignaturePad from 'react-signature-canvas';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -209,6 +211,7 @@ export const JobReport: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [originalCustomerAndCar, setOriginalCustomerAndCar] = useState<{customerId: string, carId: string} | null>(null);
   const [cancelReasonInput, setCancelReasonInput] = useState('');
   const signaturePadRef = useRef<SignaturePad>(null);
@@ -460,7 +463,7 @@ export const JobReport: React.FC = () => {
       ...prev,
       expense_items: [
         ...(prev.expense_items || []),
-        { id: Math.random().toString(36).substr(2, 9), name: '', amount: 0 }
+        { id: Math.random().toString(36).substring(2, 11), name: '', amount: 0 }
       ]
     }));
   };
@@ -2221,7 +2224,7 @@ export const JobReport: React.FC = () => {
                 height: "sm",
                 action: {
                   type: "uri",
-                  label: label.substring(0, 20), // LINE label limit is 20 chars
+                  label: (label || '').substring(0, 20), // LINE label limit is 20 chars
                   uri: p.url
                 },
                 margin: "sm"
@@ -2235,7 +2238,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: (t('origin_label') + routeLabel).substring(0, 20),
+              label: (t('origin_label') + routeLabel || '').substring(0, 20),
               uri: route.origin_url
             },
             margin: "sm"
@@ -2252,7 +2255,7 @@ export const JobReport: React.FC = () => {
                 height: "sm",
                 action: {
                   type: "uri",
-                  label: label.substring(0, 20),
+                  label: (label || '').substring(0, 20),
                   uri: d.url
                 },
                 margin: "sm"
@@ -2266,7 +2269,7 @@ export const JobReport: React.FC = () => {
             height: "sm",
             action: {
               type: "uri",
-              label: (t('destination_label') + routeLabel).substring(0, 20),
+              label: (t('destination_label') + routeLabel || '').substring(0, 20),
               uri: route.destination_url
             },
             margin: "sm"
@@ -2887,6 +2890,14 @@ export const JobReport: React.FC = () => {
   };
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const handleCopyCaseNumber = () => {
+    if (formData.case_number) {
+      navigator.clipboard.writeText(formData.case_number);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -4683,17 +4694,30 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Hash className="w-4 h-4" /> {t('case_number')}
               </label>
-              <input 
-                type="text" 
-                disabled={true}
-                placeholder={t('case_number')}
-                value={formData.case_number || ''}
-                onChange={e => setFormData({...formData, case_number: e.target.value})}
-                className={clsx(
-                  "w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
-                  "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
-                )}
-              />
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  disabled={true}
+                  placeholder={t('case_number')}
+                  value={formData.case_number || ''}
+                  onChange={e => setFormData({...formData, case_number: e.target.value})}
+                  className={clsx(
+                    "flex-1 px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all",
+                    "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed"
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyCaseNumber}
+                  className={clsx(
+                    "px-4 py-3 border rounded-2xl transition-all flex items-center justify-center",
+                    copied ? "bg-green-50 border-green-200 text-green-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  )}
+                  title={t('copy_to_clipboard')}
+                >
+                  {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1.5">

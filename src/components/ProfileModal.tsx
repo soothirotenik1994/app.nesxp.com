@@ -281,7 +281,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, lin
                 </label>
               </div>
               <h2 className="text-white text-xl font-bold mt-4">{member.display_name}</h2>
-              <p className="text-white/70 text-sm">LINE ID: {member.line_user_id.substring(0, 10)}...</p>
+              <p className="text-white/70 text-sm">LINE ID: {member.line_user_id ? `${member.line_user_id.substring(0, 10)}...` : 'N/A'}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">

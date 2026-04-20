@@ -50,16 +50,22 @@ export const SystemSettings: React.FC = () => {
       emailSmtpSecure: localStorage.getItem('email_smtp_secure') === 'true',
       emailFrom: localStorage.getItem('email_from') || '',
       emailFromName: localStorage.getItem('email_from_name') || '',
-      mapUpdateInterval: parseInt(localStorage.getItem('map_update_interval') || '10', 10),
+      googleClientSecret: localStorage.getItem('google_client_secret') || '',
+      mapUpdateInterval: parseInt(localStorage.getItem('map_update_interval') || '30', 10),
       gpsApiToken: localStorage.getItem('gps_api_token') || 'f184dc44-454a-7a69-50c5-0d5087c1e20b',
     };
   });
+
+  const [availableFields, setAvailableFields] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const settings = await directusApi.getSystemSettings();
         if (settings) {
+          // Track which fields actually exist in Directus
+          setAvailableFields(Object.keys(settings));
+          
           setFormData(prev => ({
             ...prev,
             websiteName: settings.website_name || prev.websiteName,
@@ -73,6 +79,7 @@ export const SystemSettings: React.FC = () => {
             enableLineLogin: settings.enable_line_login !== undefined ? settings.enable_line_login : prev.enableLineLogin,
             enableGoogleLogin: settings.enable_google_login !== undefined ? settings.enable_google_login : prev.enableGoogleLogin,
             googleClientId: settings.google_client_id || prev.googleClientId,
+            googleClientSecret: settings.google_client_secret || prev.googleClientSecret,
             emailSmtpHost: settings.email_smtp_host || prev.emailSmtpHost,
             emailSmtpPort: settings.email_smtp_port || prev.emailSmtpPort,
             emailSmtpUser: settings.email_smtp_user || prev.emailSmtpUser,
@@ -120,28 +127,50 @@ export const SystemSettings: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await directusApi.updateSystemSettings({
-        website_name: formData.websiteName,
-        website_logo: formData.websiteLogo,
-        website_background: formData.websiteBackground,
-        app_url: formData.appUrl,
-        google_maps_api_key: formData.googleMapsApiKey,
-        enable_queue_system: formData.enableQueueSystem,
-        bkk_max_distance: formData.bkkMaxDistance,
-        enable_tracking: formData.enableTracking,
-        enable_line_login: formData.enableLineLogin,
-        enable_google_login: formData.enableGoogleLogin,
-        google_client_id: formData.googleClientId,
-        email_smtp_host: formData.emailSmtpHost,
-        email_smtp_port: formData.emailSmtpPort,
-        email_smtp_user: formData.emailSmtpUser,
-        email_smtp_password: formData.emailSmtpPassword,
-        email_smtp_secure: formData.emailSmtpSecure,
-        email_from: formData.emailFrom,
-        email_from_name: formData.emailFromName,
-        map_update_interval: formData.mapUpdateInterval,
-        gps_api_token: formData.gpsApiToken,
+      const payload: any = {};
+      
+      // Map frontend fields to Directus fields
+      const fieldMap: Record<string, string> = {
+        websiteName: 'website_name',
+        websiteLogo: 'website_logo',
+        websiteBackground: 'website_background',
+        appUrl: 'app_url',
+        googleMapsApiKey: 'google_maps_api_key',
+        enableQueueSystem: 'enable_queue_system',
+        bkkMaxDistance: 'bkk_max_distance',
+        enableTracking: 'enable_tracking',
+        enableLineLogin: 'enable_line_login',
+        enableGoogleLogin: 'enable_google_login',
+        googleClientId: 'google_client_id',
+        googleClientSecret: 'google_client_secret',
+        emailSmtpHost: 'email_smtp_host',
+        emailSmtpPort: 'email_smtp_port',
+        emailSmtpUser: 'email_smtp_user',
+        emailSmtpPassword: 'email_smtp_password',
+        emailSmtpSecure: 'email_smtp_secure',
+        emailFrom: 'email_from',
+        emailFromName: 'email_from_name',
+        mapUpdateInterval: 'map_update_interval',
+        gpsApiToken: 'gps_api_token',
+      };
+
+      // Only include fields that exist in the Directus collection schema
+      // This prevents 400 errors when the collection is missing some fields
+      Object.entries(fieldMap).forEach(([formKey, directusKey]) => {
+        if (availableFields.length === 0 || availableFields.includes(directusKey)) {
+          let value = formData[formKey as keyof typeof formData];
+          
+          // Ensure correct types for Directus
+          if (directusKey === 'email_smtp_port' && value && !isNaN(Number(value))) {
+            value = parseInt(String(value), 10);
+          }
+          
+          payload[directusKey] = value;
+        }
       });
+
+      console.log('Saving payload to Directus:', payload);
+      await directusApi.updateSystemSettings(payload);
 
       localStorage.setItem('directus_url', formData.directusUrl);
       localStorage.setItem('static_api_key', formData.staticApiKey);
@@ -156,6 +185,7 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('enable_line_login', String(formData.enableLineLogin));
       localStorage.setItem('enable_google_login', String(formData.enableGoogleLogin));
       localStorage.setItem('google_client_id', formData.googleClientId);
+      localStorage.setItem('google_client_secret', formData.googleClientSecret);
       localStorage.setItem('email_smtp_host', formData.emailSmtpHost);
       localStorage.setItem('email_smtp_port', formData.emailSmtpPort);
       localStorage.setItem('email_smtp_user', formData.emailSmtpUser);
@@ -174,10 +204,18 @@ export const SystemSettings: React.FC = () => {
           window.location.reload();
         }, 1500);
       }, 800);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save settings:', error);
       setIsSaving(false);
-      alert('Failed to save settings to Directus.');
+      
+      let errorMsg = 'Failed to save settings to Directus.';
+      if (error.response?.data?.errors?.[0]?.message) {
+        errorMsg += ` Detail: ${error.response.data.errors[0].message}`;
+      } else if (error.message) {
+        errorMsg += ` (${error.message})`;
+      }
+      
+      alert(errorMsg);
     }
   };
 
@@ -367,6 +405,31 @@ export const SystemSettings: React.FC = () => {
                   <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
+
+              {formData.enableGoogleLogin && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">Google Client ID</label>
+                    <input 
+                      type="text" 
+                      value={formData.googleClientId}
+                      onChange={(e) => setFormData({...formData, googleClientId: e.target.value})}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                      placeholder="Enter Client ID"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">Google Client Secret</label>
+                    <input 
+                      type="password" 
+                      value={formData.googleClientSecret}
+                      onChange={(e) => setFormData({...formData, googleClientSecret: e.target.value})}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                      placeholder="Enter Client Secret"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
                 <div>

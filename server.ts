@@ -27,7 +27,7 @@ async function startServer() {
           ntp.getNetworkTime("pool.ntp.org", 123, (err2, date2) => {
             if (err2) {
               // Final fallback to HTTP time
-              axios.get('https://worldtimeapi.org/api/timezone/Asia/Bangkok', { timeout: 5000 })
+              axios.get('https://worldtimeapi.org/api/timezone/Asia/Bangkok', { timeout: 30000 })
                 .then(res => {
                   const netTime = new Date(res.data.datetime);
                   timeOffset = netTime.getTime() - Date.now();
@@ -116,7 +116,7 @@ async function startServer() {
           headers: {
             'Authorization': `Bearer ${staticToken}`
           },
-          timeout: 5000
+          timeout: 15000
         });
       } catch (error: any) {
         if (error.response?.status === 401 && staticToken !== fallbackToken) {
@@ -125,7 +125,7 @@ async function startServer() {
             headers: {
               'Authorization': `Bearer ${fallbackToken}`
             },
-            timeout: 5000
+            timeout: 15000
           });
         } else {
           throw error;
@@ -158,7 +158,7 @@ async function startServer() {
         headers: {
           'Authorization': `Bearer ${staticToken}`
         },
-        timeout: 5000
+        timeout: 15000
       });
       
       if (response.data.data && response.data.data.length > 0) {
@@ -888,7 +888,7 @@ async function startServer() {
       const gpsToken = settings?.gps_api_token || process.env.GPS_API_TOKEN || "f184dc44-454a-7a69-50c5-0d5087c1e20b";
       
       console.log(`Backend: Using GPS API Token: ${gpsToken.substring(0, 5)}...`);
-      const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`);
+      const response = await axios.post(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/login/session?token=${gpsToken}`, {}, { timeout: 30000 });
       if (response.data?.result?.sessionId) {
         sessionId = response.data.result.sessionId;
         lastLoginTime = now;
@@ -943,16 +943,23 @@ async function startServer() {
       // Robust path extraction
       const directusPath = req.path.replace(/^\/api\/directus/, '').replace(/^\//, '');
       const method = req.method;
-      const directusBaseUrl = getDirectusUrl();
-      const url = `${directusBaseUrl}/${directusPath}`;
-      
-      console.log(`Proxying Directus ${method} request to: ${url}`);
       
       // Filter out headers that might cause issues with the target server
       const headers: any = { ...req.headers };
       delete headers.host;
       delete headers.origin;
       delete headers.referer;
+      const targetUrlHeader = req.headers['x-directus-target-url'];
+      const providedStaticKey = req.headers['x-directus-static-key'];
+      delete headers['x-directus-target-url']; // Don't forward this to Directus
+      delete headers['x-directus-static-key']; // Don't forward this to Directus
+      
+      const defaultUrl = getDirectusUrl().replace(/\/$/, '');
+      const directusBaseUrl = (typeof targetUrlHeader === 'string' ? targetUrlHeader : defaultUrl).replace(/\/$/, '');
+      const url = `${directusBaseUrl}/${directusPath}`;
+      const isDefaultTarget = directusBaseUrl.includes(defaultUrl.replace('https://', '').replace('http://', ''));
+      
+      console.log(`Proxying Directus ${method} request to: ${url}`);
       
       const isJson = headers['content-type']?.includes('application/json');
       const isMultipart = headers['content-type']?.includes('multipart/form-data');
@@ -964,29 +971,47 @@ async function startServer() {
       if (headers.authorization) {
         const authHeader = String(headers.authorization);
         const tokenPart = authHeader.replace(/^Bearer\s+/i, '').trim();
-        console.log(`[PROXY] Incoming Auth Header: ${tokenPart.substring(0, 5)}...`);
         
         const badTokenValues = [
           '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
           'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
-          'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4'
+          'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4',
+          'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex',
+          'confirmedToken', 'validToken'
         ];
         
         if (badTokenValues.some(bt => bt === tokenPart || authHeader.includes(bt)) || tokenPart === 'null' || tokenPart === 'undefined' || !tokenPart) {
-          const systemToken = getStaticToken();
-          headers.authorization = `Bearer ${systemToken}`;
-          console.log(`[PROXY] REPLACED invalid/missing token with system token: ${systemToken.substring(0, 5)}...`);
+          // If the token is invalid/placeholder, try to replace it ONLY if we have a valid alternative
+          const fallbackToken = typeof providedStaticKey === 'string' && providedStaticKey.length > 20 ? providedStaticKey : (isDefaultTarget ? getStaticToken() : null);
+          
+          if (fallbackToken) {
+            headers.authorization = `Bearer ${fallbackToken}`;
+            console.log(`[PROXY] REPLACED invalid token with alternative: ${fallbackToken.substring(0, 5)}...`);
+          } else {
+            console.warn(`[PROXY] Removing invalid token for non-default target: ${directusBaseUrl}`);
+            delete headers.authorization;
+          }
+        } else {
+          console.log(`[PROXY] Using provided authorization token: ${tokenPart.substring(0, 5)}...`);
         }
       } else {
-        const systemToken = getStaticToken();
-        headers.authorization = `Bearer ${systemToken}`;
-        console.log(`[PROXY] APPENDED missing Auth Header with system token: ${systemToken.substring(0, 5)}...`);
+        // No Auth header provided. Use the provided static key or fallback to system token IF it's the default target
+        const fallbackToken = typeof providedStaticKey === 'string' && providedStaticKey.length > 20 ? providedStaticKey : (isDefaultTarget ? getStaticToken() : null);
+        
+        if (fallbackToken) {
+          headers.authorization = `Bearer ${fallbackToken}`;
+          console.log(`[PROXY] APPENDED alternative token: ${fallbackToken.substring(0, 5)}...`);
+        }
       }
       
-      // Cleanup for auth endpoints always
-      if (directusPath.startsWith('auth/login')) {
+      // Cleanup for auth endpoints always - never send Bearer token to auth endpoints
+      if (directusPath.startsWith('auth/login') || directusPath.startsWith('auth/refresh') || directusPath.startsWith('auth/logout')) {
         delete headers.authorization;
         console.log(`[PROXY] Explicitly removed auth header for auth endpoint: ${directusPath}`);
+        
+        if (isJson && directusPath.startsWith('auth/login')) {
+          console.log(`[PROXY] Login Payload keys: ${Object.keys(req.body).join(', ')}`);
+        }
       }
 
       const response = await axios({
@@ -1066,7 +1091,7 @@ async function startServer() {
         try {
           const gpsResponse = await axios.get(`https://th-slt.eupfin.com/Eup_Servlet_API_SOAP/car/log_data/car_status?carNumber=${car.car_number}`, {
             headers: { 'Authorization': currentSessionId },
-            timeout: 5000
+            timeout: 30000
           });
           
           let data = gpsResponse.data?.result || gpsResponse.data;
@@ -1127,7 +1152,7 @@ async function startServer() {
         headers: {
           'Authorization': currentSessionId
         },
-        timeout: 5000
+        timeout: 30000
       });
       
       let data = response.data;
