@@ -50,10 +50,14 @@ export const NewJobNotification: React.FC = () => {
             return [...prev, ...toAdd];
           });
 
-          // Also show a toast for each new job if Admin
+          // Also show a toast for each new job
           if (isAdmin) {
             jobsToNotify.forEach(job => {
               showToast(`${t('new_job_created', 'มีการสร้างงานใหม่')}: ${job.case_number || job.id}`, 'info');
+            });
+          } else if (isDriver) {
+            jobsToNotify.forEach(job => {
+              showToast(`${t('new_job_assigned_msg', 'คุณได้รับมอบหมายงานใหม่ กรุณาตรวจสอบและกดยอมรับงาน')}`, 'success');
             });
           }
 
