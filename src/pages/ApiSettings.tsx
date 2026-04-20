@@ -91,9 +91,9 @@ export const ApiSettings: React.FC = () => {
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">API Connection Settings</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('api_connection_settings')}</h1>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-slate-500">Connect your external websites or services to the NES Tracking system</p>
+            <p className="text-slate-500">{t('api_connection_desc')}</p>
             <span className="text-slate-300">|</span>
             <div className="flex items-center gap-1.5">
               <div className={clsx(
@@ -101,7 +101,7 @@ export const ApiSettings: React.FC = () => {
                 serverStatus === 'online' ? "bg-emerald-500" : serverStatus === 'offline' ? "bg-red-500" : "bg-slate-300 animate-pulse"
               )} />
               <span className="text-xs font-medium text-slate-400">
-                Server: {serverStatus === 'online' ? 'Online' : serverStatus === 'offline' ? 'Offline' : 'Checking...'}
+                Server: {serverStatus === 'online' ? t('online') : serverStatus === 'offline' ? t('offline') : t('checking')}
               </span>
             </div>
           </div>
@@ -116,8 +116,8 @@ export const ApiSettings: React.FC = () => {
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Public Tracking API</h2>
-              <p className="text-sm text-slate-500">Allow external tracking of packages using Case Numbers</p>
+              <h2 className="text-lg font-semibold text-slate-900">{t('public_tracking_api')}</h2>
+              <p className="text-sm text-slate-500">{t('public_tracking_desc')}</p>
             </div>
           </div>
         </div>
@@ -127,9 +127,9 @@ export const ApiSettings: React.FC = () => {
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
                 <Globe className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-slate-900">Phone Verification</h3>
+              <h3 className="font-bold text-slate-900">{t('phone_verification')}</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                The tracking API requires both a valid Case Number and the associated Phone Number to retrieve status.
+                {t('phone_verification_desc')}
               </p>
             </div>
             <div className="p-4 bg-white rounded-xl border border-slate-100 space-y-2">
@@ -155,7 +155,7 @@ export const ApiSettings: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-slate-900 font-semibold">
               <Terminal className="w-5 h-5 text-slate-400" />
-              <h3>Endpoint URL</h3>
+              <h3>{t('endpoint_url')}</h3>
             </div>
             <div className="flex items-center gap-2 p-3 bg-slate-900 text-slate-300 rounded-xl font-mono text-sm group relative">
               <span className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
@@ -186,7 +186,7 @@ export const ApiSettings: React.FC = () => {
               className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
               {copied === 'curl' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied === 'curl' ? 'Copied' : 'Copy Code'}
+              {copied === 'curl' ? t('copied') : t('copy_code')}
             </button>
           </div>
           <div className="p-4 bg-slate-900">
@@ -208,7 +208,7 @@ export const ApiSettings: React.FC = () => {
               className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
               {copied === 'js' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied === 'js' ? 'Copied' : 'Copy Code'}
+              {copied === 'js' ? t('copied') : t('copy_code')}
             </button>
           </div>
           <div className="p-4 bg-slate-900">
@@ -227,8 +227,8 @@ export const ApiSettings: React.FC = () => {
               <Play className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">API Tester</h2>
-              <p className="text-sm text-slate-500">Test the tracking API with a real Case Number</p>
+              <h2 className="text-lg font-semibold text-slate-900">{t('api_tester')}</h2>
+              <p className="text-sm text-slate-500">{t('api_tester_desc')}</p>
             </div>
           </div>
         </div>
@@ -236,14 +236,14 @@ export const ApiSettings: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input 
               type="text" 
-              placeholder="Enter Case Number (e.g. NES-2026-001)"
+              placeholder={t('enter_case_number_placeholder')}
               value={testCaseNumber}
               onChange={(e) => setTestCaseNumber(e.target.value)}
               className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
             <input 
               type="text" 
-              placeholder="Enter Phone Number (e.g. 0812345678)"
+              placeholder={`${t('enter_phone_number')} (e.g. 0812345678)`}
               value={testPhone}
               onChange={(e) => setTestPhone(e.target.value)}
               className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -255,7 +255,7 @@ export const ApiSettings: React.FC = () => {
             className="w-full px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isTesting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-            Test API
+            {t('api_tester')}
           </button>
 
           {testError && (
@@ -290,10 +290,9 @@ export const ApiSettings: React.FC = () => {
           <Info className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-bold text-amber-900">Security & Rate Limiting</h3>
+          <h3 className="font-bold text-amber-900">{t('security_rate_limiting')}</h3>
           <p className="text-sm text-amber-800/80 leading-relaxed">
-            While this API is public, it is rate-limited to prevent abuse. If you require high-volume access or more sensitive data, 
-            please contact the system administrator to request a private API key with full Directus access.
+            {t('security_note')}
           </p>
         </div>
       </div>

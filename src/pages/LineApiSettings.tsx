@@ -48,7 +48,7 @@ export const LineApiSettings: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">LINE API Settings</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('line_api_settings')}</h1>
         </div>
       </div>
 
@@ -59,8 +59,8 @@ export const LineApiSettings: React.FC = () => {
               <Key className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">LINE API Credentials</h2>
-              <p className="text-sm text-slate-500">Enter your credentials from the LINE Developers Console.</p>
+              <h2 className="text-lg font-semibold text-slate-900">{t('line_api_credentials')}</h2>
+              <p className="text-sm text-slate-500">{t('line_api_desc')}</p>
             </div>
           </div>
         </div>
@@ -68,27 +68,27 @@ export const LineApiSettings: React.FC = () => {
         <div className="p-6 space-y-6">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">
-              LINE Channel Access Token
+              {t('line_channel_token')}
             </label>
             <input
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-              placeholder="Enter Channel Access Token..."
+              placeholder={t('line_channel_token_placeholder')}
             />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">
-              LINE Channel Secret
+              {t('line_channel_secret')}
             </label>
             <input
               type="password"
               value={channelSecret}
               onChange={(e) => setChannelSecret(e.target.value)}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-              placeholder="Enter Channel Secret..."
+              placeholder={t('line_channel_secret_placeholder')}
             />
           </div>
         </div>

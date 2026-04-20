@@ -592,7 +592,7 @@ export const Cars: React.FC = () => {
                           value={formData.company_code}
                           onChange={(e) => setFormData(prev => ({...prev, company_code: e.target.value}))}
                           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                          placeholder="CODE"
+                          placeholder={t('company_code')}
                         />
                       </div>
                     </div>
@@ -628,7 +628,7 @@ export const Cars: React.FC = () => {
                         value={formData.vehicle_type}
                         onChange={(e) => setFormData(prev => ({...prev, vehicle_type: e.target.value}))}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                        placeholder="Sedan, SUV..."
+                        placeholder={t('vehicle_type_placeholder')}
                       />
                     </div>
                   </div>

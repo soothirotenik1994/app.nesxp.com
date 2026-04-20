@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { NewJobNotification } from './NewJobNotification';
+import { MaintenanceAlert } from './MaintenanceAlert';
 import { ProfileModal } from './ProfileModal';
 import { AlertCircle, X } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export const Layout: React.FC = () => {
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden transition-colors duration-300">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <NewJobNotification />
+      <MaintenanceAlert />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar 

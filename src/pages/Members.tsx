@@ -110,7 +110,7 @@ const MemberRow = React.memo(({
                 </p>
                 {memberVehicles.length > 0 && (
                   <span className="bg-blue-100 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                    {memberVehicles.length} {t('vehicles')}
+                    {memberVehicles.length} {t('units')}
                   </span>
                 )}
               </div>
@@ -1138,18 +1138,6 @@ export const Members: React.FC = () => {
                       </div>
                     </div>
                   </div>
-
-                  {editingMember && (
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-slate-700">{t('registration_date')}</label>
-                      <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
-                        <span className="text-sm text-slate-500 font-medium">{t('created_at')}</span>
-                        <div className="text-sm font-bold text-slate-900">
-                          {editingMember.date_created ? format(new Date(editingMember.date_created), 'dd/MM/yyyy HH:mm') : '-'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">{t('line_id')}</label>
