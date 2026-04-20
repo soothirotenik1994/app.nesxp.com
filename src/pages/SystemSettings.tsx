@@ -98,6 +98,8 @@ export const SystemSettings: React.FC = () => {
     fetchSettings();
   }, []);
 
+// src/pages/SystemSettings.tsx
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'websiteLogo' | 'websiteBackground') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -286,6 +288,25 @@ export const SystemSettings: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">{t('website_background')}</label>
+                <div className="flex gap-3">
+                  <input 
+                    type="text" 
+                    value={formData.websiteBackground}
+                    onChange={(e) => setFormData({...formData, websiteBackground: e.target.value})}
+                    className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                    placeholder="URL wallpaper"
+                  />
+                  <input type="file" id="bg-input" onChange={(e) => handleFileUpload(e, 'websiteBackground')} className="hidden" accept="image/*" />
+                  <button onClick={() => document.getElementById('bg-input')?.click()} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
+                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                    {t('upload')}
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-slate-400" />

@@ -23,6 +23,7 @@ const resources = {
       "website_branding": "การสร้างแบรนด์เว็บไซต์",
       "customize_website_name_logo": "ปรับแต่งชื่อและโลโก้เว็บไซต์ของคุณ",
       "website_logo": "โลโก้เว็บไซต์",
+      "website_background": "พื้นหลังเว็บไซต์",
       "logo_preview": "ตัวอย่างโลโก้",
       "background_preview": "ตัวอย่างพื้นหลัง",
       "line_api_settings": "ตั้งค่า API LINE",
