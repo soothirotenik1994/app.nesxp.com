@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Upload, Image as ImageIcon, Link as LinkIcon, MessageSquare, MapPin, History } from 'lucide-react';
+import { Settings, Save, Loader2, CheckCircle2, Globe, Key, AlertCircle, Image as ImageIcon, Link as LinkIcon, MessageSquare, MapPin, History } from 'lucide-react';
 import { directusApi } from '../api/directus';
 import { cn } from '../lib/utils';
 import { LineSettings } from './LineSettings';
@@ -9,11 +9,9 @@ export const SystemSettings: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'general' | 'line' | 'smtp' | 'logs'>('general');
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [isTestingGps, setIsTestingGps] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState(() => {
     let key = localStorage.getItem('static_api_key');
@@ -90,13 +88,12 @@ export const SystemSettings: React.FC = () => {
             mapUpdateInterval: settings.map_update_interval !== undefined ? settings.map_update_interval : prev.mapUpdateInterval,
             gpsApiToken: settings.gps_api_token || prev.gpsApiToken,
           }));
-          
-          Object.keys(settings).forEach(key => {
-            if (settings[key] !== undefined) {
-              const storageKey = key === 'expense_categories' ? 'expense_categories' : key;
-              localStorage.setItem(storageKey, String(settings[key]));
-            }
-          });
+
+          // Sync essential branding to local storage
+          if (settings.website_name) localStorage.setItem('website_name', settings.website_name);
+          if (settings.website_logo) localStorage.setItem('website_logo', settings.website_logo);
+          if (settings.website_background) localStorage.setItem('website_background', settings.website_background);
+          if (settings.app_url) localStorage.setItem('app_url', settings.app_url);
         }
       } catch (error: any) {
         console.error('Failed to fetch settings from Directus:', error);
@@ -106,23 +103,6 @@ export const SystemSettings: React.FC = () => {
   }, []);
 
 // src/pages/SystemSettings.tsx
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'websiteLogo' | 'websiteBackground') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const fileId = await directusApi.uploadFile(file);
-      const fileUrl = directusApi.getFileUrl(fileId);
-      setFormData({ ...formData, [field]: fileUrl });
-    } catch (error: any) {
-      console.error('Error uploading file:', error);
-      alert(`Upload Error: ${error.message}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -157,27 +137,47 @@ export const SystemSettings: React.FC = () => {
       // Only include fields that exist in the Directus collection schema
       // This prevents 400 errors when the collection is missing some fields
       Object.entries(fieldMap).forEach(([formKey, directusKey]) => {
-        if (availableFields.length === 0 || availableFields.includes(directusKey)) {
+        // If we have availableFields list, only include fields that exist in the collection
+        // Special case: If availableFields is completely empty, it might mean the collection is empty 
+        // but fields still exist. However, it's safer to only send branding fields as a guess if it's empty.
+        
+        const isBrandingField = ['website_name', 'website_logo', 'website_background', 'app_url'].includes(directusKey);
+        const shouldInclude = (availableFields.length > 0 && availableFields.includes(directusKey)) || 
+                            (availableFields.length === 0 && isBrandingField);
+
+        if (shouldInclude) {
           let value = formData[formKey as keyof typeof formData];
           
           // Ensure correct types for Directus
-          if (directusKey === 'email_smtp_port' && value && !isNaN(Number(value))) {
-            value = parseInt(String(value), 10);
+          const numericFields = ['email_smtp_port', 'map_update_interval', 'bkk_max_distance'];
+          const booleanFields = ['enable_queue_system', 'enable_tracking', 'enable_line_login', 'enable_google_login', 'email_smtp_secure'];
+          
+          if (numericFields.includes(directusKey)) {
+            if (value !== undefined && value !== null && value !== '') {
+              value = parseInt(String(value), 10);
+              if (isNaN(value as number)) value = 0;
+            } else {
+              value = 0;
+            }
+          } else if (booleanFields.includes(directusKey)) {
+            value = Boolean(value);
           }
           
           payload[directusKey] = value;
         }
       });
 
+      // Save branding to localStorage immediately so UI updates even if Directus fails on other fields
+      localStorage.setItem('website_name', formData.websiteName);
+      localStorage.setItem('website_logo', formData.websiteLogo);
+      localStorage.setItem('website_background', formData.websiteBackground);
+      localStorage.setItem('app_url', formData.appUrl);
+
       console.log('Saving payload to Directus:', payload);
       await directusApi.updateSystemSettings(payload);
 
       localStorage.setItem('directus_url', formData.directusUrl);
       localStorage.setItem('static_api_key', formData.staticApiKey);
-      localStorage.setItem('website_name', formData.websiteName);
-      localStorage.setItem('website_logo', formData.websiteLogo);
-      localStorage.setItem('website_background', formData.websiteBackground);
-      localStorage.setItem('app_url', formData.appUrl);
       localStorage.setItem('google_maps_api_key', formData.googleMapsApiKey);
       localStorage.setItem('enable_queue_system', String(formData.enableQueueSystem));
       localStorage.setItem('bkk_max_distance', String(formData.bkkMaxDistance));
@@ -206,13 +206,24 @@ export const SystemSettings: React.FC = () => {
       }, 800);
     } catch (error: any) {
       console.error('Failed to save settings:', error);
+      
+      // Detailed error logging
+      if (error.response) {
+        console.error('Response Data:', error.response.data);
+        console.error('Response Status:', error.response.status);
+      }
+
       setIsSaving(false);
       
       let errorMsg = 'Failed to save settings to Directus.';
-      if (error.response?.data?.errors?.[0]?.message) {
-        errorMsg += ` Detail: ${error.response.data.errors[0].message}`;
+      if (error.response?.data?.errors) {
+        // Find if it's a specific field error
+        const details = error.response.data.errors.map((e: any) => `${e.extensions?.field || 'Unknown'}: ${e.message}`).join('\n');
+        errorMsg += `\n\nDetail:\n${details}`;
+      } else if (error.response?.data?.message) {
+        errorMsg += `\nDetail: ${error.response.data.message}`;
       } else if (error.message) {
-        errorMsg += ` (${error.message})`;
+        errorMsg += `\nError: ${error.message}`;
       }
       
       alert(errorMsg);
@@ -311,37 +322,54 @@ export const SystemSettings: React.FC = () => {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-slate-700">{t('website_logo')}</label>
-                  <div className="flex gap-3">
+                  <div className="relative">
                     <input 
                       type="text" 
                       value={formData.websiteLogo}
                       onChange={(e) => setFormData({...formData, websiteLogo: e.target.value})}
-                      className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                      placeholder="https://example.com/logo.png"
                     />
-                    <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'websiteLogo')} className="hidden" accept="image/*" />
-                    <button onClick={() => fileInputRef.current?.click()} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
-                      {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                      {t('upload')}
-                    </button>
+                    {formData.websiteLogo && (
+                      <div className="mt-2 flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                        <img 
+                          src={formData.websiteLogo} 
+                          alt="Preview" 
+                          className="w-10 h-10 object-contain rounded border bg-white" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                        <span className="text-[10px] text-slate-400 truncate flex-1">{formData.websiteLogo}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700">{t('website_background')}</label>
-                <div className="flex gap-3">
+                <div className="relative">
                   <input 
                     type="text" 
                     value={formData.websiteBackground}
                     onChange={(e) => setFormData({...formData, websiteBackground: e.target.value})}
-                    className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
-                    placeholder="URL wallpaper"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all"
+                    placeholder="https://example.com/background.jpg"
                   />
-                  <input type="file" id="bg-input" onChange={(e) => handleFileUpload(e, 'websiteBackground')} className="hidden" accept="image/*" />
-                  <button onClick={() => document.getElementById('bg-input')?.click()} className="px-4 py-3 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2">
-                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                    {t('upload')}
-                  </button>
+                  {formData.websiteBackground && (
+                    <div className="mt-2 relative h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                      <img 
+                        src={formData.websiteBackground} 
+                        alt="Background Preview" 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-0.5 truncate">
+                        {formData.websiteBackground}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
