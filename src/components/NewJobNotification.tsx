@@ -5,6 +5,7 @@ import { directusApi } from '../api/directus';
 import { WorkReport } from '../types';
 import { Bell, X, ChevronRight, Truck, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { showToast } from './Toast';
 
 export const NewJobNotification: React.FC = () => {
   const { t } = useTranslation();
@@ -18,37 +19,75 @@ export const NewJobNotification: React.FC = () => {
   const isDriver = !!memberId && !isAdmin;
 
   const checkNewJobs = useCallback(async () => {
-    if (!isDriver || !memberId) return;
+    // Only check if Driver (for their own jobs) or Admin (for all jobs)
+    if (!isAdmin && !isDriver) return;
 
     try {
-      const myJobs = await directusApi.getMemberWorkReports(memberId);
-      const trulyNewJobs = myJobs.filter(job => !notifiedIdsRef.current.has(String(job.id)));
+      const allJobs = isAdmin 
+        ? await directusApi.getWorkReports() // Admins see all
+        : await directusApi.getMemberWorkReports(memberId!); // Drivers see their own
+      
+      const trulyNewJobs = allJobs.filter(job => !notifiedIdsRef.current.has(String(job.id)));
 
       if (trulyNewJobs.length > 0) {
-        setNewJobs(prev => {
-          // Add only if not already in state
-          const existingIds = new Set(prev.map(j => String(j.id)));
-          const toAdd = trulyNewJobs.filter(j => !existingIds.has(String(j.id)));
-          return [...prev, ...toAdd];
-        });
-
-        // Update notified IDs to prevent repeated popups for the same job
-        trulyNewJobs.forEach(job => notifiedIdsRef.current.add(String(job.id)));
-        localStorage.setItem('notified_job_ids', JSON.stringify(Array.from(notifiedIdsRef.current)));
+        // If it's a massive first load, don't toast everything.
+        // On first load after refresh, notifiedIdsRef might be empty.
+        // We only want to notify about jobs created in the last 5 minutes if it's the very first poll.
+        const isFirstPoll = notifiedIdsRef.current.size === 0;
+        const now = Date.now();
         
-        // Play notification sound if possible
-        try {
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-          audio.play().catch(() => {}); // Browser might block autoplay
-        } catch (e) {}
+        const jobsToNotify = isFirstPoll 
+          ? trulyNewJobs.filter(job => {
+              const createdDate = new Date(job.date_created || '').getTime();
+              return (now - createdDate) < 300000; // 5 minutes
+            })
+          : trulyNewJobs;
+
+        if (jobsToNotify.length > 0) {
+          setNewJobs(prev => {
+            const existingIds = new Set(prev.map(j => String(j.id)));
+            const toAdd = jobsToNotify.filter(j => !existingIds.has(String(j.id)));
+            return [...prev, ...toAdd];
+          });
+
+          // Also show a toast for each new job if Admin
+          if (isAdmin) {
+            jobsToNotify.forEach(job => {
+              showToast(`${t('new_job_created', 'มีการสร้างงานใหม่')}: ${job.case_number || job.id}`, 'info');
+            });
+          }
+
+          // Update notified IDs
+          jobsToNotify.forEach(job => notifiedIdsRef.current.add(String(job.id)));
+          
+          // Limit the size of notified IDs in localStorage to prevent bloat (keep last 500)
+          const idsArray = Array.from(notifiedIdsRef.current);
+          if (idsArray.length > 500) {
+            const trimmed = idsArray.slice(-500);
+            notifiedIdsRef.current = new Set(trimmed);
+            localStorage.setItem('notified_job_ids', JSON.stringify(trimmed));
+          } else {
+            localStorage.setItem('notified_job_ids', JSON.stringify(idsArray));
+          }
+          
+          // Play notification sound
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(() => {});
+          } catch (e) {}
+        } else {
+          // If first poll didn't find "truly fresh" jobs, still mark all existing as notified
+          trulyNewJobs.forEach(job => notifiedIdsRef.current.add(String(job.id)));
+          localStorage.setItem('notified_job_ids', JSON.stringify(Array.from(notifiedIdsRef.current)));
+        }
       }
     } catch (err) {
       console.error('Error checking new jobs:', err);
     }
-  }, [isDriver, memberId]);
+  }, [isAdmin, isDriver, memberId, t]);
 
   useEffect(() => {
-    if (!isDriver) return;
+    if (!isAdmin && !isDriver) return;
 
     // Initial check
     checkNewJobs();
@@ -56,7 +95,7 @@ export const NewJobNotification: React.FC = () => {
     // Poll every 30 seconds
     const interval = setInterval(checkNewJobs, 30000);
     return () => clearInterval(interval);
-  }, [isDriver, checkNewJobs]);
+  }, [isAdmin, isDriver, checkNewJobs]);
 
   const handleViewJob = (jobId: any) => {
     setNewJobs(prev => prev.filter(j => j.id !== jobId));

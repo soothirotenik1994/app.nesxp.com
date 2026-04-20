@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, User, LogOut, PlusCircle, Bell, Trash2, CheckCircle, AlertTriangle, X, Sun, Moon } from 'lucide-react';
+import { Menu, User, LogOut, PlusCircle, Bell, Trash2, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { setAuthToken } from '../api/directus';
 import { ProfileModal } from './ProfileModal';
 import { useSystemAlerts } from '../context/SystemAlertContext';
-import { useTheme } from '../context/ThemeContext';
 import { format } from 'date-fns';
 
 interface TopBarProps {
@@ -17,7 +16,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, onProfileClick }) =
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { alerts, unreadCount, markAsRead, clearAll } = useSystemAlerts();
-  const { theme, toggleTheme } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 

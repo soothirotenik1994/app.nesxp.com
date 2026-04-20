@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { showToast } from '../components/Toast';
 
 interface SystemAlert {
   id: string;
@@ -35,6 +36,7 @@ export const SystemAlertProvider: React.FC<{ children: React.ReactNode }> = ({ c
       isRead: false,
     };
     setAlerts(prev => [newAlert, ...prev]);
+    showToast(message, message.toLowerCase().includes('error') ? 'error' : 'info');
   }, []);
 
   const markAsRead = useCallback((id: string) => {

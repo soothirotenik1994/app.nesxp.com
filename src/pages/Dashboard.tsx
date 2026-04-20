@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DashboardStats } from '../components/DashboardStats';
 import { VehicleMap } from '../components/VehicleMap';
+import { AiAssistant } from '../components/AiAssistant';
 import { directusApi, api } from '../api/directus';
 import { gpsApi } from '../api/gps';
 import { Car, CarStatus, Member } from '../types';
@@ -488,6 +489,14 @@ export const Dashboard: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <AiAssistant 
+            data={{ 
+              cars, 
+              carStatuses, 
+              recentJobs, 
+              jobStats 
+            }} 
+          />
           <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-medium text-slate-600 shadow-sm">
             <Clock className="w-4 h-4 text-slate-400" />
             <span className="text-xs text-slate-400 mr-1">{t('last_update')}:</span>
