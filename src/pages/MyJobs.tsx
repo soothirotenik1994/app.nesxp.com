@@ -38,6 +38,7 @@ export const MyJobs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'scheduled'>('all');
   const memberId = localStorage.getItem('member_id');
   const userEmail = localStorage.getItem('user_email');
   const userRole = localStorage.getItem('user_role') || 'customer';
@@ -195,6 +196,9 @@ export const MyJobs: React.FC = () => {
       }
     }
 
+    // Filter by type (Scheduled only)
+    if (filterType === 'scheduled' && !r.advance_opening_time) return false;
+
     // Only show active jobs (not completed, cancelled, or deleted)
     if (r.status === 'completed' || r.status === 'cancelled' || r.status === 'deleted') return false;
 
@@ -209,13 +213,30 @@ export const MyJobs: React.FC = () => {
     }
 
     const search = searchTerm.toLowerCase();
+    
+    // Get formatted case number (tracking ID)
+    const trackingId = formatCaseNumber(r).toLowerCase();
+    
+    // Get driver name if available
+    const member = (r.member_id && typeof r.member_id === 'object' ? r.member_id : null) || 
+                   (r.driver_id && typeof r.driver_id === 'object' ? r.driver_id : null);
+    const driverName = member ? `${member.first_name} ${member.last_name}`.toLowerCase() : '';
+    
     const customer = String(r.customer_name || '').toLowerCase();
     const origin = String(r.origin || '').toLowerCase();
     const dest = String(r.destination || '').toLowerCase();
     const car = typeof r.car_id === 'object' ? String(r.car_id.car_number || '').toLowerCase() : '';
-    const caseNum = String(r.id || '').toLowerCase();
+    const dbId = String(r.id || '').toLowerCase();
+    const dbCaseNum = String(r.case_number || '').toLowerCase();
     
-    return customer.includes(search) || origin.includes(search) || dest.includes(search) || car.includes(search) || caseNum.includes(search);
+    return customer.includes(search) || 
+           origin.includes(search) || 
+           dest.includes(search) || 
+           car.includes(search) || 
+           trackingId.includes(search) || 
+           dbCaseNum.includes(search) || 
+           dbId.includes(search) ||
+           driverName.includes(search);
   }).sort((a, b) => {
     const getStatusWeight = (status: string) => {
       switch (status) {
@@ -342,6 +363,32 @@ export const MyJobs: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                  <button
+                    onClick={() => setFilterType('all')}
+                    className={clsx(
+                      "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
+                      filterType === 'all' 
+                        ? "bg-white text-primary shadow-sm" 
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    {t('show_all')}
+                  </button>
+                  <button
+                    onClick={() => setFilterType('scheduled')}
+                    className={clsx(
+                      "px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
+                      filterType === 'scheduled' 
+                        ? "bg-white text-primary shadow-sm" 
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    {t('scheduled_jobs')}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-4">
@@ -414,9 +461,17 @@ export const MyJobs: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {formatDate(report.work_date || report.date_created, 'dd/MM/yyyy')}
+                          <div className="flex items-center flex-wrap gap-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {formatDate(report.work_date || report.date_created, 'dd/MM/yyyy')}
+                            </div>
+                            {report.advance_opening_time && (
+                              <div className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-bold">
+                                <Clock className="w-3 h-3" />
+                                {t('scheduled_jobs')}: {formatTime(report.advance_opening_time)}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">

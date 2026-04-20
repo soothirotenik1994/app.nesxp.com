@@ -1974,7 +1974,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: `${t('case_number_prefix', 'เลขที่เคส')} ${data.case_number || '-'}`,
+                    text: `${t('case_number_prefix', 'รหัสติดตามพัสดุ')} ${data.case_number || '-'}`,
                     size: "sm",
                     color: "#111111",
                     flex: 9
@@ -2386,7 +2386,7 @@ export const JobReport: React.FC = () => {
                   },
                   {
                     type: "text",
-                    text: `${t('case_number_prefix', 'เลขที่เคส')} ${data.case_number || '-'}`,
+                    text: `${t('case_number_prefix', 'รหัสติดตามพัสดุ')} ${data.case_number || '-'}`,
                     size: "sm",
                     color: "#111111",
                     flex: 9

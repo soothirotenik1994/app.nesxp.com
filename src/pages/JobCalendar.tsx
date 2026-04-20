@@ -208,16 +208,19 @@ export const JobCalendar: React.FC = () => {
                 meridiem: false,
                 hour12: false
               }}
-              locale={i18n.language === 'th' ? 'th' : 'en'}
+              locale={i18n.language.startsWith('th') ? 'th' : 'en'}
               locales={[thLocale]}
-              titleFormat={i18n.language === 'th' ? { year: 'numeric', month: 'long' } : { year: 'numeric', month: 'long' }}
+              firstDay={1}
+              titleFormat={{ year: 'numeric', month: 'long' }}
               dayMaxEvents={true}
               nowIndicator={true}
               buttonText={{
-                today: t('today'),
-                month: t('month'),
-                week: t('week'),
-                day: t('day')
+                today: t('today', 'วันนี้'),
+                month: t('month', 'เดือน'),
+                week: t('week', 'สัปดาห์'),
+                day: t('day', 'วัน'),
+                prev: t('prev', 'ก่อนหน้า'),
+                next: t('next', 'ถัดไป')
               }}
             />
           </div>
