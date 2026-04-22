@@ -38,6 +38,7 @@ export const SystemSettings: React.FC = () => {
       enableQueueSystem: localStorage.getItem('enable_queue_system') !== 'false',
       bkkMaxDistance: parseInt(localStorage.getItem('bkk_max_distance') || '250', 10),
       enableTracking: localStorage.getItem('enable_tracking') !== 'false',
+      enablePWA: localStorage.getItem('enable_pwa') !== 'false',
       enableLineLogin: localStorage.getItem('enable_line_login') !== 'false',
       enableGoogleLogin: localStorage.getItem('enable_google_login') === 'true',
       googleClientId: localStorage.getItem('google_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '559675370597-bs7c8aabdco373h9vc81gb09kbp62dte.apps.googleusercontent.com',
@@ -74,6 +75,7 @@ export const SystemSettings: React.FC = () => {
             enableQueueSystem: settings.enable_queue_system !== undefined ? settings.enable_queue_system : prev.enableQueueSystem,
             bkkMaxDistance: settings.bkk_max_distance !== undefined ? settings.bkk_max_distance : prev.bkkMaxDistance,
             enableTracking: settings.enable_tracking !== undefined ? settings.enable_tracking : prev.enableTracking,
+            enablePWA: settings.enable_pwa !== undefined ? settings.enable_pwa : prev.enablePWA,
             enableLineLogin: settings.enable_line_login !== undefined ? settings.enable_line_login : prev.enableLineLogin,
             enableGoogleLogin: settings.enable_google_login !== undefined ? settings.enable_google_login : prev.enableGoogleLogin,
             googleClientId: settings.google_client_id || prev.googleClientId,
@@ -119,6 +121,7 @@ export const SystemSettings: React.FC = () => {
         enableQueueSystem: 'enable_queue_system',
         bkkMaxDistance: 'bkk_max_distance',
         enableTracking: 'enable_tracking',
+        enablePWA: 'enable_pwa',
         enableLineLogin: 'enable_line_login',
         enableGoogleLogin: 'enable_google_login',
         googleClientId: 'google_client_id',
@@ -182,6 +185,7 @@ export const SystemSettings: React.FC = () => {
       localStorage.setItem('enable_queue_system', String(formData.enableQueueSystem));
       localStorage.setItem('bkk_max_distance', String(formData.bkkMaxDistance));
       localStorage.setItem('enable_tracking', String(formData.enableTracking));
+      localStorage.setItem('enable_pwa', String(formData.enablePWA));
       localStorage.setItem('enable_line_login', String(formData.enableLineLogin));
       localStorage.setItem('enable_google_login', String(formData.enableGoogleLogin));
       localStorage.setItem('google_client_id', formData.googleClientId);
@@ -421,6 +425,17 @@ export const SystemSettings: React.FC = () => {
                   <input type="number" value={formData.bkkMaxDistance} onChange={(e) => setFormData({...formData, bkkMaxDistance: parseInt(e.target.value) || 0})} className="w-24 px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary transition-all text-center" />
                   <span className="text-slate-500">{t('km')}</span>
                 </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{t('pwa_feature_label')}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{t('pwa_feature_desc')}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer mt-4 sm:mt-0">
+                  <input type="checkbox" className="sr-only peer" checked={formData.enablePWA} onChange={(e) => setFormData({...formData, enablePWA: e.target.checked})} />
+                  <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+                </label>
               </div>
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">

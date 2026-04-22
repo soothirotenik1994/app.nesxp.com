@@ -181,23 +181,17 @@ export const directusApi = {
   },
   
   getMembers: async (): Promise<Member[]> => {
+    const params = {
+      limit: -1,
+      fields: '*,car_users.*,car_users.car_id.*'
+    };
     try {
-      const response = await api.get('/items/line_users', {
-        params: {
-          limit: -1,
-          fields: '*,car_users.*,car_users.car_id.*'
-        }
-      });
+      const response = await api.get('/items/line_users', { params });
       return response.data.data || [];
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn('[directusApi] getMembers Auth failed (401), trying Public Access fallback...');
-        const response = await axios.get(`${PROXY_URL}/items/line_users`, { 
-          params: { 
-            limit: -1,
-            fields: '*,car_users.*,car_users.car_id.*'
-          } 
-        });
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] getMembers failed (${error.response?.status || 'Network Error'}), trying Public Access fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/line_users`, { params });
         return response.data.data || [];
       }
       throw error;
@@ -205,21 +199,16 @@ export const directusApi = {
   },
 
   getMember: async (id: string): Promise<Member> => {
+    const params = {
+      fields: '*,car_users.*,car_users.car_id.*'
+    };
     try {
-      const response = await api.get(`/items/line_users/${id}`, {
-        params: {
-          fields: '*,car_users.*,car_users.car_id.*'
-        }
-      });
+      const response = await api.get(`/items/line_users/${id}`, { params });
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn(`[directusApi] getMember ${id} Auth failed (401), trying Public Access fallback...`);
-        const response = await axios.get(`${PROXY_URL}/items/line_users/${id}`, {
-          params: {
-            fields: '*,car_users.*,car_users.car_id.*'
-          }
-        });
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] getMember ${id} failed (${error.response?.status || 'Network Error'}), trying Public Access fallback...`);
+        const response = await axios.get(`${PROXY_URL}/items/line_users/${id}`, { params });
         return response.data.data;
       }
       throw error;
@@ -411,21 +400,22 @@ export const directusApi = {
   },
   
   getWorkReports: async (): Promise<any[]> => {
+    const fields = '*,car_id.*,driver_id.*,member_id.*,customer_id.*';
     try {
       const response = await api.get('/items/work_reports', {
         params: {
-          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+          fields,
           sort: '-date_created',
           limit: -1
         }
       });
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn('[directusApi] getWorkReports Auth failed (401), trying Public Access fallback...');
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] getWorkReports failed (${error.response?.status || 'Network Error'}), trying Public Access fallback...`);
         const response = await axios.get(`${PROXY_URL}/items/work_reports`, { 
           params: { 
-            fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+            fields,
             sort: '-date_created',
             limit: -1
           } 
@@ -437,20 +427,17 @@ export const directusApi = {
   },
 
   getWorkReport: async (id: string): Promise<any> => {
+    const fields = '*,car_id.*,driver_id.*,member_id.*,customer_id.*';
     try {
       const response = await api.get(`/items/work_reports/${id}`, {
-        params: {
-          fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
-        }
+        params: { fields }
       });
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn(`[directusApi] getWorkReport ${id} Auth failed (401), trying Public Access fallback...`);
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] getWorkReport ${id} failed (${error.response?.status || 'Network Error'}), trying Public Access fallback...`);
         const response = await axios.get(`${PROXY_URL}/items/work_reports/${id}`, {
-          params: {
-            fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*'
-          }
+          params: { fields }
         });
         return response.data.data;
       }
@@ -467,7 +454,7 @@ export const directusApi = {
         ],
         status: { _eq: 'pending' }
       },
-      fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*,customer_id.member_id.*,customer_id.members.*,customer_id.members.line_user_id.*',
+      fields: '*,car_id.*,driver_id.*,member_id.*,customer_id.*',
       sort: '-date_created',
       limit: -1
     };
@@ -476,8 +463,8 @@ export const directusApi = {
       const response = await api.get('/items/work_reports', { params });
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn(`[directusApi] getMemberWorkReports ${memberId} Auth failed (401), trying Public Access fallback...`);
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] getMemberWorkReports ${memberId} failed (${error.response?.status || 'Network Error'}), trying Public Access fallback...`);
         const response = await axios.get(`${PROXY_URL}/items/work_reports`, { params });
         return response.data.data || [];
       }
@@ -504,8 +491,8 @@ export const directusApi = {
       const response = await api.patch(`/items/work_reports/${id}`, data);
       return response.data.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        console.warn(`[directusApi] updateWorkReport ${id} Auth failed (401), trying fallback...`);
+      if (!error.response || error.response?.status === 401 || error.response?.status === 403) {
+        console.warn(`[directusApi] updateWorkReport ${id} failed (${error.response?.status || 'Network Error'}), trying fallback...`);
         const response = await axios.patch(`${PROXY_URL}/items/work_reports/${id}`, data);
         return response.data.data;
       }

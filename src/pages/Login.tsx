@@ -8,6 +8,7 @@ import { gpsApi } from '../api/gps';
 import clsx from 'clsx';
 import { VehicleMap } from '../components/VehicleMap';
 import { CarStatus } from '../types';
+import { PWAInstallButton } from '../components/PWAInstallButton';
 
 const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const { t } = useTranslation();
@@ -92,6 +93,7 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   
   const isTrackingEnabled = localStorage.getItem('enable_tracking') !== 'false';
+  const isPWAEnabled = localStorage.getItem('enable_pwa') !== 'false';
   const isLineLoginEnabled = localStorage.getItem('enable_line_login') !== 'false';
   const isGoogleLoginEnabled = localStorage.getItem('enable_google_login') === 'true';
   const googleClientId = localStorage.getItem('google_client_id') || '';
@@ -531,6 +533,12 @@ export const Login: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {isPWAEnabled && (
+                  <div className="mt-4">
+                    <PWAInstallButton />
+                  </div>
+                )}
               </>
             )}
 

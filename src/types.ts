@@ -143,7 +143,7 @@ export interface Route {
   destination_lat?: number;
   destination_lng?: number;
   distance?: number;
-  route_type?: 'upcountry' | 'bangkok_vicinity';
+  route_type?: 'upcountry' | 'bangkok_vicinity' | string;
   // New fields for multi-drop
   type?: 'outbound' | 'return';
   pickups?: TripPoint[];
@@ -167,6 +167,7 @@ export interface WorkReport {
   id: string;
   case_number?: string;
   UUID?: string;
+  job_type?: 'one_way' | 'round_trip' | string;
   work_date: string;
   customer_name: string;
   customer_contact_name?: string;
@@ -191,23 +192,26 @@ export interface WorkReport {
   standby_time: string;
   departure_time: string;
   arrival_time: string;
-  mileage_start?: number;
-  mileage_end?: number;
+  mileage_start?: string | number;
+  mileage_end?: string | number;
   notes?: string;
   photos?: string[];
   pickup_photos?: string[];
   delivery_photos?: string[];
   signature_pickup?: string;
   signature_delivery?: string;
+  signature?: string;
+  signature_name?: string;
+  photo_document?: string[];
   photo_metadata?: {
     file_id: string;
     latitude?: number;
     longitude?: number;
     timestamp?: string;
   }[];
-  toll_fee?: number;
-  fuel_cost?: number;
-  other_expenses?: number;
+  toll_fee?: number | string;
+  fuel_cost?: number | string;
+  other_expenses?: number | string;
   other_expenses_note?: string;
   expense_items?: ExpenseItem[];
   status?: 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending' | 'deleted';

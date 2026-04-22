@@ -34,6 +34,8 @@ const resources = {
       "queue_system_desc": "เปิดเพื่อใช้ระบบคำนวณและแนะนำคิวรถอัตโนมัติในหน้าจ่ายงาน (คำนวณจากประวัติการวิ่งงาน กทม. และ ตจว.)",
       "bkk_max_distance_label": "ระยะทางสูงสุดสำหรับงาน กทม./ปริมณฑล (กิโลเมตร)",
       "bkk_max_distance_desc": "ใช้สำหรับแยกระหว่างงาน กทม. และงานต่างจังหวัด ในระบบจัดคิวรถ (ค่าเริ่มต้น: 250 กม.)",
+      "pwa_feature_label": "ปุ่มติดตั้ง Fleet Mobile App (PWA)",
+      "pwa_feature_desc": "เปิดเพื่อแสดงปุ่มติดตั้งแอปลงมือถือที่หน้า Login เพื่อให้คนขับติดตั้งได้ง่าย",
       "tracking_system": "ระบบติดตามพัสดุ",
       "save_success": "บันทึกสำเร็จ",
       "success": "สำเร็จ",
@@ -670,6 +672,9 @@ const resources = {
       "complete_job": "งานเสร็จสิ้น",
       "reopen_job": "เปิดงานใหม่",
       "delete_job": "ลบงาน",
+      "download_pdf": "ดาวน์โหลด PDF สรุปงาน",
+      "job_summary_report": "รายงานสรุปงานส่งสินค้า",
+      "downloading_pdf": "กำลังสร้างไฟล์ PDF...",
       "sms_disabled_warning": "การแจ้งเตือน SMS ถูกปิดใช้งานในการตั้งค่า",
       "sms_will_be_sent": "SMS จะถูกส่งไปยังสมาชิกเมื่อบันทึกงาน",
       "available": "ว่าง",
@@ -687,7 +692,7 @@ const resources = {
       "standby_time": "เวลาสแตนด์บาย",
       "photo_pickup": "ภาพตอนขึ้นของ (Pickup)",
       "photo_delivery": "ภาพตอนส่งของ (Delivery)",
-      "photo_document": "ภาพเอกสาร (Document)",
+      "photo_document": "ภาพถ่ายเอกสาร",
       "upload_photo_btn": "อัปโหลดภาพ",
       "save_report": "บันทึกรายงาน",
       "loading_history": "กำลังโหลดประวัติงาน...",
@@ -703,7 +708,7 @@ const resources = {
       "job_report": "รายงานการส่งสินค้า",
       "pickup_photos": "ภาพตอนขึ้นของ (Pickup)",
       "delivery_photos": "ภาพตอนส่งของ (Delivery)",
-      "upload_photos_error": "กรุณาอัปโหลดภาพให้ครบทั้ง 2 ประเภท: ภาพตอนขึ้นของ, ภาพตอนส่งของ",
+      "upload_photos_error": "กรุณาอัปโหลดภาพถ่ายเอกสาร",
       "new_job_notification": "🔔 มีงานใหม่มอบหมายให้คุณ",
       "case_id": "🆔 รหัสติดตาม",
       "customer_label": "🏢 ลูกค้า",
@@ -910,7 +915,15 @@ const resources = {
       "member_notification_desc": "สมาชิกที่เลือกจะได้รับการแจ้งเตือนงานผ่าน LINE เมื่อมีการทำงานในพิกัดนี้",
       "drag_members_here": "ลากพนักงานมาวางที่นี่",
       "no_available_members": "ไม่พบพนักงานในระบบ",
-      "company_code_placeholder": "รหัสบริษัท"
+      "company_code_placeholder": "รหัสบริษัท",
+      "install_pwa_btn": "ติดตั้ง Fleet Mobile App",
+      "pwa_install_android_tip": "กรุณากดที่เมนู 3 จุดของเบราว์เซอร์ แล้วเลือก \"ติดตั้งแอป\" (Install App)",
+      "install_on_ios": "วิธีติดตั้งบน iPhone",
+      "ios_step_1_title": "กดปุ่มแชร์ (Share)",
+      "ios_step_1_desc": "มองหาไอคอนสี่เหลี่ยมที่มีลูกศรชี้ขึ้น ที่แถบด้านล่างของ Safari",
+      "ios_step_2_title": "เลือก \"เพิ่มลงในหน้าจอโฮม\"",
+      "ios_step_2_desc": "เลื่อนหาเมนู \"Add to Home Screen\" เพื่อติดตั้งแอปลงบนมือถือ",
+      "got_it": "รับทราบ"
     }
   }
 };

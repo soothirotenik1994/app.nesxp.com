@@ -26,7 +26,6 @@ import {
   Camera, 
   Send, 
   Save,
-  Loader2, 
   CheckCircle2,
   Circle,
   X,
@@ -46,8 +45,12 @@ import {
   RefreshCw,
   ChevronDown,
   Copy,
-  Check
+  Check,
+  FileDown,
+  Loader2
 } from 'lucide-react';
+import { JobSummaryPDF } from '../components/JobSummaryPDF';
+import { generateJobSummaryPDF } from '../services/pdfService';
 import SignaturePad from 'react-signature-canvas';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { WebcamModal } from '../components/WebcamModal';
@@ -115,78 +118,6 @@ const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-const processImageWithOverlay = async (file: File, location: { lat: number, lng: number } | null): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-
-      // Set canvas dimensions to match image
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      // Draw image
-      ctx.drawImage(img, 0, 0);
-
-      // Prepare overlay text
-      const now = new Date();
-      const timestamp = now.toLocaleString('th-TH', { 
-        year: 'numeric', month: 'long', day: 'numeric', 
-        hour: '2-digit', minute: '2-digit', second: '2-digit' 
-      });
-      
-      let locationText = '';
-      if (location) {
-        locationText = `Lat: ${location.lat.toFixed(6)}, Lng: ${location.lng.toFixed(6)}`;
-      }
-
-      // Set text style
-      const fontSize = Math.max(24, Math.floor(canvas.width / 35));
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      
-      // Draw background for text for better readability
-      const textHeight = locationText ? fontSize * 2.5 : fontSize * 1.5;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.fillRect(0, canvas.height - textHeight - 40, canvas.width, textHeight + 40);
-
-      ctx.fillStyle = 'white';
-      ctx.textAlign = 'left';
-
-      const padding = 40;
-      let y = canvas.height - padding;
-
-      // Draw location text
-      if (locationText) {
-        ctx.fillText(locationText, padding, y);
-        y -= fontSize * 1.2;
-      }
-
-      // Draw timestamp
-      ctx.fillText(timestamp, padding, y);
-
-      // Convert back to blob
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Canvas toBlob failed'));
-      }, 'image/jpeg', 0.85);
-      
-      // Clean up
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = (err) => {
-      URL.revokeObjectURL(img.src);
-      reject(err);
-    };
-    img.src = URL.createObjectURL(file);
-  });
-};
-
-
 export const JobReport: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -201,6 +132,7 @@ export const JobReport: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [showWebcam, setShowWebcam] = useState(false);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
@@ -247,8 +179,8 @@ export const JobReport: React.FC = () => {
         arrival_time: '',
         mileage_start: '',
         mileage_end: '',
-        pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
-        deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
+        pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
+        deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
         distance: undefined as number | undefined,
         // Legacy fields for backward compatibility
         origin: '',
@@ -274,7 +206,7 @@ export const JobReport: React.FC = () => {
     mileage_start: '',
     mileage_end: '',
     notes: '',
-    status: 'pending' as 'pending' | 'accepted' | 'arrived' | 'cancelled' | 'completed' | 'cancel_pending',
+    status: 'pending' as 'pending' | 'accepted' | 'cancelled' | 'completed' | 'cancel_pending',
     cancel_reason: '',
     status_logs: [] as any[],
     signature: '' as string,
@@ -306,6 +238,53 @@ export const JobReport: React.FC = () => {
     setIsUpdatingRouteStatus(true);
     try {
       const newRoutes = [...formData.routes];
+      const route = newRoutes[routeIndex];
+
+      // Upload point-specific photos if any
+      // Pre-upload pickups photos
+      for (let pIdx = 0; pIdx < (route.pickups || []).length; pIdx++) {
+        const key = `r-${routeIndex}-p-${pIdx}`;
+        const photosToUpload = pointPhotosMap[key] || [];
+        if (photosToUpload.length > 0) {
+          const uploadedIds = [];
+          for (const p of photosToUpload) {
+            const fileId = await directusApi.uploadFile(p.file);
+            uploadedIds.push(fileId);
+          }
+          const currentPhotos = route.pickups[pIdx].photos || [];
+          route.pickups[pIdx].photos = [...currentPhotos, ...uploadedIds];
+          
+          // Clear local photos after successful upload
+          setPointPhotosMap(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
+      }
+
+      // Pre-upload deliveries photos
+      for (let dIdx = 0; dIdx < (route.deliveries || []).length; dIdx++) {
+        const key = `r-${routeIndex}-d-${dIdx}`;
+        const photosToUpload = pointPhotosMap[key] || [];
+        if (photosToUpload.length > 0) {
+          const uploadedIds = [];
+          for (const p of photosToUpload) {
+            const fileId = await directusApi.uploadFile(p.file);
+            uploadedIds.push(fileId);
+          }
+          const currentPhotos = route.deliveries[dIdx].photos || [];
+          route.deliveries[dIdx].photos = [...currentPhotos, ...uploadedIds];
+
+          // Clear local photos after successful upload
+          setPointPhotosMap(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
+      }
+
       newRoutes[routeIndex].status = 'completed';
       
       // Update local state first
@@ -501,8 +480,8 @@ export const JobReport: React.FC = () => {
 
       if (points.length < 2) {
         if (route.origin_url && route.destination_url) {
-          points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '' });
-          points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '' });
+          points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '', photos: [] as string[] });
+          points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '', photos: [] as string[] });
         } else {
           throw new Error(t('route_points_error', { index: index + 1 }));
         }
@@ -578,8 +557,8 @@ export const JobReport: React.FC = () => {
         if (points.length < 2) {
           // Fallback to legacy origin/destination if pickups/deliveries not used
           if (route.origin_url && route.destination_url) {
-            points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '' });
-            points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '' });
+            points.push({ name: route.origin || '', url: route.origin_url, contact_name: '', contact_phone: '', time: '', photos: [] as string[] });
+            points.push({ name: route.destination || '', url: route.destination_url, contact_name: '', contact_phone: '', time: '', photos: [] as string[] });
           } else {
             throw new Error(t('route_points_error', { index: i + 1 }));
           }
@@ -1077,6 +1056,9 @@ export const JobReport: React.FC = () => {
   const [deliveryPhotos, setDeliveryPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
   const [documentPhotos, setDocumentPhotos] = useState<{file: File, metadata: any, preview: string}[]>([]);
   
+  // New state for point-specific photos (per route point)
+  const [pointPhotosMap, setPointPhotosMap] = useState<Record<string, {file: File, metadata: any, preview: string}[]>>({});
+  
   const removeExistingPhoto = (index: number, type: 'pickup' | 'delivery' | 'document') => {
     if (type === 'pickup') {
       setExistingPickupPhotos(prev => prev.filter((_, i) => i !== index));
@@ -1087,15 +1069,31 @@ export const JobReport: React.FC = () => {
     }
   };
 
+  const removePointExistingPhoto = (routeIdx: number, pointIdx: number, photoIdx: number, pointType: 'pickup' | 'delivery') => {
+    setFormData(prev => {
+      const newRoutes = [...prev.routes];
+      const point = pointType === 'pickup' 
+        ? newRoutes[routeIdx].pickups[pointIdx] 
+        : newRoutes[routeIdx].deliveries[pointIdx];
+      
+      if (point && point.photos) {
+        point.photos = (point.photos as string[]).filter((_, i) => i !== photoIdx);
+      }
+      
+      return { ...prev, routes: newRoutes };
+    });
+  };
+
   const renderPhotoSection = (
     title: string, 
     photos: {file: File, metadata: any, preview: string}[], 
     existingPhotos: string[],
-    type: 'pickup' | 'delivery' | 'document',
+    type: string,
     onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
     onRemove: (index: number) => void,
     onRemoveExisting: (index: number) => void,
-    isProcessing?: boolean
+    isProcessing?: boolean,
+    idPrefix: string = 'global'
   ) => (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="p-3 border-b border-slate-200 bg-white">
@@ -1153,9 +1151,9 @@ export const JobReport: React.FC = () => {
                 type="button"
                 onClick={() => {
                   if (isMobile) {
-                    document.getElementById(`camera-input-${type}`)?.click();
+                    document.getElementById(`camera-input-${idPrefix}-${type}`)?.click();
                   } else {
-                    setWebcamType(type);
+                    setWebcamType(type as any);
                     setShowWebcam(true);
                   }
                 }}
@@ -1164,7 +1162,7 @@ export const JobReport: React.FC = () => {
                 <Camera className="w-5 h-5" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">{t('capture_photo')}</span>
                 <input 
-                  id={`camera-input-${type}`}
+                  id={`camera-input-${idPrefix}-${type}`}
                   type="file" 
                   accept="image/*" 
                   capture="environment" 
@@ -1227,6 +1225,21 @@ export const JobReport: React.FC = () => {
 
     const runningNumber = (maxRunning + 1).toString().padStart(3, '0');
     return `${prefix}${runningNumber}`;
+  };
+
+  const handleDownloadPDF = async () => {
+    if (isGeneratingPDF) return;
+    
+    setIsGeneratingPDF(true);
+    try {
+      const filename = `Report-${formData.case_number || 'JOB'}.pdf`;
+      await generateJobSummaryPDF('pdf-summary-template', filename);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   useEffect(() => {
@@ -1377,8 +1390,8 @@ export const JobReport: React.FC = () => {
                 arrival_time: formatTimeForInput(report.arrival_time),
                 mileage_start: report.mileage_start !== null && report.mileage_start !== undefined ? report.mileage_start.toString() : '',
                 mileage_end: report.mileage_end !== null && report.mileage_end !== undefined ? report.mileage_end.toString() : '',
-                pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
-                deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
+                pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
+                deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
                 origin: report.origin || '',
                 origin_url: report.origin_url || '',
                 origin_lat: report.origin_lat,
@@ -1657,30 +1670,13 @@ export const JobReport: React.FC = () => {
 
     setProcessingPhotos(true);
     try {
-      // Get current location for timestamp overlay
-      const currentLocation = await new Promise<{ lat: number, lng: number } | null>((resolve) => {
-        if (!navigator.geolocation) {
-          resolve(null);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => resolve(null),
-          { timeout: 5000, enableHighAccuracy: true }
-        );
-      });
-
       let newPhotos: any[] = [];
       if (type === 'pickup') newPhotos = [...pickupPhotos];
       else if (type === 'delivery') newPhotos = [...deliveryPhotos];
       else newPhotos = [...documentPhotos];
 
       for (const file of files) {
-        // Process image with overlay (timestamp and location)
-        const processedBlob = await processImageWithOverlay(file, currentLocation);
-        const processedFile = new File([processedBlob], file.name, { type: 'image/jpeg' });
-
-        // Extract EXIF data (optional, but keeping for metadata consistency)
+        // Extract EXIF data
         const metadata: any = await new Promise((resolve) => {
           EXIF.getData(file as any, function(this: any) {
             const allMetadata = EXIF.getAllTags(this);
@@ -1704,9 +1700,9 @@ export const JobReport: React.FC = () => {
             }
 
             resolve({
-              latitude: latitude || currentLocation?.lat,
-              longitude: longitude || currentLocation?.lng,
-              timestamp: timestamp || new Date().toISOString(),
+              latitude,
+              longitude,
+              timestamp,
               all: allMetadata
             });
           });
@@ -1715,26 +1711,17 @@ export const JobReport: React.FC = () => {
         const reader = new FileReader();
         const previewUrl = await new Promise<string>((resolve) => {
           reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(processedFile);
+          reader.readAsDataURL(file);
         });
 
-        newPhotos.push({
-          file: processedFile,
-          metadata,
-          preview: previewUrl
-        } as any);
+        newPhotos.push({ file, preview: previewUrl, metadata });
       }
 
-      if (type === 'pickup') {
-        setPickupPhotos(newPhotos);
-      } else if (type === 'delivery') {
-        setDeliveryPhotos(newPhotos);
-      } else {
-        setDocumentPhotos(newPhotos);
-      }
+      if (type === 'pickup') setPickupPhotos(newPhotos);
+      else if (type === 'delivery') setDeliveryPhotos(newPhotos);
+      else setDocumentPhotos(newPhotos);
     } catch (err) {
-      console.error("Error processing photos:", err);
-      setError("Error processing photos. Please try again.");
+      console.error('Error processing photos:', err);
     } finally {
       setProcessingPhotos(false);
     }
@@ -1748,6 +1735,66 @@ export const JobReport: React.FC = () => {
     } else {
       setDocumentPhotos(prev => prev.filter((_, i) => i !== index));
     }
+  };
+
+  const handlePointPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, pointKey: string) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setProcessingPhotos(true);
+    try {
+      const currentPointPhotos = pointPhotosMap[pointKey] || [];
+      const newProcessPhotos: {file: File, metadata: any, preview: string}[] = [...currentPointPhotos];
+
+      for (const file of files) {
+        const metadata: any = await new Promise((resolve) => {
+          EXIF.getData(file as any, function(this: any) {
+            const allMetadata = EXIF.getAllTags(this);
+            const lat = EXIF.getTag(this, "GPSLatitude");
+            const lon = EXIF.getTag(this, "GPSLongitude");
+            const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+            const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+            const timestamp = EXIF.getTag(this, "DateTimeOriginal") || EXIF.getTag(this, "DateTime");
+
+            let latitude = null;
+            let longitude = null;
+
+            if (lat && lat.length === 3) {
+              latitude = lat[0] + lat[1] / 60 + lat[2] / 3600;
+              if (latRef === "S") latitude = -latitude;
+            }
+
+            if (lon && lon.length === 3) {
+              longitude = lon[0] + lon[1] / 60 + lon[2] / 3600;
+              if (lonRef === "W") longitude = -longitude;
+            }
+
+            resolve({ latitude, longitude, timestamp, all: allMetadata });
+          });
+        });
+
+        const reader = new FileReader();
+        const previewUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        newProcessPhotos.push({ file, preview: previewUrl, metadata });
+      }
+
+      setPointPhotosMap(prev => ({ ...prev, [pointKey]: newProcessPhotos }));
+    } catch (err) {
+      console.error('Error processing point photos:', err);
+    } finally {
+      setProcessingPhotos(false);
+    }
+  };
+
+  const removePointPhoto = (pointKey: string, photoIdx: number) => {
+    setPointPhotosMap(prev => ({
+      ...prev,
+      [pointKey]: (prev[pointKey] || []).filter((_, i) => i !== photoIdx)
+    }));
   };
 
   const sendLineNotification = async (to: string, messages: any[], altText: string) => {
@@ -2781,7 +2828,7 @@ export const JobReport: React.FC = () => {
     };
   };
 
-  const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'arrived' | 'completed', jobId?: string, targetCustomerId?: string) => {
+  const sendCustomerStatusNotification = async (status: 'pending' | 'accepted' | 'completed', jobId?: string, targetCustomerId?: string) => {
     // Only send for Accepted (In Transit) and Completed statuses for customers
     if (status !== 'accepted' && status !== 'completed') {
       console.log(`Skipping customer notification for status: ${status}`);
@@ -2967,6 +3014,44 @@ export const JobReport: React.FC = () => {
       await uploadPhotos(pickupPhotos, pickupPhotoIds);
       await uploadPhotos(deliveryPhotos, deliveryPhotoIds);
       await uploadPhotos(documentPhotos, documentPhotoIds);
+
+      // 1.1 Upload point-specific photos
+      console.log('executeSave: Starting point-specific photo uploads...');
+      const processedRoutes = [...formData.routes]; // Use a copy to update point photos
+      for (let rIdx = 0; rIdx < processedRoutes.length; rIdx++) {
+        const route = processedRoutes[rIdx];
+        
+        // Pickups
+        for (let pIdx = 0; pIdx < (route.pickups || []).length; pIdx++) {
+          const key = `r-${rIdx}-p-${pIdx}`;
+          const photosToUpload = pointPhotosMap[key] || [];
+          if (photosToUpload.length > 0) {
+            const uploadedIds = [];
+            for (const p of photosToUpload) {
+              const fileId = await directusApi.uploadFile(p.file);
+              uploadedIds.push(fileId);
+            }
+            const currentPhotos = route.pickups[pIdx].photos || [];
+            route.pickups[pIdx].photos = [...currentPhotos, ...uploadedIds];
+          }
+        }
+
+        // Deliveries
+        for (let dIdx = 0; dIdx < (route.deliveries || []).length; dIdx++) {
+          const key = `r-${rIdx}-d-${dIdx}`;
+          const photosToUpload = pointPhotosMap[key] || [];
+          if (photosToUpload.length > 0) {
+            const uploadedIds = [];
+            for (const p of photosToUpload) {
+              const fileId = await directusApi.uploadFile(p.file);
+              uploadedIds.push(fileId);
+            }
+            const currentPhotos = route.deliveries[dIdx].photos || [];
+            route.deliveries[dIdx].photos = [...currentPhotos, ...uploadedIds];
+          }
+        }
+      }
+
       console.log('executeSave: Photo uploads completed');
 
       // Capture signature if pad is not empty
@@ -3001,12 +3086,26 @@ export const JobReport: React.FC = () => {
 
       // 1.6 Mandatory photos check for drivers
       console.log('executeSave: Performing validation checks...');
-      if (!isAdmin && id && formData.status === 'completed') {
-        // Require at least one photo for each category: pickup, delivery
-        const totalPickupPhotos = pickupPhotos.length + existingPickupPhotos.length;
-        const totalDeliveryPhotos = deliveryPhotos.length + existingDeliveryPhotos.length;
+      if (!isAdmin && id && (formData.status === 'completed' || formData.status === 'accepted')) {
+        // Require at least one photo across any category (now all labeled as document)
+        const totalPhotos = 
+          pickupPhotos.length + existingPickupPhotos.length + 
+          deliveryPhotos.length + existingDeliveryPhotos.length + 
+          documentPhotos.length + existingDocumentPhotos.length;
         
-        if (totalPickupPhotos === 0 || totalDeliveryPhotos === 0) {
+        // Also check per-point photos
+        let pointPhotosCount = 0;
+        formData.routes.forEach(r => {
+          (r.pickups || []).forEach(p => { pointPhotosCount += (p.photos?.length || 0); });
+          (r.deliveries || []).forEach(d => { pointPhotosCount += (d.photos?.length || 0); });
+        });
+        
+        // Check local point photos map too
+        Object.values(pointPhotosMap).forEach(photos => {
+          pointPhotosCount += photos.length;
+        });
+
+        if (totalPhotos === 0 && pointPhotosCount === 0 && formData.status === 'completed') {
           setError(t('upload_photos_error'));
           setSubmitting(false);
           return;
@@ -3072,7 +3171,7 @@ export const JobReport: React.FC = () => {
       
       // Add routes data - always allow updates to routes (times/mileage)
       if (formData.routes !== undefined) {
-        reportData.routes = formData.routes.map((route: any) => ({
+        reportData.routes = processedRoutes.map((route: any) => ({
           ...route,
           standby_time: route.standby_time ? formatTime(route.standby_time) : (route.standby_time === '' ? null : (route.standby_time || null)),
           departure_time: route.departure_time ? formatTime(route.departure_time) : (route.departure_time === '' ? null : (route.departure_time || null)),
@@ -3512,7 +3611,7 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const sendDriverStatusNotification = async (status: 'accepted' | 'arrived' | 'completed') => {
+  const sendDriverStatusNotification = async (status: 'accepted' | 'completed') => {
     try {
       const currentMemberId = typeof formData.member_id === 'object' ? (formData.member_id as any).id : formData.member_id;
       const member = members.find(m => String(m.id) === String(currentMemberId));
@@ -3526,11 +3625,10 @@ export const JobReport: React.FC = () => {
       }
 
       const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
-      const statusText = status === 'accepted' ? t('status_accepted_msg') : 
-                        (status === 'arrived' ? t('status_arrived_msg') : t('status_completed_msg'));
+      const statusText = status === 'accepted' ? t('status_accepted_msg') : t('status_completed_msg');
       
       const headerColor = '#2c5494'; // NES Blue
-      const statusColor = status === 'completed' ? '#27ae60' : (status === 'arrived' ? '#f39c12' : '#e54d42');
+      const statusColor = status === 'completed' ? '#27ae60' : '#e54d42';
 
       const flexContents = generateDriverFlexMessage(
         `${t('job_status_notification')}: ${statusText}`,
@@ -3780,7 +3878,7 @@ export const JobReport: React.FC = () => {
     }
   };
 
-  const verifyGeofence = async (type: 'arrived' | 'completed'): Promise<{ lat: number, lng: number, verified: boolean, distance: number } | null> => {
+  const verifyGeofence = async (type: 'completed'): Promise<{ lat: number, lng: number, verified: boolean, distance: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
         resolve(null);
@@ -3815,23 +3913,6 @@ export const JobReport: React.FC = () => {
   const handleCompleteJob = async () => {
     if (!id) return;
     
-    // Mandatory photos check
-    if (!isAdmin) {
-      const totalPickupPhotos = pickupPhotos.length + existingPickupPhotos.length;
-      const totalDeliveryPhotos = deliveryPhotos.length + existingDeliveryPhotos.length;
-      
-      if (totalPickupPhotos === 0 || totalDeliveryPhotos === 0) {
-        setStatusConfig({
-          type: 'error',
-          title: t('incomplete_info'),
-          message: t('upload_required_photos_error')
-        });
-        setShowStatusModal(true);
-        return;
-      }
-    }
-
-    setSubmitting(true);
     try {
       // Prepare the full dataset for completion, just like executeSave
       const formatTime = (t: string) => {
@@ -3935,69 +4016,6 @@ export const JobReport: React.FC = () => {
     } catch (error: any) {
       if (error.response?.status === 401) return;
       console.error('Error completing job:', error);
-      setStatusConfig({
-        type: 'error',
-        title: t('error'),
-        message: error.message || t('error_saving')
-      });
-      setShowStatusModal(true);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleArriveAtJob = async () => {
-    if (!id) return;
-    setSubmitting(true);
-    try {
-      const updatePayload: any = { status: 'arrived' };
-      
-      if (!isAdmin) {
-        const geoResult = await verifyGeofence('arrived');
-        if (geoResult) {
-          updatePayload.is_geofence_verified = geoResult.verified;
-          updatePayload.actual_arrived_lat = geoResult.lat;
-          updatePayload.actual_arrived_lng = geoResult.lng;
-          
-          if (!geoResult.verified) {
-            setStatusConfig({
-              type: 'error',
-              title: t('geofence_error_title', 'ไม่อยู่ในพื้นที่ที่กำหนด'),
-              message: t('geofence_error_msg', `คุณอยู่ห่างจากจุดหมายเกินไป (${Math.round(geoResult.distance)} เมตร) ไม่สามารถเปลี่ยนสถานะได้`)
-            });
-            setShowStatusModal(true);
-            setSubmitting(false);
-            
-            // Save the failed attempt coordinates
-            await directusApi.updateWorkReport(id, {
-              is_geofence_verified: false,
-              actual_arrived_lat: geoResult.lat,
-              actual_arrived_lng: geoResult.lng
-            }).catch(console.error);
-            return;
-          }
-        }
-      }
-
-      await directusApi.updateWorkReport(id, updatePayload);
-      setFormData(prev => ({ ...prev, ...updatePayload }));
-      
-      // Notify customer
-      const customerId = typeof formData.customer_id === 'object' && formData.customer_id ? (formData.customer_id as any).id : formData.customer_id;
-      await sendCustomerStatusNotification('arrived', id, customerId);
-      
-      // Notify driver
-      await sendDriverStatusNotification('arrived');
-
-      setStatusConfig({
-        type: 'success',
-        title: t('status_arrived'),
-        message: t('status_arrived_msg')
-      });
-      setShowStatusModal(true);
-    } catch (error: any) {
-      if (error.response?.status === 401) return;
-      console.error('Error arriving at job:', error);
       setStatusConfig({
         type: 'error',
         title: t('error'),
@@ -4292,7 +4310,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
   };
 
   const isCustomer = userRole.toLowerCase() === 'customer';
-  const isEditable = (!id || isAdmin || formData.status === 'accepted' || formData.status === 'arrived' || formData.status === 'pending') && !isCustomer;
+  const isEditable = (!id || isAdmin || formData.status === 'accepted' || formData.status === 'pending') && !isCustomer;
   const isPendingCancel = formData.status === 'cancel_pending';
   const selectedMember = members.find(m => String(m.id) === String(typeof formData.member_id === 'object' ? (formData.member_id as any)?.id : formData.member_id));
   const selectedCar = cars.find(c => String(c.id) === String(typeof formData.car_id === 'object' ? (formData.car_id as any)?.id : formData.car_id));
@@ -4399,8 +4417,27 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
       <div className="max-w-2xl mx-auto pb-12 space-y-6">
         {/* Header Section */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-900">{t('job_details')}</h2>
+            {(formData.status === 'completed' || isAdmin) && id && (
+              <button
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100",
+                  isGeneratingPDF && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {isGeneratingPDF ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileDown className="w-4 h-4" />
+                )}
+                <span className="text-sm font-bold uppercase tracking-wider">
+                  {isGeneratingPDF ? t('downloading_pdf') : t('download_pdf')}
+                </span>
+              </button>
+            )}
           </div>
           <button 
             onClick={() => navigate(-1)}
@@ -4569,9 +4606,31 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
   return (
     <div className="max-w-2xl mx-auto pb-12">
       <div className="mb-8 flex flex-col gap-4">
-        <h2 className="text-2xl font-bold text-slate-900">
-          {id ? t('update_job_details') : t('new_job_assignment_title')}
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-slate-900">
+            {id ? t('update_job_details') : t('new_job_assignment_title')}
+          </h2>
+          {(formData.status === 'completed' || isAdmin) && id && (
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100",
+                isGeneratingPDF && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isGeneratingPDF ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileDown className="w-4 h-4" />
+              )}
+              <span className="text-sm font-bold uppercase tracking-wider">
+                {isGeneratingPDF ? t('downloading_pdf') : t('download_pdf')}
+              </span>
+            </button>
+          )}
+        </div>
         {formData.case_number && (
           <div className="text-sm text-slate-500 font-medium">
             {t('case_number')}: {formData.case_number}
@@ -4659,6 +4718,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {id && <StatusTimeline status={formData.status} />}
+
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="w-5 h-5" />
@@ -5023,8 +5083,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                           arrival_time: '',
                           mileage_start: '',
                           mileage_end: '',
-                          pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
-                          deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '' }],
+                          pickups: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
+                          deliveries: [{ name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }],
                           distance: undefined,
                           origin: '',
                           origin_url: '',
@@ -5256,7 +5316,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               type="button"
                               onClick={() => {
                                 const newRoutes = [...formData.routes];
-                                newRoutes[index].pickups = [...(newRoutes[index].pickups || []), { name: '', url: '', contact_name: '', contact_phone: '', time: '' }];
+                                newRoutes[index].pickups = [...(newRoutes[index].pickups || []), { name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                 setFormData({ ...formData, routes: newRoutes });
                               }}
                               className="text-xs text-primary hover:text-primary-dark font-medium flex items-center gap-1"
@@ -5293,7 +5353,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].pickups[pIndex].name = val;
                                     if (pIndex === 0) newRoutes[index].origin = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -5313,7 +5373,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     onChange={e => {
                                       const val = e.target.value;
                                       const newRoutes = [...formData.routes];
-                                      if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                      if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                       newRoutes[index].pickups[pIndex].url = val;
                                       if (pIndex === 0) newRoutes[index].origin_url = val;
                                       setFormData({ ...formData, routes: newRoutes });
@@ -5342,7 +5402,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].pickups[pIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -5359,7 +5419,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].pickups[pIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -5376,13 +5436,30 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].pickups[pIndex].time = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
+
+                              {/* Photos for Pickup Point */}
+                              {id && (formData.status === 'accepted' || formData.status === 'completed') && (
+                                <div className="md:col-span-2 pt-2 border-t border-slate-100">
+                                  {renderPhotoSection(
+                                    t('photo_document'),
+                                    pointPhotosMap[`r-${index}-p-${pIndex}`] || [],
+                                    pickup.photos || [],
+                                    'pickup',
+                                    (e) => handlePointPhotoChange(e, `r-${index}-p-${pIndex}`),
+                                    (i) => removePointPhoto(`r-${index}-p-${pIndex}`, i),
+                                    (i) => removePointExistingPhoto(index, pIndex, i, 'pickup'),
+                                    processingPhotos,
+                                    `r-${index}-p-${pIndex}`
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -5399,7 +5476,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                               type="button"
                               onClick={() => {
                                 const newRoutes = [...formData.routes];
-                                newRoutes[index].deliveries = [...(newRoutes[index].deliveries || []), { name: '', url: '', contact_name: '', contact_phone: '', time: '' }];
+                                newRoutes[index].deliveries = [...(newRoutes[index].deliveries || []), { name: '', url: '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                 setFormData({ ...formData, routes: newRoutes });
                               }}
                               className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
@@ -5436,7 +5513,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].deliveries[dIndex].name = val;
                                     if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
                                     setFormData({ ...formData, routes: newRoutes });
@@ -5456,7 +5533,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                     onChange={e => {
                                       const val = e.target.value;
                                       const newRoutes = [...formData.routes];
-                                      if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                      if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                       newRoutes[index].deliveries[dIndex].url = val;
                                       if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
                                       setFormData({ ...formData, routes: newRoutes });
@@ -5485,7 +5562,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].deliveries[dIndex].contact_name = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -5502,7 +5579,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].deliveries[dIndex].contact_phone = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
@@ -5519,21 +5596,38 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   onChange={e => {
                                     const val = e.target.value;
                                     const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }];
+                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
                                     newRoutes[index].deliveries[dIndex].time = val;
                                     setFormData({ ...formData, routes: newRoutes });
                                   }}
                                   className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
                                 />
                               </div>
+
+                              {/* Photos for Delivery Point */}
+                              {id && (formData.status === 'accepted' || formData.status === 'completed') && (
+                                <div className="md:col-span-2 pt-2 border-t border-slate-100">
+                                  {renderPhotoSection(
+                                    t('photo_document'),
+                                    pointPhotosMap[`r-${index}-d-${dIndex}`] || [],
+                                    delivery.photos || [],
+                                    'delivery',
+                                    (e) => handlePointPhotoChange(e, `r-${index}-d-${dIndex}`),
+                                    (i) => removePointPhoto(`r-${index}-d-${dIndex}`, i),
+                                    (i) => removePointExistingPhoto(index, dIndex, i, 'delivery'),
+                                    processingPhotos,
+                                    `r-${index}-d-${dIndex}`
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                  {id && (formData.status === 'accepted' || formData.status === 'arrived' || (isAdmin && formData.status !== 'completed')) && (
-                    <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                    {id && (formData.status === 'accepted' || (isAdmin && formData.status !== 'completed')) && (
+                      <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
                       {route.status === 'completed' ? (
                         <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-sm border border-emerald-100 italic">
                           <CheckCircle2 className="w-4 h-4" />
@@ -5976,9 +6070,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
           </div>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {renderPhotoSection(t('photo_pickup'), pickupPhotos, existingPickupPhotos, 'pickup', (e) => handlePhotoChange(e, 'pickup'), (i) => removePhoto(i, 'pickup'), (i) => removeExistingPhoto(i, 'pickup'), processingPhotos)}
-              {renderPhotoSection(t('photo_delivery'), deliveryPhotos, existingDeliveryPhotos, 'delivery', (e) => handlePhotoChange(e, 'delivery'), (i) => removePhoto(i, 'delivery'), (i) => removeExistingPhoto(i, 'delivery'), processingPhotos)}
+            <div className="grid grid-cols-1 gap-4">
               {renderPhotoSection(t('photo_document'), documentPhotos, existingDocumentPhotos, 'document', (e) => handlePhotoChange(e, 'document'), (i) => removePhoto(i, 'document'), (i) => removeExistingPhoto(i, 'document'), processingPhotos)}
             </div>
 
@@ -6163,7 +6255,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
         {/* Action Buttons */}
         <div className="space-y-4">
-          {!isAdmin && (formData.status === 'accepted' || formData.status === 'arrived') && (
+          {!isAdmin && (formData.status === 'accepted') && (
             <button
               type="button"
               onClick={handleCompleteJob}
@@ -6516,6 +6608,18 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         confirmText={t('delete')}
         isDestructive={true}
       />
+
+      {/* Hidden PDF Template */}
+      <div style={{ display: 'none' }}>
+        <div id="pdf-summary-template">
+          <JobSummaryPDF 
+            data={formData} 
+            cars={cars || []} 
+            members={members || []} 
+            customers={customers || []} 
+          />
+        </div>
+      </div>
     </div>
   );
 };

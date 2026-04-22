@@ -976,7 +976,6 @@ async function startServer() {
           '1US7kkCXks43DIJBn0XZlc0nQhAWA9x0',
           'JwVz29Z6wVy_QpOqxc1J9sw-BAt3v8nn',
           'KC7bsoqj_bmFeKWJCDGadyxXZsleRUi4',
-          'r0eWclUwYkWhUWVlaYkzgOJzAKpRtEex',
           'confirmedToken', 'validToken'
         ];
         
@@ -1023,10 +1022,15 @@ async function startServer() {
         responseType: 'stream',
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
+        timeout: 25000, // 25 seconds timeout to prevent hanging
         validateStatus: () => true,
       });
       
       res.status(response.status);
+      
+      if (response.status === 403) {
+        console.warn(`[PROXY] 403 Forbidden returned from Directus for ${method} ${url}. This usually means the token lacks permissions for the requested fields or collection.`);
+      }
       
       // Forward relevant headers from Directus
       const headersToForward = [
