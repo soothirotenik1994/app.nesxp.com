@@ -424,8 +424,13 @@ export const Members: React.FC = () => {
   const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('members_columns_v2');
-    return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'vehicles', 'actions'];
+    try {
+      const saved = localStorage.getItem('members_columns_v2');
+      return saved ? JSON.parse(saved) : ['name', 'contact', 'role', 'vehicles', 'actions'];
+    } catch (e) {
+      console.error('Error parsing members_columns_v2:', e);
+      return ['name', 'contact', 'role', 'vehicles', 'actions'];
+    }
   });
 
   useEffect(() => {

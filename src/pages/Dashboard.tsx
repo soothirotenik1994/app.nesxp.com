@@ -71,11 +71,6 @@ export const Dashboard: React.FC = () => {
     setHasMonitorPermission(checkPermission());
   }, [userRole]);
 
-  // Handle role-based rendering AFTER all hooks have been called
-  if (userRole.toLowerCase() === 'customer') {
-    return <CustomerDashboard />;
-  }
-
   const fetchGpsData = async (carsData: CarType[]) => {
     const BATCH_SIZE = 3;
     const statuses: CarStatus[] = [];
@@ -517,6 +512,13 @@ export const Dashboard: React.FC = () => {
   const handleZoomToVehicle = useCallback((vehicle: CarStatus) => {
     setSelectedVehicle(vehicle);
   }, []);
+
+  // All hooks must be declared before any conditional return
+  
+  // Handle role-based rendering ONLY AFTER all hooks have been called
+  if (userRole.toLowerCase() === 'customer') {
+    return <CustomerDashboard />;
+  }
 
   const formatCaseNumber = (report: any) => {
     if (!report) return '';

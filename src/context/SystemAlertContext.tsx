@@ -20,8 +20,13 @@ const SystemAlertContext = createContext<SystemAlertContextType | undefined>(und
 
 export const SystemAlertProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => {
-    const saved = localStorage.getItem('system_alerts');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('system_alerts');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Error parsing system_alerts:', e);
+      return [];
+    }
   });
 
   useEffect(() => {

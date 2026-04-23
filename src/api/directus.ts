@@ -1,18 +1,27 @@
 import axios from 'axios';
 import { Member, Car, CarPermission, AdminUser, MaintenanceHistory } from '../types';
 
-export const DIRECTUS_URL = localStorage.getItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
+const getSafeStorageItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn(`[directusApi] localStorage access denied for key: ${key}`, e);
+    return null;
+  }
+};
+
+export const DIRECTUS_URL = getSafeStorageItem('directus_url') || import.meta.env.VITE_DIRECTUS_URL || 'https://data.nesxp.com';
 
 // Use administrative proxy for better reliability and token management
 const PROXY_URL = '/api/directus';
 
 const getStaticKey = () => {
-  let key = localStorage.getItem('static_api_key');
+  let key = getSafeStorageItem('static_api_key');
   
   // Clean up problematic values
   if (key === 'null' || key === 'undefined' || key === '') {
     key = null;
-    localStorage.removeItem('static_api_key');
+    try { localStorage.removeItem('static_api_key'); } catch (e) {}
   }
   
   const badTokens = [
@@ -28,7 +37,7 @@ const getStaticKey = () => {
   
   if (key && (badTokens.some(bt => key.trim().includes(bt)) || key.length < 20)) {
     console.log('[directusApi] Specifically found and clearing invalid/leaked token from localStorage');
-    localStorage.removeItem('static_api_key');
+    try { localStorage.removeItem('static_api_key'); } catch (e) {}
     key = null;
   }
   

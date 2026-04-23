@@ -11,7 +11,17 @@ export const NewJobNotification: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [newJobs, setNewJobs] = useState<WorkReport[]>([]);
-  const notifiedIdsRef = useRef<Set<string>>(new Set(JSON.parse(localStorage.getItem('notified_job_ids') || '[]')));
+  const notifiedIdsRef = useRef<Set<string>>(
+    (() => {
+      try {
+        const saved = localStorage.getItem('notified_job_ids');
+        return new Set(JSON.parse(saved || '[]'));
+      } catch (e) {
+        console.error('Error parsing notified_job_ids:', e);
+        return new Set<string>();
+      }
+    })()
+  );
   
   const memberId = localStorage.getItem('member_id');
   const userRole = localStorage.getItem('user_role') || 'customer';

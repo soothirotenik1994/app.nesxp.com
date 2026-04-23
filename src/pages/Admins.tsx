@@ -33,8 +33,13 @@ export const Admins: React.FC = () => {
 
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('admins_columns');
-    return saved ? JSON.parse(saved) : ['name', 'email', 'role', 'status', 'line_uid'];
+    try {
+      const saved = localStorage.getItem('admins_columns');
+      return saved ? JSON.parse(saved) : ['name', 'email', 'role', 'status', 'line_uid'];
+    } catch (e) {
+      console.error('Error parsing admins_columns:', e);
+      return ['name', 'email', 'role', 'status', 'line_uid'];
+    }
   });
 
   const columns = [
