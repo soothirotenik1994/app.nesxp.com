@@ -472,10 +472,35 @@ export const CustomerLocations: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [locationsData, membersData] = await Promise.all([
-        directusApi.getCustomerLocations(),
-        directusApi.getMembers()
-      ]);
+      const memberId = localStorage.getItem('member_id');
+      
+      // Use individually handled promises to avoid failures if one fails (especially for members)
+      let locationsData: CustomerLocation[] = [];
+      let membersData: Member[] = [];
+
+      try {
+        locationsData = await directusApi.getCustomerLocations();
+      } catch (locErr: any) {
+        if (locErr.response?.status === 401) return;
+        console.error('Error fetching locations:', locErr);
+        throw locErr;
+      }
+
+      try {
+        membersData = await directusApi.getMembers();
+      } catch (memErr) {
+        console.warn('Could not fetch all members, this is expected for non-admin users.');
+        // If we have a memberId, try to fetch just that member at least
+        if (memberId) {
+          try {
+            const me = await directusApi.getMember(memberId);
+            if (me) membersData = [me];
+          } catch (meErr) {
+            console.error('Even single member fetch failed:', meErr);
+          }
+        }
+      }
+
       console.log('Fetched Locations:', locationsData.length);
       setLocations(locationsData);
       setMembers(membersData);
@@ -724,12 +749,37 @@ export const CustomerLocations: React.FC = () => {
     }
   };
 
-  const filteredLocations = locations.filter(l => {
-    const company = (l.company_name || '').toLowerCase();
+  const filteredLocations = useMemo(() => {
+    const memberId = localStorage.getItem('member_id');
     const search = searchTerm.toLowerCase();
     
-    return company.includes(search);
-  });
+    return locations.filter(l => {
+      // 1. Search term match
+      const company = (l.company_name || '').toLowerCase();
+      const searchMatch = company.includes(search);
+      if (!searchMatch) return false;
+
+      // 2. Role-based view permissions
+      if (isAdmin) return true; // Admins see everything
+
+      // Members/Drivers/Customers only see their linked locations
+      if (memberId) {
+        // Direct link via member_id field
+        const primaryId = typeof l.member_id === 'object' ? l.member_id?.id : l.member_id;
+        if (String(primaryId) === String(memberId)) return true;
+        
+        // Link via members junction collection
+        return l.members?.some((m: any) => {
+          const mId = typeof m.line_user_id === 'object' ? m.line_user_id?.id : 
+                     (typeof m.line_users_id === 'object' ? m.line_users_id?.id : 
+                     (typeof m.members_id === 'object' ? m.members_id?.id : (m.line_user_id || m.line_users_id || m.members_id)));
+          return String(mId) === String(memberId);
+        });
+      }
+      
+      return false; // No memberId and not admin -> see nothing
+    });
+  }, [locations, searchTerm, isAdmin]);
 
   return (
     <div className="space-y-6">

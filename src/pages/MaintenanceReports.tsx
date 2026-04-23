@@ -275,65 +275,9 @@ export const MaintenanceReports: React.FC = () => {
         </div>
       </div>
 
-      {/* Report Table */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Mobile View: Card List */}
-        <div className="md:hidden divide-y divide-gray-100">
-          {loading ? (
-            <div className="py-12 text-center text-gray-400">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-              <p>{t('loading')}</p>
-            </div>
-          ) : filteredHistory.length === 0 ? (
-            <div className="py-12 text-center text-gray-400">
-              <Wrench className="w-12 h-12 mb-4 opacity-10 mx-auto" />
-              <p>{t('no_items_found')}</p>
-            </div>
-          ) : (
-            filteredHistory.map((record) => {
-              const car = typeof record.car_id === 'object' ? record.car_id : cars.find(c => c.id === record.car_id);
-              return (
-                <div key={record.id} className="p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                        <CarIcon className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900">{car?.car_number || '-'}</p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{formatDate(record.date)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-emerald-600">฿{(record.cost || 0).toLocaleString()}</p>
-                      <p className="text-[10px] text-gray-500 font-mono">{record.mileage.toLocaleString()} km</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{t('history_service_type')}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {record.service_type.split(',').map((type, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold">
-                          {type.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {record.notes && (
-                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{t('history_notes')}</p>
-                      <p className="text-xs text-gray-600 leading-relaxed">{record.notes}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Desktop View: Table */}
+      {/* Report Table / Cards */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -387,7 +331,7 @@ export const MaintenanceReports: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 text-right font-mono">
-                        {(record.mileage || 0).toLocaleString()} {t('km')}
+                        {record.mileage.toLocaleString()} {t('km')}
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600 text-right">
                         ฿{(record.cost || 0).toLocaleString()}
@@ -401,6 +345,62 @@ export const MaintenanceReports: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {loading ? (
+            <div className="px-6 py-12 text-center">
+              <div className="flex flex-col items-center justify-center text-gray-400">
+                <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                <p>{t('loading')}</p>
+              </div>
+            </div>
+          ) : filteredHistory.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <div className="flex flex-col items-center justify-center text-gray-400">
+                <Wrench className="w-12 h-12 mb-4 opacity-10" />
+                <p>{t('no_items_found')}</p>
+              </div>
+            </div>
+          ) : (
+            filteredHistory.map((record) => {
+              const car = typeof record.car_id === 'object' ? record.car_id : cars.find(c => c.id === record.car_id);
+              return (
+                <div key={record.id} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <CarIcon className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="font-bold text-gray-900">{car?.car_number || '-'}</span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-400">{formatDate(record.date)}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] font-bold">
+                      {record.service_type}
+                    </span>
+                    <span className="text-sm font-bold text-emerald-600">
+                      ฿{(record.cost || 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{t('mileage_at_service')}</p>
+                      <p className="text-xs font-mono text-gray-600">{record.mileage.toLocaleString()} {t('km')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{t('history_notes')}</p>
+                      <p className="text-xs text-gray-500 truncate">{record.notes || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

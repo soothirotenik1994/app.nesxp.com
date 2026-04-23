@@ -945,7 +945,17 @@ const resources = {
       "ios_step_2_desc": "เลื่อนหาเมนู \"Add to Home Screen\" เพื่อติดตั้งแอปลงบนมือถือ",
       "got_it": "รับทราบ",
       "download_pdf": "ดาวน์โหลด PDF",
-      "pdf_generation_failed": "ไม่สามารถสร้างไฟล์ PDF ได้"
+      "pdf_generation_failed": "ไม่สามารถสร้างไฟล์ PDF ได้",
+      "fleet_live_location": "ตำแหน่งรถแบบเรียลไทม์",
+      "live_updates": "อัปเดตสด",
+      "ongoing_jobs": "งานปัจจุบัน",
+      "view_all_history": "ดูประวัติทั้งหมด",
+      "map_view": "ดูแผนที่",
+      "job_list": "รายการงาน",
+      "no_active_jobs": "ไม่มีงานที่กำลังดำเนินการ",
+      "active_jobs": "งานที่กำลังทำ",
+      "connecting_gps": "กำลังเชื่อมต่อ GPS...",
+      "please_wait_for_updates": "โปรดรอสักครู่ขณะดึงข้อมูลตำแหน่งรถ"
     }
   }
 };

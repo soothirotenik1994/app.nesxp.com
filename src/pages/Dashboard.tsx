@@ -13,6 +13,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { useTheme } from '../context/ThemeContext';
 import { clsx } from 'clsx';
 import { ROLE_PERMISSIONS } from '../config/menuPermissions';
+import { CustomerDashboard } from './CustomerDashboard';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -43,6 +44,11 @@ export const Dashboard: React.FC = () => {
 
   const userRole = localStorage.getItem('user_role') || 'Customer';
   const [hasMonitorPermission, setHasMonitorPermission] = useState(false);
+
+  // If customer, show specialized dashboard
+  if (userRole.toLowerCase() === 'customer') {
+    return <CustomerDashboard />;
+  }
 
   useEffect(() => {
     const checkPermission = () => {
