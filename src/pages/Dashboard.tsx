@@ -45,11 +45,6 @@ export const Dashboard: React.FC = () => {
   const userRole = localStorage.getItem('user_role') || 'Customer';
   const [hasMonitorPermission, setHasMonitorPermission] = useState(false);
 
-  // If customer, show specialized dashboard
-  if (userRole.toLowerCase() === 'customer') {
-    return <CustomerDashboard />;
-  }
-
   useEffect(() => {
     const checkPermission = () => {
       // 1. Check dynamic permissions
@@ -75,6 +70,11 @@ export const Dashboard: React.FC = () => {
     };
     setHasMonitorPermission(checkPermission());
   }, [userRole]);
+
+  // Handle role-based rendering AFTER all hooks have been called
+  if (userRole.toLowerCase() === 'customer') {
+    return <CustomerDashboard />;
+  }
 
   const fetchGpsData = async (carsData: CarType[]) => {
     const BATCH_SIZE = 3;

@@ -41,27 +41,39 @@ export const CustomerDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      const token = localStorage.getItem('admin_token');
+      const memberId = localStorage.getItem('member_id');
+      
+      console.log('CustomerDashboard: Fetching data for memberId:', memberId);
+
       const [reportsData, carsData] = await Promise.all([
-        directusApi.getWorkReports(),
-        directusApi.getCars()
+        directusApi.getWorkReports().catch(err => {
+          console.error('Error fetching reports:', err);
+          return [] as WorkReport[];
+        }),
+        directusApi.getCars().catch(err => {
+          console.error('Error fetching cars:', err);
+          return [] as Car[];
+        })
       ]);
 
       // Filter reports for this customer
-      const myReports = reportsData.filter(r => {
+      const myReports = (reportsData || []).filter(r => {
+        if (!r) return false;
         // 1. Direct assignment
         const reportMemberId = typeof r.member_id === 'object' ? r.member_id?.id : r.member_id;
-        if (String(reportMemberId) === String(memberId)) return true;
+        if (memberId && String(reportMemberId) === String(memberId)) return true;
 
         // 2. Customer ID match (direct or through location junction)
         const customerLoc = typeof r.customer_id === 'object' ? r.customer_id : null;
         if (customerLoc) {
           const primaryId = typeof customerLoc.member_id === 'object' ? customerLoc.member_id?.id : customerLoc.member_id;
-          if (String(primaryId) === String(memberId)) return true;
+          if (memberId && String(primaryId) === String(memberId)) return true;
           
           if (customerLoc.members && Array.isArray(customerLoc.members)) {
             return customerLoc.members.some((m: any) => {
               const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-              return String(id) === String(memberId);
+              return memberId && String(id) === String(memberId);
             });
           }
         }
@@ -79,21 +91,29 @@ export const CustomerDashboard: React.FC = () => {
 
       const filteredCars = carsData.filter(car => activeCarIds.has(String(car.id)));
       setCars(filteredCars);
+      
+      // Clear loading early so UI renders while we fetch individual GPS statuses
+      setLoading(false);
 
-      // Fetch GPS status for filtered cars
+      // Fetch GPS status for filtered cars in background
       if (filteredCars.length > 0) {
-        const statuses = await Promise.all(
-          filteredCars.map(async (car) => {
-            try {
-              const status = await gpsApi.getCarStatus(car.car_number);
-              return status;
-            } catch {
-              return null;
+        // Individual fetching avoids one slow request blocking others
+        filteredCars.forEach(async (car) => {
+          try {
+            const status = await gpsApi.getCarStatus(car.car_number);
+            if (status) {
+              setCarStatuses(prev => {
+                const exists = prev.some(s => s.carNumber === status.carNumber);
+                if (exists) {
+                  return prev.map(s => s.carNumber === status.carNumber ? status : s);
+                }
+                return [...prev, status];
+              });
             }
-          })
-        );
-        const validStatuses = statuses.filter(Boolean) as CarStatus[];
-        setCarStatuses(validStatuses);
+          } catch (e) {
+            console.warn(`Background fetch failed for ${car.car_number}`);
+          }
+        });
       }
     } catch (error: any) {
       if (error.response?.status === 401) return;
@@ -110,9 +130,9 @@ export const CustomerDashboard: React.FC = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const active = reports.filter(r => r.status === 'accepted' || r.status === 'pending').length;
-    const completed = reports.filter(r => r.status === 'completed').length;
-    const total = reports.length;
+    const active = (reports || []).filter(r => r.status === 'accepted' || r.status === 'pending').length;
+    const completed = (reports || []).filter(r => r.status === 'completed').length;
+    const total = (reports || []).length;
 
     return [
       { label: t('all_jobs', 'งานทั้งหมด'), value: total, icon: Package, color: 'text-slate-600', bg: 'bg-slate-50' },
@@ -122,9 +142,14 @@ export const CustomerDashboard: React.FC = () => {
   }, [reports, t]);
 
   const activeJobs = useMemo(() => {
+    if (!reports) return [];
     return reports
-      .filter(r => r.status === 'accepted' || r.status === 'pending')
-      .sort((a, b) => new Date(b.date_created || b.work_date).getTime() - new Date(a.date_created || a.work_date).getTime());
+      .filter(r => r && (r.status === 'accepted' || r.status === 'pending'))
+      .sort((a, b) => {
+        const dateA = new Date(a.date_created || a.work_date || 0).getTime();
+        const dateB = new Date(b.date_created || b.work_date || 0).getTime();
+        return dateB - dateA;
+      });
   }, [reports]);
 
   const getStatusBadge = (status?: string) => {
@@ -178,7 +203,7 @@ export const CustomerDashboard: React.FC = () => {
       </div>
 
       {/* View Switcher Controls (Sticky on Mobile) */}
-      <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm md:hidden sticky top-4 z-20">
+      <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm md:hidden z-20">
         <button 
           onClick={() => setActiveTab('map')}
           className={clsx(
