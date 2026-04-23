@@ -4,8 +4,8 @@ import { DashboardStats } from '../components/DashboardStats';
 import { VehicleMap } from '../components/VehicleMap';
 import { directusApi, api } from '../api/directus';
 import { gpsApi } from '../api/gps';
-import { Car, CarStatus, Member } from '../types';
-import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History, TrendingUp, Package, BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { Car as CarType, CarStatus, Member } from '../types';
+import { MapPin, Navigation, Clock, Search, Sparkles, AlertCircle, Activity, Zap, Map as MapIcon, ChevronRight, Hash, History, TrendingUp, Package, BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw, Calendar, CheckCircle2, Wrench, Car as CarIcon } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { formatDateTime } from '../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +19,7 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const [members, setMembers] = useState<Member[]>([]);
-  const [cars, setCars] = useState<Car[]>([]);
+  const [cars, setCars] = useState<CarType[]>([]);
   const [carStatuses, setCarStatuses] = useState<CarStatus[]>([]);
   const [activeJobsByCar, setActiveJobsByCar] = useState<Map<string, any>>(new Map());
   const [selectedVehicle, setSelectedVehicle] = useState<CarStatus | null>(null);
@@ -30,6 +30,16 @@ export const Dashboard: React.FC = () => {
   const [updateInterval, setUpdateInterval] = useState(30);
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
+  const [dailyStats, setDailyStats] = useState({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pending: 0,
+    freeCars: 0,
+    busyCars: 0,
+    maintenanceAlerts: 0,
+    latePending: 0
+  });
 
   const userRole = localStorage.getItem('user_role') || 'Customer';
   const [hasMonitorPermission, setHasMonitorPermission] = useState(false);
@@ -60,7 +70,7 @@ export const Dashboard: React.FC = () => {
     setHasMonitorPermission(checkPermission());
   }, [userRole]);
 
-  const fetchGpsData = async (carsData: Car[]) => {
+  const fetchGpsData = async (carsData: CarType[]) => {
     const BATCH_SIZE = 3;
     const statuses: CarStatus[] = [];
 
@@ -119,7 +129,7 @@ export const Dashboard: React.FC = () => {
 
       // Fetch members and cars
       let membersData: Member[] = [];
-      let carsData: Car[] = [];
+      let carsData: CarType[] = [];
 
       try {
         // Optimization: If not admin, we might not need to fetch ALL members
@@ -164,13 +174,13 @@ export const Dashboard: React.FC = () => {
         }
       }
 
-      let finalCars: Car[] = [];
+      let finalCars: CarType[] = [];
       if (isAdminUser) {
         finalCars = carsData;
       } else if (memberId) {
         // 1. Get cars from active jobs (so GPS tracking from reports works)
         // For customers, we ONLY show cars from their active jobs as requested
-        let jobCars: Car[] = [];
+        let jobCars: CarType[] = [];
         try {
           const allReports = await directusApi.getWorkReports();
           const myActiveReports = allReports.filter(r => {
@@ -218,7 +228,7 @@ export const Dashboard: React.FC = () => {
             if (typeof r.car_id === 'object' && r.car_id !== null) {
               // Only add if not already in jobCars
               if (!jobCars.some(c => c.id === r.car_id.id)) {
-                jobCars.push(r.car_id as Car);
+                jobCars.push(r.car_id as CarType);
               }
             }
           });
@@ -241,7 +251,7 @@ export const Dashboard: React.FC = () => {
 
         // 2. Get cars with direct permissions (car_users) - only for non-customers or if needed
         // But the user specifically said "only cars in jobs" for customers
-        let permittedCars: Car[] = [];
+        let permittedCars: CarType[] = [];
         if (userRole !== 'customer') {
           try {
             const permissions = await directusApi.getCarPermissions(memberId);
@@ -264,7 +274,7 @@ export const Dashboard: React.FC = () => {
                 api.get(`/items/cars/${id}`).then(res => res.data.data).catch(() => null)
               );
               const fetchedCars = await Promise.all(carPromises);
-              permittedCars = fetchedCars.filter(Boolean) as Car[];
+              permittedCars = fetchedCars.filter(Boolean) as CarType[];
             }
           } catch (e) {
             console.error('Error fetching car permissions:', e);
@@ -357,9 +367,58 @@ export const Dashboard: React.FC = () => {
         setJobStats(chartData);
         
         // Set recent jobs
-        setRecentJobs(reports.sort((a, b) => 
+        const sortedReports = reports.sort((a, b) => 
           new Date(b.work_date || b.date_created || 0).getTime() - new Date(a.work_date || a.date_created || 0).getTime()
-        ).slice(0, 5));
+        );
+        setRecentJobs(sortedReports.slice(0, 5));
+
+        // Calculate Daily Stats
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const todayReports = reports.filter(r => {
+          const rDate = format(new Date(r.work_date || r.date_created), 'yyyy-MM-dd');
+          return rDate === today;
+        });
+
+        const activeCarIds = new Set();
+        reports.forEach(r => {
+          if (r.status === 'accepted' || r.status === 'in_progress') {
+            const carId = typeof r.car_id === 'object' ? r.car_id?.id : r.car_id;
+            if (carId) activeCarIds.add(String(carId));
+          }
+        });
+
+        // Calculate Maintenance Alerts
+        let maintenanceAlertsCount = 0;
+        const now = new Date();
+        carsData.forEach(car => {
+          let hasAlert = false;
+          if ((car as any).next_maintenance_date) {
+            const nextDate = new Date((car as any).next_maintenance_date);
+            if (nextDate < now) hasAlert = true;
+          }
+          if ((car as any).next_maintenance_mileage && (car as any).current_mileage) {
+            if ((car as any).current_mileage >= (car as any).next_maintenance_mileage) hasAlert = true;
+          }
+          if (hasAlert) maintenanceAlertsCount++;
+        });
+
+        const pendingJobs = todayReports.filter(r => r.status === 'pending');
+        const lateThreshold = new Date(Date.now() - 30 * 60 * 1000); // 30 mins ago
+        const latePendingCount = pendingJobs.filter(r => {
+          const createdAt = new Date(r.date_created || Date.now());
+          return createdAt < lateThreshold;
+        }).length;
+
+        setDailyStats({
+          total: todayReports.length,
+          completed: todayReports.filter(r => r.status === 'completed').length,
+          inProgress: todayReports.filter(r => r.status === 'accepted' || r.status === 'in_progress').length,
+          pending: pendingJobs.length,
+          busyCars: activeCarIds.size,
+          freeCars: Math.max(0, carsData.length - activeCarIds.size),
+          maintenanceAlerts: maintenanceAlertsCount,
+          latePending: latePendingCount
+        });
       } catch (e) {
         console.error('Error fetching job stats:', e);
       }
@@ -513,6 +572,156 @@ export const Dashboard: React.FC = () => {
           localStorage.getItem('user_role')?.toLowerCase() === 'driver'
         } 
       />
+
+      {/* Daily Operations Dashboard - Only for Admin/Admins */}
+      {(userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator') && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Today's Jobs Summary */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              {t('daily_jobs_summary', 'สรุปงานวันนี้')}
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-[10px] font-bold text-slate-500 uppercase">{t('total', 'ทั้งหมด')}</p>
+                <p className="text-2xl font-black text-slate-900">{dailyStats.total}</p>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase">{t('completed', 'เสร็จสิ้น')}</p>
+                <p className="text-2xl font-black text-emerald-700">{dailyStats.completed}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <p className="text-[10px] font-bold text-blue-600 uppercase">{t('in_progress', 'กำลังดำเนินการ')}</p>
+                <p className="text-2xl font-black text-blue-700">{dailyStats.inProgress}</p>
+              </div>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                <p className="text-[10px] font-bold text-amber-600 uppercase">{t('pending', 'รอรับงาน')}</p>
+                <p className="text-2xl font-black text-amber-700">{dailyStats.pending}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vehicle Status Summary */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <CarIcon className="w-4 h-4 text-primary" />
+              {t('vehicle_availability', 'สถานะความพร้อมของรถ')}
+            </h3>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900">{t('free_cars', 'รถว่าง (พร้อมรับงาน)')}</p>
+                    <p className="text-[10px] text-emerald-600">{t('ready_to_serve', 'พร้อมให้บริการ')}</p>
+                  </div>
+                </div>
+                <p className="text-3xl font-black text-emerald-700">{dailyStats.freeCars}</p>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-white">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{t('busy_cars', 'รถไม่ว่าง (ติดงาน)')}</p>
+                    <p className="text-[10px] text-slate-500">{t('currently_on_job', 'กำลังอยู่ระหว่างงาน')}</p>
+                  </div>
+                </div>
+                <p className="text-3xl font-black text-slate-700">{dailyStats.busyCars}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Required / Quick Info */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+              {t('attention_required', 'สิ่งที่ต้องตรวจสอบ')}
+            </h3>
+            <div className="space-y-3">
+              {dailyStats.latePending > 0 ? (
+                <div 
+                  onClick={() => navigate('/reports?status=pending')}
+                  className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between cursor-pointer hover:bg-red-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white animate-pulse">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-red-900">{t('late_acceptance_warning', 'งานรอรับนานผิดปกติ')}</p>
+                      <p className="text-xs text-red-600">{t('late_pending_count', { count: dailyStats.latePending })}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-red-400" />
+                </div>
+              ) : dailyStats.pending > 0 ? (
+                <div 
+                  onClick={() => navigate('/jobs/history')}
+                  className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-xs font-bold text-amber-800">{t('jobs_awaiting_acceptance', 'มีงานที่ยังไม่มีคนกดรับ')}</span>
+                  </div>
+                  <span className="text-xs bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">{dailyStats.pending}</span>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs font-bold text-slate-600">{t('all_jobs_assigned', 'งานทั้งหมดถูกรับมอบหมายแล้ว')}</span>
+                </div>
+              )}
+
+              {dailyStats.maintenanceAlerts > 0 && (
+                <div 
+                  onClick={() => navigate('/maintenance')}
+                  className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center justify-between cursor-pointer hover:bg-rose-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-rose-500 rounded-full flex items-center justify-center text-white">
+                      <Wrench className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-rose-900">{t('vehicles_due_maintenance', 'มีรถที่ต้องซ่อมบำรุง')}</p>
+                      <p className="text-xs text-rose-600">{t('maintenance_due_count', { count: dailyStats.maintenanceAlerts })}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-rose-400" />
+                </div>
+              )}
+              
+              <div 
+                onClick={() => navigate('/cars')}
+                className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between cursor-pointer hover:bg-blue-100 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-bold text-blue-800">{t('monitor_truck_movements', 'ตรวจสอบการเคลื่อนไหวรถ')}</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-400" />
+              </div>
+
+              {dailyStats.maintenanceAlerts > 0 && (
+                <div 
+                  onClick={() => navigate('/maintenance')}
+                  className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between cursor-pointer hover:bg-red-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-red-500" />
+                    <span className="text-xs font-bold text-red-800">{t('vehicles_due_maintenance', 'มีรถที่ต้องซ่อมบำรุง')}</span>
+                  </div>
+                  <span className="text-xs bg-red-200 text-red-900 px-2 py-0.5 rounded-full font-bold">{dailyStats.maintenanceAlerts}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Analytics Section */}

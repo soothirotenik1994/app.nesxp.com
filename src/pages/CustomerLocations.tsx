@@ -64,7 +64,7 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
         isOverlay && "shadow-xl border-primary/30 ring-2 ring-primary/10"
       )}
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-white rounded-md text-slate-400">
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-primary transition-colors">
         <GripVertical className="w-4 h-4" />
       </div>
       
@@ -72,11 +72,11 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
         <img 
           src={directusApi.getFileUrl(member.picture_url)} 
           alt="" 
-          className="w-8 h-8 rounded-full object-cover border border-slate-100"
+          className="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-sm"
           referrerPolicy="no-referrer"
         />
       ) : (
-        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-100">
+        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-100">
           {(member.display_name || member.first_name || 'U').charAt(0).toUpperCase()}
         </div>
       )}
@@ -85,7 +85,14 @@ const SortableMember: React.FC<SortableMemberProps> = ({ member, onRemove, onAdd
         <p className="text-sm font-bold text-slate-900 truncate">
           {member.display_name || `${member.first_name} ${member.last_name}`}
         </p>
-        {member.email && <p className="text-[10px] text-slate-500 truncate">{member.email}</p>}
+        <div className="flex items-center gap-2">
+          {member.role && (
+             <span className="text-[9px] font-bold text-primary uppercase tracking-tighter bg-blue-50 px-1 rounded">
+               {t(`${member.role}_role`)}
+             </span>
+          )}
+          {member.email && <p className="text-[10px] text-slate-500 truncate">{member.email}</p>}
+        </div>
       </div>
 
       {onAdd && (
@@ -117,11 +124,11 @@ const DroppableContainer = ({ id, items, title, onRemove, onAdd, icon: Icon, emp
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div className="flex-1 flex flex-col min-h-[300px]">
+    <div className="flex-1 flex flex-col min-h-[200px] md:min-h-[300px]">
       <div className="flex items-center gap-2 mb-2 px-1">
-        <Icon className="w-3.5 h-3.5 text-slate-400" />
-        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</h3>
-        <span className="ml-auto text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+        <Icon className="w-3.5 h-3.5 text-primary" />
+        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{title}</h3>
+        <span className="ml-auto text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
           {items.length}
         </span>
       </div>
@@ -129,8 +136,8 @@ const DroppableContainer = ({ id, items, title, onRemove, onAdd, icon: Icon, emp
       <div
         ref={setNodeRef}
         className={clsx(
-          "flex-1 p-2 rounded-xl border-2 border-dashed transition-all overflow-y-auto max-h-[350px]",
-          isOver ? "bg-primary/5 border-primary/30 ring-4 ring-primary/5" : "bg-white/50 border-slate-200"
+          "flex-1 p-3 rounded-2xl border-2 border-dashed transition-all overflow-y-auto max-h-[400px] scrollbar-hide",
+          isOver ? "bg-primary/10 border-primary/40 ring-8 ring-primary/5" : "bg-slate-50/50 border-slate-200"
         )}
       >
         <SortableContext items={items.map((i: any) => String(i.id))} strategy={verticalListSortingStrategy}>
@@ -154,6 +161,171 @@ const DroppableContainer = ({ id, items, title, onRemove, onAdd, icon: Icon, emp
     </div>
   );
 };
+
+// Memoized LocationCard component for better mobile layout
+const LocationCard = React.memo(({ 
+  loc, 
+  members, 
+  canEdit, 
+  onEdit, 
+  onDelete 
+}: { 
+  loc: CustomerLocation, 
+  members: Member[],
+  canEdit: boolean,
+  onEdit: (loc: CustomerLocation) => void,
+  onDelete: (id: string) => void
+}) => {
+  const { t } = useTranslation();
+
+  const assignedMemberIds = useMemo(() => {
+    const ids: string[] = [];
+    if (loc.members && Array.isArray(loc.members)) {
+      loc.members.forEach((m: any) => {
+        const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
+        if (id && !ids.includes(String(id))) {
+          const memberObj = members.find(mbr => String(mbr.id) === String(id));
+          if (memberObj && (memberObj.role === 'member' || memberObj.role === 'driver' || memberObj.role === 'customer')) {
+            ids.push(String(id));
+          }
+        }
+      });
+    }
+    return ids;
+  }, [loc.members, members]);
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-100 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all group h-full flex flex-col">
+      <div className="p-5 flex-1">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-primary/5 group-hover:border-primary/10 transition-colors shadow-sm">
+              <Building2 className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 line-clamp-1">{loc.company_name}</h3>
+              {loc.company_code && (
+                <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg uppercase tracking-wider">
+                  {loc.company_code}
+                </span>
+              )}
+            </div>
+          </div>
+          {canEdit && (
+            <div className="flex gap-1">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(loc);
+                }}
+                className="p-2 hover:bg-slate-50 text-slate-400 hover:text-primary rounded-xl transition-colors"
+                title={t('edit')}
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(loc.id);
+                }}
+                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-colors"
+                title={t('delete')}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2.5">
+            {loc.tax_id && (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100/50">
+                <FileText className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                  {t('tax_id')}: {loc.tax_id}
+                </span>
+              </div>
+            )}
+            {loc.branch && (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100/50">
+                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                  {t('branch')}: {loc.branch}
+                </span>
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {loc.phone && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+                  <Phone className="w-3.5 h-3.5 text-slate-400" />
+                  <a href={`tel:${loc.phone}`} className="hover:text-primary transition-colors">{loc.phone}</a>
+                </div>
+              )}
+              {loc.email && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <a href={`mailto:${loc.email}`} className="hover:text-primary transition-colors truncate">{loc.email}</a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {assignedMemberIds.length > 0 && (
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('contact_person')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2 overflow-hidden">
+                    {members.filter(m => assignedMemberIds.includes(String(m.id))).slice(0, 3).map((m) => (
+                      <div key={m.id} className="inline-block h-7 w-7 rounded-full ring-2 ring-white overflow-hidden bg-white shadow-sm" title={m.display_name || `${m.first_name} ${m.last_name}`}>
+                        {m.picture_url ? (
+                          <img 
+                            src={directusApi.getFileUrl(m.picture_url)} 
+                            alt="" 
+                            className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-[8px] font-bold text-slate-500 uppercase">
+                            {(m.display_name || m.first_name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-600 font-bold ml-1">
+                    {(() => {
+                      const selectedMembers = members.filter(m => assignedMemberIds.includes(String(m.id)));
+                      if (selectedMembers.length === 1) {
+                        return selectedMembers[0].display_name || selectedMembers[0].first_name;
+                      }
+                      if (selectedMembers.length === 2) {
+                        return `${selectedMembers[0].display_name || selectedMembers[0].first_name}, ...`;
+                      }
+                      return `${selectedMembers[0].display_name || selectedMembers[0].first_name} +${selectedMembers.length - 1}`;
+                    })()}
+                  </p>
+                </div>
+              </div>
+            )}
+            {loc.address && (
+              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
+                <div className="flex items-start gap-2">
+                  <Map className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                  <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-3">{loc.address}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export const CustomerLocations: React.FC = () => {
   const { t } = useTranslation();
@@ -616,126 +788,14 @@ export const CustomerLocations: React.FC = () => {
             </div>
           ) : (
             filteredLocations.map((loc) => (
-              <div key={loc.id} className="bg-white p-5 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 group-hover:border-blue-200 transition-colors">
-                    <Building2 className="w-6 h-6 text-slate-400 group-hover:text-primary" />
-                  </div>
-                  <div className="flex gap-1">
-                    {canAddLocation && (
-                      <>
-                        <button 
-                          onClick={() => handleOpenModal(loc)}
-                          className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setDeleteId(loc.id)}
-                          className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-slate-900">{loc.company_name}</h3>
-                    {loc.company_code && (
-                      <span className="px-2 py-1 bg-slate-200 text-slate-600 text-[10px] font-bold rounded-md uppercase tracking-wider">
-                        {loc.company_code}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {loc.tax_id && (
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5 text-slate-400" />
-                        <p className="text-xs text-slate-500">{t('tax_id')}: {loc.tax_id}</p>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {loc.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <p className="text-xs text-slate-500">{loc.phone}</p>
-                        </div>
-                      )}
-                      {loc.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          <p className="text-xs text-slate-500">{loc.email}</p>
-                        </div>
-                      )}
-                    </div>
-                    {loc.branch && (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                        <p className="text-xs text-slate-500">{t('branch')}: {loc.branch}</p>
-                      </div>
-                    )}
-                    {(() => {
-                      const memberIds: string[] = [];
-                      
-                      if (loc.members && Array.isArray(loc.members)) {
-                        loc.members.forEach((m: any) => {
-                          const id = typeof m.line_user_id === 'object' ? m.line_user_id?.id : m.line_user_id;
-                          if (id && !memberIds.includes(String(id))) {
-                            // Only include those with proper roles
-                            const memberObj = members.find(mbr => String(mbr.id) === String(id));
-                            if (memberObj && (memberObj.role === 'member' || memberObj.role === 'customer')) {
-                              memberIds.push(String(id));
-                            }
-                          }
-                        });
-                      }
-
-                      if (memberIds.length === 0) return null;
-
-                      return (
-                        <div className="flex items-center gap-2">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <div className="flex -space-x-2 overflow-hidden">
-                            {members.filter(m => memberIds.includes(String(m.id))).map((m, i) => (
-                              <div key={m.id} className="inline-block h-6 w-6 rounded-full ring-2 ring-white overflow-hidden bg-slate-100" title={m.display_name || `${m.first_name} ${m.last_name}`}>
-                                {m.picture_url ? (
-                                  <img 
-                                    src={directusApi.getFileUrl(m.picture_url)} 
-                                    alt="" 
-                                    className="h-full w-full object-cover"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : (
-                                  <div className="h-full w-full flex items-center justify-center text-[8px] font-bold text-slate-500">
-                                    {(m.display_name || m.first_name || 'U').charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-xs text-slate-500 ml-1">
-                            {(() => {
-                              const selectedMembers = members.filter(m => memberIds.includes(String(m.id)));
-                              if (selectedMembers.length <= 2) {
-                                return selectedMembers.map(m => m.display_name || `${m.first_name} ${m.last_name}`).join(', ');
-                              }
-                              return `${selectedMembers[0].display_name || selectedMembers[0].first_name} +${selectedMembers.length - 1}`;
-                            })()}
-                          </p>
-                        </div>
-                      );
-                    })()}
-                    {loc.address && (
-                      <div className="flex items-start gap-2">
-                        <Map className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
-                        <p className="text-xs text-slate-500 line-clamp-2">{loc.address}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <LocationCard 
+                key={loc.id} 
+                loc={loc} 
+                members={members} 
+                canEdit={canAddLocation} 
+                onEdit={handleOpenModal} 
+                onDelete={setDeleteId} 
+              />
             ))
           )}
         </div>

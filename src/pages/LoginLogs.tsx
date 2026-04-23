@@ -46,10 +46,10 @@ export const LoginLogs: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+              <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-[0.15em]">
                 <th className="px-6 py-4">{t('user')}</th>
                 <th className="px-6 py-4">{t('ip_address')}</th>
                 <th className="px-6 py-4">{t('login_time')}</th>
@@ -68,26 +68,28 @@ export const LoginLogs: React.FC = () => {
                 ))
               ) : loginLogs.length > 0 ? (
                 loginLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{log.user_email}</div>
+                      <div className="font-bold text-slate-700">{log.user_email}</div>
                     </td>
-                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">
-                      {log.ip_address}
+                    <td className="px-6 py-4">
+                      <code className="text-[11px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                        {log.ip_address}
+                      </code>
                     </td>
                     <td className="px-6 py-4 text-slate-600 text-sm">
                       {log.timestamp ? format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss', { locale: th }) : '-'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                         log.status === 'success' 
-                          ? 'bg-emerald-100 text-emerald-700' 
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-emerald-500 text-white' 
+                          : 'bg-red-500 text-white'
                       }`}>
                         {log.status === 'success' ? t('success') : t('failed')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-400 text-xs max-w-xs truncate" title={log.user_agent}>
+                    <td className="px-6 py-4 text-slate-400 text-[11px] max-w-xs truncate" title={log.user_agent}>
                       {log.user_agent}
                     </td>
                   </tr>
@@ -96,14 +98,69 @@ export const LoginLogs: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="px-6 py-32 text-center">
                     <div className="flex flex-col items-center gap-2">
-                      <AlertCircle className="w-8 h-8 text-slate-200" />
-                      <p className="text-slate-400 font-medium">{t('no_history_found')}</p>
+                       <AlertCircle className="w-10 h-10 text-slate-200" />
+                       <p className="text-slate-400 font-medium">{t('no_history_found')}</p>
                     </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Layout (Cards) */}
+        <div className="lg:hidden divide-y divide-slate-100">
+           {isLoadingLogs ? (
+             Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-4 animate-pulse space-y-3">
+                   <div className="h-4 bg-slate-100 rounded w-3/4"></div>
+                   <div className="h-3 bg-slate-50 rounded w-1/2"></div>
+                   <div className="h-3 bg-slate-50 rounded w-1/4"></div>
+                </div>
+             ))
+           ) : loginLogs.length > 0 ? (
+             loginLogs.map((log) => (
+               <div key={log.id} className="p-4 space-y-3 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                     <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-800 truncate">{log.user_email}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                           {log.timestamp ? format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss', { locale: th }) : '-'}
+                        </span>
+                     </div>
+                     <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                        log.status === 'success' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {log.status === 'success' ? t('success') : t('failed')}
+                     </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                     <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[80px]">{t('ip_address')}</span>
+                        <code className="text-[11px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                           {log.ip_address}
+                        </code>
+                     </div>
+                     <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('user_agent')}</span>
+                        <span className="text-[10px] text-slate-500 leading-relaxed text-balance">
+                           {log.user_agent}
+                        </span>
+                     </div>
+                  </div>
+               </div>
+             ))
+           ) : (
+             <div className="p-12 text-center">
+                <div className="flex flex-col items-center gap-2">
+                   <AlertCircle className="w-10 h-10 text-slate-200" />
+                   <p className="text-slate-400 font-medium text-sm">{t('no_history_found')}</p>
+                </div>
+             </div>
+           )}
         </div>
       </div>
     </div>

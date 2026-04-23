@@ -158,7 +158,7 @@ export const JobCalendar: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[700px]">
+      <div className="bg-white p-3 sm:p-6 rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] sm:min-h-[700px]">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-[600px] gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -273,6 +273,52 @@ export const JobCalendar: React.FC = () => {
           --fc-border-color: #e2e8f0;
           --fc-daygrid-event-dot-width: 8px;
         }
+        
+        /* Responsive Toolbar */
+        @media (max-width: 640px) {
+          .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+          }
+          .fc .fc-toolbar-title {
+            font-size: 1.25rem !important;
+            order: 1;
+          }
+          .fc .fc-toolbar-chunk:nth-child(1) {
+            order: 2;
+          }
+          .fc .fc-toolbar-chunk:nth-child(3) {
+            order: 3;
+            width: 100%;
+          }
+          .fc .fc-button-group {
+            display: flex;
+            width: 100%;
+          }
+          .fc .fc-button-group > .fc-button {
+            flex: 1;
+            padding: 6px 4px !important;
+            font-size: 0.75rem !important;
+          }
+          .fc .fc-today-button {
+            width: 100%;
+            margin-top: 4px;
+          }
+          .fc-daygrid-day-number {
+            font-size: 0.7rem !important;
+            padding: 4px !important;
+          }
+          .fc-col-header-cell-cushion {
+            font-size: 0.6rem !important;
+            padding: 8px 2px !important;
+          }
+          .fc-event {
+            padding: 2px 4px !important;
+            font-size: 0.6rem !important;
+          }
+        }
+
         .fc .fc-button-primary {
           background-color: #ffffff;
           border-color: #e2e8f0;

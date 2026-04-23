@@ -1494,6 +1494,327 @@ async function startServer() {
     }
   });
 
+  // PDF Generation Endpoint
+  app.get("/api/generate-pdf/:id", async (req, res) => {
+    let browser;
+    try {
+      const { id } = req.params;
+      const staticToken = getStaticToken();
+      const directusUrl = getDirectusUrl();
+      
+      console.log(`Backend: Generating PDF for job ID: ${id}`);
+      
+      // Fetch the job data
+      const response = await axios.get(`${directusUrl}/items/work_reports/${id}`, {
+        params: {
+          fields: '*,member_id.*,car_id.*,pickup_photos.*,delivery_photos.*,photos.*'
+        },
+        headers: {
+          'Authorization': `Bearer ${staticToken}`
+        }
+      });
+      
+      const report = response.data.data;
+      if (!report) {
+        return res.status(404).json({ error: "Job report not found" });
+      }
+
+      // Prepare data for template
+      const car = report.car_id || {};
+      const member = report.member_id || {};
+      const workDate = (report.work_date || report.date_created || '').split('T')[0];
+      
+      // Helper to fetch image and return base64
+      const getBase64Image = async (fileId: string) => {
+        try {
+          const imgResponse = await axios.get(`${directusUrl}/assets/${fileId}`, {
+            headers: { 'Authorization': `Bearer ${staticToken}` },
+            responseType: 'arraybuffer'
+          });
+          const base64 = Buffer.from(imgResponse.data, 'binary').toString('base64');
+          return `data:${imgResponse.headers['content-type']};base64,${base64}`;
+        } catch (e) {
+          console.error(`Failed to fetch image ${fileId}:`, e);
+          return null;
+        }
+      };
+
+      // Fetch all photos
+      const pickupPhotos = [];
+      if (Array.isArray(report.pickup_photos)) {
+        for (const photo of report.pickup_photos) {
+          const b64 = await getBase64Image(photo.directus_files_id || photo);
+          if (b64) pickupPhotos.push(b64);
+        }
+      }
+
+      const deliveryPhotos = [];
+      if (Array.isArray(report.delivery_photos || report.photos)) {
+        const photos = report.delivery_photos || report.photos;
+        for (const photo of photos) {
+          const b64 = await getBase64Image(photo.directus_files_id || photo);
+          if (b64) deliveryPhotos.push(b64);
+        }
+      }
+
+      // Basic HTML template
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Job Report - ${report.case_number || id}</title>
+          <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+          <style>
+            body {
+              font-family: 'Sarabun', sans-serif;
+              padding: 40px;
+              line-height: 1.6;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #3b82f6;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              margin: 0;
+              color: #1e3a8a;
+              font-size: 24px;
+            }
+            .section {
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 18px;
+              color: #1e3a8a;
+              margin-bottom: 10px;
+              border-left: 4px solid #3b82f6;
+              padding-left: 10px;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+            }
+            .item {
+              margin-bottom: 8px;
+            }
+            .label {
+              font-weight: bold;
+              color: #666;
+              font-size: 14px;
+            }
+            .value {
+              font-size: 15px;
+            }
+            .photos-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 10px;
+              margin-top: 10px;
+            }
+            .photo-card {
+              border: 1px solid #eee;
+              padding: 5px;
+              border-radius: 4px;
+              display: flex;
+              flex-direction: column;
+            }
+            .photo-card img {
+              width: 100%;
+              height: 150px;
+              object-fit: cover;
+              border-radius: 2px;
+            }
+            .expense-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            .expense-table th, .expense-table td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            .expense-table th {
+              background-color: #f8fafc;
+            }
+            .footer {
+              margin-top: 50px;
+              text-align: center;
+              font-size: 12px;
+              color: #999;
+              border-top: 1px solid #eee;
+              padding-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>ใบรายงานปฏิบัติงาน (Job Report)</h1>
+            <div>หมายเลขงาน: ${report.case_number || report.id}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">ข้อมูลทั่วไป</div>
+            <div class="grid">
+              <div class="item">
+                <span class="label">วันที่ปฏิบัติงาน:</span>
+                <span class="value">${workDate}</span>
+              </div>
+              <div class="item">
+                <span class="label">ชื่อลูกค้า:</span>
+                <span class="value">${report.customer_name || '-'}</span>
+              </div>
+              <div class="item">
+                <span class="label">ทะเบียนรถ:</span>
+                <span class="value">${car.car_number || '-'} (${car.vehicle_type || '-'})</span>
+              </div>
+              <div class="item">
+                <span class="label">พนักงานขับรถ:</span>
+                <span class="value">${member.first_name || ''} ${member.last_name || ''}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">เส้นทาง</div>
+            <div class="item">
+              <span class="label">ต้นทาง:</span>
+              <span class="value">${report.origin || '-'}</span>
+            </div>
+            <div class="item">
+              <span class="label">ปลายทาง:</span>
+              <span class="value">${report.destination || '-'}</span>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">บันทึกเวลาและระยะทาง</div>
+            <div class="grid">
+              <div class="item">
+                <span class="label">เวลาสแตนด์บาย:</span>
+                <span class="value">${report.standby_time || '-'}</span>
+              </div>
+              <div class="item">
+                <span class="label">เวลาออกรถ:</span>
+                <span class="value">${report.departure_time || '-'}</span>
+              </div>
+              <div class="item">
+                <span class="label">เวลาถึงที่หมาย:</span>
+                <span class="value">${report.arrival_time || '-'}</span>
+              </div>
+              <div class="item">
+                <span class="label">ระยะทางโดยประมาณ:</span>
+                <span class="value">${report.estimated_distance || '-'} กม.</span>
+              </div>
+              <div class="item">
+                <span class="label">เลขไมล์เริ่ม:</span>
+                <span class="value">${report.mileage_start || '-'}</span>
+              </div>
+              <div class="item">
+                <span class="label">เลขไมล์สิ้นสุด:</span>
+                <span class="value">${report.mileage_end || '-'}</span>
+              </div>
+            </div>
+          </div>
+
+          ${(report.expense_items && report.expense_items.length > 0) ? `
+          <div class="section">
+            <div class="section-title">ค่าใช้จ่าย</div>
+            <table class="expense-table">
+              <thead>
+                <tr>
+                  <th>รายการ</th>
+                  <th style="text-align: right;">จำนวนเงิน (บาท)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${report.expense_items.map((item: any) => `
+                  <tr>
+                    <td>${item.name || 'ค่าใช้จ่าย'}</td>
+                    <td style="text-align: right;">${(Number(item.amount) || 0).toLocaleString()}</td>
+                  </tr>
+                `).join('')}
+                <tr>
+                  <td style="font-weight: bold;">รวมทั้งหมด</td>
+                  <td style="text-align: right; font-weight: bold;">
+                    ${report.expense_items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0).toLocaleString()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          ${(report.notes) ? `
+          <div class="section">
+            <div class="section-title">หมายเหตุ</div>
+            <div class="value">${report.notes}</div>
+          </div>
+          ` : ''}
+
+          ${pickupPhotos.length > 0 ? `
+          <div class="section">
+            <div class="section-title">ภาพถ่ายจุดรับสินค้า</div>
+            <div class="photos-grid">
+              ${pickupPhotos.map(p => `<div class="photo-card"><img src="${p}" /></div>`).join('')}
+            </div>
+          </div>
+          ` : ''}
+
+          ${deliveryPhotos.length > 0 ? `
+          <div class="section">
+            <div class="section-title">ภาพถ่ายจุดส่งสินค้า</div>
+            <div class="photos-grid">
+              ${deliveryPhotos.map(p => `<div class="photo-card"><img src="${p}" /></div>`).join('')}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="footer">
+            พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')} | NES Tracking System
+          </div>
+        </body>
+        </html>
+      `;
+
+      browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
+      });
+
+      await browser.close();
+
+      res.set({
+        'Content-Type': 'application/json', // Or 'application/pdf' if sending raw
+        'Content-Disposition': `attachment; filename="report_${report.case_number || id}.pdf"`
+      });
+
+      // Send as Base64 to handle complex environments easily
+      res.json({ 
+        base64: pdfBuffer.toString('base64'),
+        fileName: `Report_${report.case_number || id}.pdf`
+      });
+
+    } catch (err: any) {
+      console.error('PDF Generation Error:', err.message);
+      if (browser) await browser.close();
+      res.status(500).json({ error: "Failed to generate PDF", details: err.message });
+    }
+  });
+
   // Catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {
     console.log(`Backend: Unmatched API request: ${req.method} ${req.path}`);

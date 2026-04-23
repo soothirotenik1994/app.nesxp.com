@@ -251,6 +251,160 @@ const MemberRow = React.memo(({
   );
 });
 
+// Memoized MemberCard component for mobile
+const MemberCard = React.memo(({ 
+  member, 
+  allCars, 
+  allPermissions, 
+  allCustomerLocations,
+  onEdit, 
+  onDelete,
+  onSwitchAccount
+}: { 
+  member: Member, 
+  allCars: any[], 
+  allPermissions: any[], 
+  allCustomerLocations: CustomerLocation[],
+  onEdit: (member: Member) => void, 
+  onDelete: (id: string) => void,
+  onSwitchAccount: (member: Member) => void
+}) => {
+  const { t } = useTranslation();
+
+  const memberAddress = useMemo(() => {
+    const loc = allCustomerLocations.find(l => {
+      const primaryId = typeof l.member_id === 'object' ? l.member_id?.id : l.member_id;
+      if (String(primaryId) === String(member.id)) return true;
+      return l.members?.some((m: any) => {
+        const mId = typeof m.line_users_id === 'object' ? m.line_users_id?.id : 
+                   (typeof m.line_user_id === 'object' ? m.line_user_id?.id : 
+                   (typeof m.members_id === 'object' ? m.members_id?.id : (m.line_users_id || m.line_user_id || m.members_id)));
+        return String(mId) === String(member.id);
+      });
+    });
+    return loc ? { address: loc.address, company: loc.company_name, branch: loc.branch } : null;
+  }, [member.id, allCustomerLocations]);
+
+  const memberVehicles = useMemo(() => {
+    const memberPermissions = allPermissions.filter(p => {
+      const id = p.line_user_id && typeof p.line_user_id === 'object' ? (p.line_user_id as any).id : p.line_user_id;
+      return String(id) === String(member.id);
+    });
+    const cars = allCars.filter(car => memberPermissions.some(p => {
+      const id = p.car_id && typeof p.car_id === 'object' ? (p.car_id as any).id : p.car_id;
+      return String(id) === String(car.id);
+    }));
+    if (cars.length > 0) return cars;
+    if (member.car_users && member.car_users.length > 0) {
+      const nestedCars = member.car_users.map((cu: any) => cu.car_id).filter(Boolean);
+      return nestedCars.filter((car: any, index: number, self: any[]) =>
+        index === self.findIndex((c) => c.id === car.id)
+      );
+    }
+    return [];
+  }, [member.id, member.car_users, allCars, allPermissions]);
+
+  return (
+    <div className="p-4 bg-white space-y-4">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          {member.picture_url ? (
+            <img 
+              src={directusApi.getFileUrl(member.picture_url)} 
+              alt="" 
+              className="w-12 h-12 rounded-2xl border border-slate-100 object-cover shadow-sm"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center font-bold border border-slate-100 shadow-sm">
+              {String(member.first_name || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h4 className="font-bold text-slate-900 truncate">
+              {member.first_name || member.last_name 
+                ? `${member.first_name} ${member.last_name}`.trim()
+                : member.display_name || t('not_specified')}
+            </h4>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={clsx(
+                "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shadow-sm",
+                member.status === 'inactive' ? "bg-red-500 text-white" :
+                member.role === 'member' || member.role === 'driver' ? "bg-blue-500 text-white" :
+                member.role === 'general' ? "bg-slate-500 text-white" :
+                "bg-emerald-500 text-white"
+              )}>
+                {member.status === 'inactive' ? t('disabled') : t(`${member.role || 'customer'}_role`)}
+              </span>
+              {member.display_name && (
+                <span className="text-[10px] text-primary font-bold">{t('line_label')}{member.display_name}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button onClick={() => onSwitchAccount(member)} className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-xl transition-colors">
+            <UserCheck className="w-5 h-5" />
+          </button>
+          <button onClick={() => onEdit(member)} className="p-2 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors">
+            <Edit2 className="w-5 h-5" />
+          </button>
+          <button onClick={() => onDelete(member.id)} className="p-2 hover:bg-red-50 text-red-600 rounded-xl transition-colors">
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 pt-2">
+         {(member.email || member.phone) && (
+           <div className="flex flex-col gap-2 p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
+             {member.email && (
+               <div className="flex items-center gap-3">
+                 <Mail className="w-4 h-4 text-slate-400" />
+                 <a href={`mailto:${member.email}`} className="text-xs text-slate-600 font-medium truncate">{member.email}</a>
+               </div>
+             )}
+             {member.phone && (
+               <div className="flex items-center gap-3">
+                 <Phone className="w-4 h-4 text-slate-400" />
+                 <a href={`tel:${member.phone}`} className="text-xs text-slate-600 font-medium italic">{member.phone}</a>
+               </div>
+             )}
+           </div>
+         )}
+
+         {memberAddress && (
+            <div className="p-3 bg-blue-50/30 rounded-2xl border border-blue-100/50 space-y-2">
+               <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold text-slate-800">{memberAddress.company}</span>
+               </div>
+               <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                  <span className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{memberAddress.address}</span>
+               </div>
+            </div>
+         )}
+
+         {memberVehicles.length > 0 && (
+           <div className="space-y-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('assigned_vehicles')}</p>
+              <div className="flex flex-wrap gap-2">
+                {memberVehicles.map((car: any) => (
+                  <div key={car.id} className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-1.5 rounded-xl shadow-sm">
+                    <CarIcon className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-700">{car.car_number}</span>
+                  </div>
+                ))}
+              </div>
+           </div>
+         )}
+      </div>
+    </div>
+  );
+});
+
 export const Members: React.FC = () => {
   const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
@@ -833,7 +987,7 @@ export const Members: React.FC = () => {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white text-slate-500 text-xs uppercase tracking-wider font-bold">
@@ -877,6 +1031,33 @@ export const Members: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View (Cards) */}
+        <div className="lg:hidden divide-y divide-slate-100 bg-slate-50/30">
+          {loading ? (
+             <div className="p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-slate-500 text-sm font-medium">{t('loading')}</p>
+             </div>
+          ) : filteredMembers.length === 0 ? (
+             <div className="p-12 text-center text-slate-400">
+                {t('no_data')}
+             </div>
+          ) : (
+             filteredMembers.map((member) => (
+                <MemberCard 
+                   key={member.id}
+                   member={member}
+                   allCars={allCars}
+                   allPermissions={allPermissions}
+                   allCustomerLocations={allCustomerLocations}
+                   onEdit={handleEdit}
+                   onDelete={handleDeleteClick}
+                   onSwitchAccount={handleSwitchAccountClick}
+                />
+             ))
+          )}
         </div>
       </div>
 

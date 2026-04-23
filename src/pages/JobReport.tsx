@@ -49,8 +49,6 @@ import {
   FileDown,
   Loader2
 } from 'lucide-react';
-import { JobSummaryPDF } from '../components/JobSummaryPDF';
-import { generateJobSummaryPDF } from '../services/pdfService';
 import SignaturePad from 'react-signature-canvas';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { WebcamModal } from '../components/WebcamModal';
@@ -73,45 +71,76 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const { t } = useTranslation();
   const steps = [
-    { key: 'pending', label: t('status_pending') },
-    { key: 'accepted', label: t('status_accepted') },
-    { key: 'completed', label: t('status_completed') }
+    { key: 'pending', label: t('status_pending'), icon: Clock },
+    { key: 'accepted', label: t('status_accepted'), icon: CheckCircle2 },
+    { key: 'completed', label: t('status_completed'), icon: Package }
   ];
 
   const currentIdx = steps.findIndex(s => s.key === status);
   const isCancelled = status === 'cancelled' || status === 'cancel_pending';
+  
+  // Calculate progress bar width
+  const progressWidth = isCancelled ? 0 : (currentIdx / (steps.length - 1)) * 100;
 
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-      <div className="flex items-center justify-between relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white -translate-y-1/2 z-0" />
-        {steps.map((step, idx) => {
+    <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      <div className="relative">
+        {/* Status Pipeline Line */}
+        <div className="absolute top-[18px] left-[30px] right-[30px] sm:left-[40px] sm:right-[40px] h-0.5 bg-slate-100 z-0">
+          {!isCancelled && (
+            <div 
+              className="h-full bg-primary transition-all duration-700 ease-in-out"
+              style={{ width: `${progressWidth}%` }}
+            />
+          )}
+        </div>
+
+        <div className="relative flex items-center justify-between z-10 px-1 sm:px-2">
+          {steps.map((step, idx) => {
           const isActive = idx <= currentIdx && !isCancelled;
           const isCurrent = idx === currentIdx && !isCancelled;
+          const Icon = step.icon;
           
           return (
-            <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
+            <div key={step.key} className="relative z-10 flex flex-col items-center gap-2 sm:gap-3">
               <div className={clsx(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-blue-100" : "bg-white text-slate-400",
-                isCurrent && "ring-4 ring-blue-50"
+                "w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-500 border-2",
+                isActive 
+                  ? "bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/20" 
+                  : "bg-white border-slate-100 text-slate-300",
+                isCurrent && "ring-4 ring-primary/10"
               )}>
-                {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                <Icon className={clsx("w-4 h-4 sm:w-5 sm:h-5", isCurrent && "animate-pulse")} />
               </div>
-              <span className={clsx(
-                "text-[10px] font-bold uppercase tracking-wider",
-                isActive ? "text-primary" : "text-slate-400"
-              )}>
-                {step.label}
-              </span>
+              <div className="flex flex-col items-center">
+                <span className={clsx(
+                  "text-[10px] font-bold uppercase tracking-wider text-center",
+                  isActive ? "text-primary font-black" : "text-slate-400"
+                )}>
+                  {step.label}
+                </span>
+                {isCurrent && (
+                  <span className="text-[8px] font-bold text-primary animate-bounce mt-1">
+                    {t('current_status')}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
+        </div>
       </div>
       {isCancelled && (
-        <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          {status === 'cancel_pending' ? t('status_cancel_pending') : t('status_cancelled')}
+        <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold flex items-center gap-3 border border-red-100 animate-in fade-in slide-in-from-top-2">
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="uppercase tracking-wider text-[10px] text-red-400 mb-0.5">{t('status_update')}</p>
+            <p className="text-sm font-bold leading-none">
+              {status === 'cancel_pending' ? t('status_cancel_pending') : t('status_cancelled')}
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -132,7 +161,6 @@ export const JobReport: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [showWebcam, setShowWebcam] = useState(false);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
@@ -143,6 +171,9 @@ export const JobReport: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [showRouteCompleteConfirm, setShowRouteCompleteConfirm] = useState(false);
+  const [completingRouteIndex, setCompletingRouteIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [originalCustomerAndCar, setOriginalCustomerAndCar] = useState<{customerId: string, carId: string} | null>(null);
   const [cancelReasonInput, setCancelReasonInput] = useState('');
@@ -232,9 +263,16 @@ export const JobReport: React.FC = () => {
   const [isJobOverdue, setIsJobOverdue] = useState(false);
   const [isUpdatingRouteStatus, setIsUpdatingRouteStatus] = useState(false);
 
-  const handleCompleteRoute = async (routeIndex: number) => {
-    if (!id || isUpdatingRouteStatus) return;
+  const handleCompleteRoute = (index: number) => {
+    setCompletingRouteIndex(index);
+    setShowRouteCompleteConfirm(true);
+  };
+
+  const confirmCompleteRoute = async () => {
+    if (completingRouteIndex === null || !id || isUpdatingRouteStatus) return;
     
+    const routeIndex = completingRouteIndex;
+    setShowRouteCompleteConfirm(false);
     setIsUpdatingRouteStatus(true);
     try {
       const newRoutes = [...formData.routes];
@@ -1225,21 +1263,6 @@ export const JobReport: React.FC = () => {
 
     const runningNumber = (maxRunning + 1).toString().padStart(3, '0');
     return `${prefix}${runningNumber}`;
-  };
-
-  const handleDownloadPDF = async () => {
-    if (isGeneratingPDF) return;
-    
-    setIsGeneratingPDF(true);
-    try {
-      const filename = `Report-${formData.case_number || 'JOB'}.pdf`;
-      await generateJobSummaryPDF('pdf-summary-template', filename);
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      alert('Failed to generate PDF. Please try again.');
-    } finally {
-      setIsGeneratingPDF(false);
-    }
   };
 
   useEffect(() => {
@@ -3910,9 +3933,14 @@ export const JobReport: React.FC = () => {
     });
   };
 
-  const handleCompleteJob = async () => {
+  const handleCompleteJob = () => {
+    setShowCompleteConfirm(true);
+  };
+
+  const confirmCompleteJob = async () => {
     if (!id) return;
-    
+    setShowCompleteConfirm(false);
+    setSubmitting(true);
     try {
       // Prepare the full dataset for completion, just like executeSave
       const formatTime = (t: string) => {
@@ -4317,10 +4345,10 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
   const InfoRow: React.FC<{ icon: React.ReactNode, label: string, value: string | React.ReactNode, className?: string, valueClassName?: string }> = ({ icon, label, value, className, valueClassName }) => (
     <div className={clsx("flex flex-col gap-1", className)}>
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 px-1">
         {icon} {label}
       </label>
-      <div className={clsx("text-sm font-bold bg-white px-4 py-3 rounded-2xl border border-slate-100 whitespace-pre-wrap", valueClassName || "text-slate-700")}>
+      <div className={clsx("text-sm font-bold bg-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl border border-slate-100 shadow-sm whitespace-pre-wrap", valueClassName || "text-slate-700")}>
         {value || '-'}
       </div>
     </div>
@@ -4334,16 +4362,17 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
+        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+        <p className="text-slate-500 font-medium animate-pulse">{t('loading_job_details')}</p>
       </div>
     );
   }
 
   if (submitted) {
     return (
-      <div className="max-w-md mx-auto mt-12 p-8 bg-white rounded-3xl shadow-xl space-y-6 animate-in fade-in zoom-in duration-500">
-        <div className="text-center space-y-4">
+      <div className="max-w-md mx-4 sm:mx-auto mt-12 p-6 sm:p-8 bg-white rounded-3xl shadow-xl space-y-6 animate-in fade-in zoom-in duration-500 text-center">
+        <div className="space-y-4">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-12 h-12 text-green-600" />
           </div>
@@ -4414,30 +4443,11 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
   if (isCustomer && id) {
     return (
-      <div className="max-w-2xl mx-auto pb-12 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 space-y-6">
         {/* Header Section */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-900">{t('job_details')}</h2>
-            {(formData.status === 'completed' || isAdmin) && id && (
-              <button
-                onClick={handleDownloadPDF}
-                disabled={isGeneratingPDF}
-                className={clsx(
-                  "flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100",
-                  isGeneratingPDF && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                {isGeneratingPDF ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <FileDown className="w-4 h-4" />
-                )}
-                <span className="text-sm font-bold uppercase tracking-wider">
-                  {isGeneratingPDF ? t('downloading_pdf') : t('download_pdf')}
-                </span>
-              </button>
-            )}
           </div>
           <button 
             onClick={() => navigate(-1)}
@@ -4451,8 +4461,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         <StatusTimeline status={formData.status} />
 
         {/* Driver & Vehicle Card */}
-        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center gap-4">
+        <div className="bg-white p-5 sm:p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-inner">
               {selectedMember?.picture_url ? (
                 <img 
@@ -4513,8 +4523,8 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         </div>
 
         {/* Job Details Grid */}
-        <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-5 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <InfoRow icon={<Hash className="w-3 h-3" />} label={t('case_number')} value={formData.case_number} />
             <InfoRow icon={<Calendar className="w-3 h-3" />} label={t('report_date')} value={formData.work_date.replace('T', ' ')} />
             <InfoRow icon={<Building2 className="w-3 h-3" />} label={t('customer_name')} value={formData.customer_name} />
@@ -4538,17 +4548,17 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('standby_time')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-slate-50">
+            <div className="text-center sm:text-left space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-tight">{t('standby_time')}</p>
               <p className="text-xs font-bold text-slate-700">{formData.standby_time ? new Date(formData.standby_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('departure_time')}</p>
+            <div className="text-center sm:text-left space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-tight">{t('departure_time')}</p>
               <p className="text-xs font-bold text-slate-700">{formData.departure_time ? new Date(formData.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t('arrival_time')}</p>
+            <div className="text-center sm:text-left space-y-1">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-tight">{t('arrival_time')}</p>
               <p className="text-xs font-bold text-slate-700">{formData.arrival_time ? new Date(formData.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</p>
             </div>
           </div>
@@ -4604,32 +4614,12 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       <div className="mb-8 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-slate-900">
             {id ? t('update_job_details') : t('new_job_assignment_title')}
           </h2>
-          {(formData.status === 'completed' || isAdmin) && id && (
-            <button
-              type="button"
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
-              className={clsx(
-                "flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100",
-                isGeneratingPDF && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              {isGeneratingPDF ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FileDown className="w-4 h-4" />
-              )}
-              <span className="text-sm font-bold uppercase tracking-wider">
-                {isGeneratingPDF ? t('downloading_pdf') : t('download_pdf')}
-              </span>
-            </button>
-          )}
         </div>
         {formData.case_number && (
           <div className="text-sm text-slate-500 font-medium">
@@ -4727,7 +4717,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         )}
         {/* Cancellation Reason Section */}
         {formData.cancel_reason && (
-          <div className="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm space-y-3">
+          <div className="bg-red-50 p-5 sm:p-6 rounded-3xl border border-red-100 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-red-100 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-red-600" />
@@ -4741,7 +4731,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         )}
 
         {/* Basic Info Section */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-2 bg-blue-50 rounded-lg">
               <FileText className="w-5 h-5 text-primary" />
@@ -5108,7 +5098,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
 
             <div className="space-y-4">
               {formData.routes.map((route, index) => (
-                <div key={index} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm relative group transition-all hover:border-primary/30">
+                <div key={index} className="p-4 sm:p-6 bg-white rounded-3xl border border-slate-200 shadow-sm relative group transition-all hover:border-primary/30">
                   {(!id || isAdmin) && index > 0 && (
                     <button
                       type="button"
@@ -5116,20 +5106,20 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         const newRoutes = formData.routes.filter((_, i) => i !== index);
                         setFormData({ ...formData, routes: newRoutes });
                       }}
-                      className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md z-10 opacity-0 group-hover:opacity-100"
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md z-10 sm:opacity-0 group-hover:opacity-100"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   )}
                   
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center font-bold text-sm shrink-0">
                       {index + 1}
                     </div>
                     <span className="font-bold text-slate-700">{t('route_index', { index: index + 1 })}</span>
                     
                     {/* Route Time & Mileage */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mt-4 p-3 sm:p-4 bg-slate-50 rounded-2xl border border-slate-100 w-full">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                           <Calendar className="w-3 h-3" /> {t('date')}
@@ -5327,7 +5317,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.pickups || [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '' }]).map((pickup: any, pIndex: number) => (
-                          <div key={`pickup-${pIndex}`} className="p-4 bg-white rounded-2xl border border-slate-200 relative group">
+                          <div key={`pickup-${pIndex}`} className="p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.pickups?.length > 1) && (
                               <button
                                 type="button"
@@ -5336,96 +5326,96 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   newRoutes[index].pickups = newRoutes[index].pickups.filter((_: any, i: number) => i !== pIndex);
                                   setFormData({ ...formData, routes: newRoutes });
                                 }}
-                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm z-10 opacity-0 group-hover:opacity-100"
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm z-10 sm:opacity-0 group-hover:opacity-100"
                               >
                                 <X className="w-3 h-3" />
                               </button>
                             )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('location_name_pickup', { index: pIndex + 1 })}</label>
-                                <input 
-                                  type="text" 
-                                  required
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('enter_location_placeholder')}
-                                  value={pickup.name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].pickups[pIndex].name = val;
-                                    if (pIndex === 0) newRoutes[index].origin = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
-                                <div className="flex gap-2">
-                                  <input 
-                                    type="text" 
-                                    required
-                                    disabled={!!id && !isAdmin}
-                                    placeholder={t('enter_google_map_link')}
-                                    value={pickup.url || ''}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      const newRoutes = [...formData.routes];
-                                      if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                      newRoutes[index].pickups[pIndex].url = val;
-                                      if (pIndex === 0) newRoutes[index].origin_url = val;
-                                      setFormData({ ...formData, routes: newRoutes });
-                                    }}
-                                    className="flex-1 px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                  />
-                                  {pickup.url && pickup.url.startsWith('http') && (
-                                    <button
-                                      type="button"
-                                      onClick={() => window.open(pickup.url, '_blank')}
-                                      className="px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 whitespace-nowrap"
-                                    >
-                                      <Navigation className="w-3.5 h-3.5" />
-                                      {t('navigate')}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
-                                <input 
-                                  type="text" 
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('contact_name')}
-                                  value={pickup.contact_name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].pickups[pIndex].contact_name = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('phone_optional')}</label>
-                                <input 
-                                  type="text" 
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('contact_phone')}
-                                  value={pickup.contact_phone || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].pickups[pIndex].contact_phone = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('location_name_pickup', { index: pIndex + 1 })}</label>
+                <input 
+                  type="text" 
+                  required
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('enter_location_placeholder')}
+                  value={pickup.name || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].pickups[pIndex].name = val;
+                    if (pIndex === 0) newRoutes[index].origin = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('google_map_url')}</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input 
+                    type="text" 
+                    required
+                    disabled={!!id && !isAdmin}
+                    placeholder={t('enter_google_map_link')}
+                    value={pickup.url || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const newRoutes = [...formData.routes];
+                      if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                      newRoutes[index].pickups[pIndex].url = val;
+                      if (pIndex === 0) newRoutes[index].origin_url = val;
+                      setFormData({ ...formData, routes: newRoutes });
+                    }}
+                    className="flex-1 px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white min-w-0"
+                  />
+                  {pickup.url && pickup.url.startsWith('http') && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(pickup.url, '_blank')}
+                      className="px-6 py-3 bg-primary text-white rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 text-sm font-bold shadow-sm active:scale-95 whitespace-nowrap"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      {t('navigate')}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('contact_name_optional')}</label>
+                <input 
+                  type="text" 
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('contact_name')}
+                  value={pickup.contact_name || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].pickups[pIndex].contact_name = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('phone_optional')}</label>
+                <input 
+                  type="text" 
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('contact_phone')}
+                  value={pickup.contact_phone || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].pickups) newRoutes[index].pickups = [{ name: route.origin || '', url: route.origin_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].pickups[pIndex].contact_phone = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
@@ -5487,7 +5477,7 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                         </div>
                         
                         {(route.deliveries || [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '' }]).map((delivery: any, dIndex: number) => (
-                          <div key={`delivery-${dIndex}`} className="p-4 bg-white rounded-2xl border border-slate-200 relative group">
+                          <div key={`delivery-${dIndex}`} className="p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 relative group">
                             {(!id || isAdmin) && (route.deliveries?.length > 1) && (
                               <button
                                 type="button"
@@ -5496,96 +5486,96 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
                                   newRoutes[index].deliveries = newRoutes[index].deliveries.filter((_: any, i: number) => i !== dIndex);
                                   setFormData({ ...formData, routes: newRoutes });
                                 }}
-                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm z-10 opacity-0 group-hover:opacity-100"
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm z-10 sm:opacity-0 group-hover:opacity-100"
                               >
                                 <X className="w-3 h-3" />
                               </button>
                             )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('location_name_delivery', { index: dIndex + 1 })}</label>
-                                <input 
-                                  type="text" 
-                                  required
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('enter_location_placeholder')}
-                                  value={delivery.name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].deliveries[dIndex].name = val;
-                                    if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('google_map_url')}</label>
-                                <div className="flex gap-2">
-                                  <input 
-                                    type="text" 
-                                    required
-                                    disabled={!!id && !isAdmin}
-                                    placeholder={t('enter_google_map_link')}
-                                    value={delivery.url || ''}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      const newRoutes = [...formData.routes];
-                                      if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                      newRoutes[index].deliveries[dIndex].url = val;
-                                      if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
-                                      setFormData({ ...formData, routes: newRoutes });
-                                    }}
-                                    className="flex-1 px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                  />
-                                  {delivery.url && delivery.url.startsWith('http') && (
-                                    <button
-                                      type="button"
-                                      onClick={() => window.open(delivery.url, '_blank')}
-                                      className="px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 whitespace-nowrap"
-                                    >
-                                      <Navigation className="w-3.5 h-3.5" />
-                                      {t('navigate')}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('contact_name_optional')}</label>
-                                <input 
-                                  type="text" 
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('contact_name')}
-                                  value={delivery.contact_name || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].deliveries[dIndex].contact_name = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500">{t('phone_optional')}</label>
-                                <input 
-                                  type="text" 
-                                  disabled={!!id && !isAdmin}
-                                  placeholder={t('contact_phone')}
-                                  value={delivery.contact_phone || ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const newRoutes = [...formData.routes];
-                                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
-                                    newRoutes[index].deliveries[dIndex].contact_phone = val;
-                                    setFormData({ ...formData, routes: newRoutes });
-                                  }}
-                                  className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm bg-white"
-                                />
-                              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('location_name_delivery', { index: dIndex + 1 })}</label>
+                <input 
+                  type="text" 
+                  required
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('enter_location_placeholder')}
+                  value={delivery.name || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].deliveries[dIndex].name = val;
+                    if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('google_map_url')}</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input 
+                    type="text" 
+                    required
+                    disabled={!!id && !isAdmin}
+                    placeholder={t('enter_google_map_link')}
+                    value={delivery.url || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const newRoutes = [...formData.routes];
+                      if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                      newRoutes[index].deliveries[dIndex].url = val;
+                      if (dIndex === newRoutes[index].deliveries.length - 1) newRoutes[index].destination_url = val;
+                      setFormData({ ...formData, routes: newRoutes });
+                    }}
+                    className="flex-1 px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white min-w-0"
+                  />
+                  {delivery.url && delivery.url.startsWith('http') && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(delivery.url, '_blank')}
+                      className="px-6 py-3 bg-primary text-white rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 text-sm font-bold shadow-sm active:scale-95 whitespace-nowrap"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      {t('navigate')}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('contact_name_optional')}</label>
+                <input 
+                  type="text" 
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('contact_name')}
+                  value={delivery.contact_name || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].deliveries[dIndex].contact_name = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('phone_optional')}</label>
+                <input 
+                  type="text" 
+                  disabled={!!id && !isAdmin}
+                  placeholder={t('contact_phone')}
+                  value={delivery.contact_phone || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const newRoutes = [...formData.routes];
+                    if (!newRoutes[index].deliveries) newRoutes[index].deliveries = [{ name: route.destination || '', url: route.destination_url || '', contact_name: '', contact_phone: '', time: '', photos: [] as string[] }];
+                    newRoutes[index].deliveries[dIndex].contact_phone = val;
+                    setFormData({ ...formData, routes: newRoutes });
+                  }}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-slate-50/50 focus:bg-white"
+                />
+              </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500">{t('appointment_time')}</label>
                                 <input 
@@ -6609,17 +6599,27 @@ ${formData.estimated_distance !== undefined ? `\n📏 ${t('estimated_distance')}
         isDestructive={true}
       />
 
-      {/* Hidden PDF Template */}
-      <div style={{ display: 'none' }}>
-        <div id="pdf-summary-template">
-          <JobSummaryPDF 
-            data={formData} 
-            cars={cars || []} 
-            members={members || []} 
-            customers={customers || []} 
-          />
-        </div>
-      </div>
+      <ConfirmModal
+        isOpen={showCompleteConfirm}
+        onCancel={() => setShowCompleteConfirm(false)}
+        onConfirm={confirmCompleteJob}
+        title={t('confirm_complete_job')}
+        message={t('confirm_complete_job_msg')}
+        isDestructive={false}
+      />
+
+      <ConfirmModal
+        isOpen={showRouteCompleteConfirm}
+        onCancel={() => {
+          setShowRouteCompleteConfirm(false);
+          setCompletingRouteIndex(null);
+        }}
+        onConfirm={confirmCompleteRoute}
+        title={t('confirm_complete_route')}
+        message={t('confirm_complete_route_msg', { number: (completingRouteIndex !== null ? completingRouteIndex + 1 : '') })}
+        isDestructive={false}
+      />
+
     </div>
   );
 };

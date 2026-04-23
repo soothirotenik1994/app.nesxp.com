@@ -13,45 +13,76 @@ import { PWAInstallButton } from '../components/PWAInstallButton';
 const StatusTimeline: React.FC<{ status: string }> = ({ status }) => {
   const { t } = useTranslation();
   const steps = [
-    { key: 'pending', label: t('status_pending') },
-    { key: 'accepted', label: t('status_accepted') },
-    { key: 'completed', label: t('status_completed') }
+    { key: 'pending', label: t('status_pending'), icon: Clock },
+    { key: 'accepted', label: t('status_accepted'), icon: CheckCircle2 },
+    { key: 'completed', label: t('status_completed'), icon: Package }
   ];
 
   const currentIdx = steps.findIndex(s => s.key === status);
   const isCancelled = status === 'cancelled' || status === 'cancel_pending';
+  
+  // Calculate progress bar width
+  const progressWidth = isCancelled ? 0 : (currentIdx / (steps.length - 1)) * 100;
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 mb-6 shadow-sm">
-      <div className="flex items-center justify-between relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
-        {steps.map((step, idx) => {
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      <div className="relative">
+        {/* Status Pipeline Line */}
+        <div className="absolute top-[18px] left-[40px] right-[40px] h-0.5 bg-slate-100 z-0">
+          {!isCancelled && (
+            <div 
+              className="h-full bg-primary transition-all duration-700 ease-in-out"
+              style={{ width: `${progressWidth}%` }}
+            />
+          )}
+        </div>
+
+        <div className="relative flex items-center justify-between z-10 px-2">
+          {steps.map((step, idx) => {
           const isActive = idx <= currentIdx && !isCancelled;
           const isCurrent = idx === currentIdx && !isCancelled;
+          const Icon = step.icon;
           
           return (
-            <div key={step.key} className="relative z-10 flex flex-col items-center gap-2">
+            <div key={step.key} className="relative z-10 flex flex-col items-center gap-3">
               <div className={clsx(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500",
-                isActive ? "bg-primary text-white scale-110 shadow-lg shadow-primary/20" : "bg-white text-slate-300 border-2 border-slate-100",
+                "w-9 h-9 rounded-full flex items-center justify-center transition-all duration-500 border-2",
+                isActive 
+                  ? "bg-primary border-primary text-white scale-110 shadow-lg shadow-primary/20" 
+                  : "bg-white border-slate-100 text-slate-300",
                 isCurrent && "ring-4 ring-primary/10"
               )}>
-                {isActive ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                <Icon className={clsx("w-5 h-5", isCurrent && "animate-pulse")} />
               </div>
-              <span className={clsx(
-                "text-[10px] font-bold uppercase tracking-wider",
-                isActive ? "text-primary" : "text-slate-400"
-              )}>
-                {step.label}
-              </span>
+              <div className="flex flex-col items-center">
+                <span className={clsx(
+                  "text-[10px] font-bold uppercase tracking-wider text-center",
+                  isActive ? "text-primary font-black" : "text-slate-400"
+                )}>
+                  {step.label}
+                </span>
+                {isCurrent && (
+                  <span className="text-[8px] font-bold text-primary animate-bounce mt-1">
+                    {t('current_status')}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
+        </div>
       </div>
       {isCancelled && (
-        <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          {status === 'cancel_pending' ? t('status_cancel_pending') : t('status_cancelled')}
+        <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold flex items-center gap-3 border border-red-100 animate-in fade-in slide-in-from-top-2">
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="uppercase tracking-wider text-[10px] text-red-400 mb-0.5">{t('status_update')}</p>
+            <p className="text-sm font-bold leading-none">
+              {status === 'cancel_pending' ? t('status_cancel_pending') : t('status_cancelled')}
+            </p>
+          </div>
         </div>
       )}
     </div>
